@@ -96,19 +96,15 @@ El sistema está **completamente listo y optimizado** para funcionar detrás de 
 - **Arquitectura de Dominio Único:** El frontend Nginx y el backend FastAPI operan bajo el mismo dominio de forma transparente. Todas las llamadas a la API se realizan a través de la ruta relativa `/api/v1`, evitando cualquier bloqueo de CORS o problemas de contenido mixto (Mixed Content HTTP/HTTPS).
 - **Soporte de Headers Cloudflare:** Nginx y FastAPI reenvían y reconocen automáticamente las cabeceras `CF-Connecting-IP`, `X-Forwarded-Proto` (HTTPS) y `X-Forwarded-For`.
 
-#### Opción A: Mediante Cloudflare Tunnel (Recomendado para ZimaBoard / CasaOS)
-Si utilizas **Cloudflare Tunnel (`cloudflared`)** en tu ZimaBoard:
-1. En el panel de **Cloudflare Zero Trust** > **Networks** > **Tunnels** (o en la configuración local de tu túnel):
-2. Agrega un **Public Hostname**:
-   - **Subdominio / Dominio:** `auditorias.jmob.ar`
+#### Opción A: Mediante Cloudflare Tunnel (Recomendado para ZimaOS / CasaOS)
+Si utilizas **Cloudflare Tunnel (`cloudflared`)** en tu ZimaBoard / ZimaOS:
+1. En el panel de **Cloudflare Zero Trust** > **Networks** > **Tunnels** (o en la configuración de tu túnel):
+2. Agrega o edita un **Public Hostname**:
+   - **Subdominio:** `auditorias`
+   - **Dominio:** `jmob.ar`
    - **Type (Servicio):** `HTTP`
-   - **URL / Host:** `localhost:80` (o `127.0.0.1:80` o la IP de tu ZimaBoard en el puerto configurado en `APP_PORT`).
-3. ¡Listo! Cloudflare se encargará automáticamente del certificado SSL/TLS y podrás ingresar a `https://auditorias.jmob.ar`.
-
-#### Opción B: Mediante Cloudflare Proxy DNS + Nginx / Traefik / Caddy
-Si apuntas el registro DNS tipo `A` o `CNAME` de `auditorias.jmob.ar` hacia la IP de tu servidor con el proxy de Cloudflare activado (nube naranja):
-1. Asegúrate de que el puerto `80` (o `443`) de tu ZimaBoard esté expuesto o redirigido.
-2. En Cloudflare SSL/TLS, selecciona el modo **Full** o **Flexible**.
+   - **URL / Host:** `localhost:3080` (o `127.0.0.1:3080` o la IP de tu ZimaBoard puerto `3080`).
+3. ¡Listo! Al ingresar a `https://auditorias.jmob.ar`, Cloudflare enviará el tráfico HTTPS al puerto `3080` de tu ZimaOS.
 
 ---
 
@@ -116,10 +112,11 @@ Si apuntas el registro DNS tipo `A` o `CNAME` de `auditorias.jmob.ar` hacia la I
 
 Una vez que los contenedores estén en estado *healthy/running*:
 
-- **URL de la Aplicación Web:** `http://IP_DE_TU_ZIMABOARD` (o `http://localhost:80`)
+- **URL de la Aplicación Web Local:** `http://IP_DE_TU_ZIMABOARD:3080`
+- **URL con Dominio Cloudflare:** `https://auditorias.jmob.ar`
 - **Usuario Administrador:** `admin`
 - **Contraseña Inicial:** `admin123456`
-- **Documentación Swagger API:** `http://IP_DE_TU_ZIMABOARD/docs`
+- **Documentación Swagger API:** `https://auditorias.jmob.ar/docs` (o `http://IP_DE_TU_ZIMABOARD:3080/docs`)
 
 > ⚠️ **Recomendación de Seguridad:** Inicia sesión con la cuenta de administrador e ingresa inmediatamente a **Usuarios > Cambiar Contraseña** para establecer una clave segura.
 
