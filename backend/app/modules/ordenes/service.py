@@ -1,6 +1,8 @@
+import os
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional, Sequence, Tuple
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.exceptions import (

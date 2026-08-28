@@ -531,3 +531,5 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 - **Eliminación de archivos adjuntos:**
   - Endpoint `DELETE /api/v1/ordenes/adjuntos/{adjunto_id}` para eliminar archivos adjuntos no deseados con remoción física del disco y registro inmutable en la bitácora de auditoría (*Audit Trail*).
   - Botón de papelera roja 🗑️ en el panel de detalle (`OrdenDetailPanel.vue`) y en la vista completa (`OrdenDetailView.vue`) con confirmación interactiva.
+
+- **Corrección de importación de `os` y `logger` en `OrdenMedicaService`:** Se añadieron los módulos faltantes en `backend/app/modules/ordenes/service.py` para prevenir error 500 al eliminar archivos adjuntos.
