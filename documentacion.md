@@ -505,3 +505,6 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 - Configuración en Cloudflare Tunnel:
   - Public Hostname: `auditorias.jmob.ar`
   - Service: `HTTP -> localhost:80` (o el puerto configurado en `APP_PORT`).
+
+
+- **Solución al error de validación Pydantic en `BACKEND_CORS_ORIGINS`:** Se implementó un parser resiliente en `backend/app/core/config.py` que admite comodín `*`, listas JSON o cadenas separadas por coma sin arrojar errores de validación en Docker Compose.
