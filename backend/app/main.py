@@ -52,6 +52,24 @@ def sync_sqlite_columns(connection):
                 ) THEN
                     ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50);
                 END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='ordenes_medicas' AND column_name='valor_estudios_no_autorizados'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ADD COLUMN valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='ordenes_medicas' AND column_name='observacion_resultado_auditoria'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ADD COLUMN observacion_resultado_auditoria TEXT;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='ordenes_medicas' AND column_name='debe_orden_medica'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT FALSE;
+                END IF;
             END $$;
         """))
     except Exception:

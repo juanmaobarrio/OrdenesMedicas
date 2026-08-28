@@ -513,3 +513,6 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - Se convirtió el campo de Obra Social en Pacientes a un selector `Dropdown` con búsqueda conectado al catálogo de mutuales.
   - Se incorporó el campo `nro_afiliado` en el modelo y esquema de Órdenes Médicas, con auto-completado automático desde el paciente seleccionado.
   - En la tabla de órdenes y en los paneles de detalle se muestra el **Valor Total a Abonar** (Bono/Copago + Estudios No Autorizados) con desglose claro de cada concepto.
+
+- **Corrección de sincronización de columnas en PostgreSQL (`lifespan`):** Se añadió migración automática segura `IF NOT EXISTS` para `nro_afiliado`, `valor_estudios_no_autorizados`, `observacion_resultado_auditoria` y `debe_orden_medica` al iniciar el backend.
+- **Sincronización de Alembic con `nro_afiliado`:** Se actualizó `0001_initial_schema.py` para incluir la columna `nro_afiliado` en `ordenes_medicas`.

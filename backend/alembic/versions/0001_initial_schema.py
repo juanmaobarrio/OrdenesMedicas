@@ -185,6 +185,7 @@ def upgrade() -> None:
         sa.Column("fecha_prescripcion", sa.Date(), nullable=False),
         sa.Column("cantidad_ordenes_fisicas", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("mutual", sa.String(100), nullable=False),
+        sa.Column("nro_afiliado", sa.String(50), nullable=True),
         sa.Column("valor_copago", sa.Numeric(12, 2), nullable=False, server_default="0.00"),
         sa.Column("valor_estudios_no_autorizados", sa.Numeric(12, 2), nullable=False, server_default="0.00"),
         sa.Column("fecha_vencimiento", sa.Date(), nullable=True),
