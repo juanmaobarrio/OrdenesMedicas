@@ -78,6 +78,7 @@ class RoleService:
             code=dto.code.upper().strip(),
             name=dto.name,
             description=dto.description,
+            hierarchy_level=dto.hierarchy_level if dto.hierarchy_level is not None else 10,
             is_system=False,
         )
 
@@ -96,6 +97,8 @@ class RoleService:
             role.name = dto.name.strip()
         if dto.description is not None:
             role.description = dto.description.strip() if dto.description else None
+        if dto.hierarchy_level is not None:
+            role.hierarchy_level = dto.hierarchy_level
         if dto.permission_ids is not None:
             permissions = await self.perm_repo.list_by_ids(dto.permission_ids)
             role.permissions = list(permissions)

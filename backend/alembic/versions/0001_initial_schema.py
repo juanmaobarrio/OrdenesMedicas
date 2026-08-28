@@ -52,6 +52,7 @@ def upgrade() -> None:
         sa.Column("code", sa.String(50), nullable=False),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("description", sa.String(255), nullable=True),
+        sa.Column("hierarchy_level", sa.Integer(), nullable=False, server_default="10"),
         sa.Column("is_system", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

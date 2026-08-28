@@ -518,3 +518,5 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 - **Sincronización de Alembic con `nro_afiliado`:** Se actualizó `0001_initial_schema.py` para incluir la columna `nro_afiliado` en `ordenes_medicas`.
 
 - **Script de migración y diagnóstico (`migrar_columnas.py`):** Permite ejecutar `ALTER TABLE IF NOT EXISTS` e inspeccionar registros existentes directamente en PostgreSQL de ZimaBoard.
+
+- **Corrección de actualización de jerarquía de roles (`hierarchy_level`):** Se mapeó `hierarchy_level` en `RoleService.update_role` y `create_role` en `backend/app/modules/users/service.py` para persistir correctamente el nivel jerárquico.

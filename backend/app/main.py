@@ -48,6 +48,12 @@ def sync_sqlite_columns(connection):
             BEGIN
                 IF NOT EXISTS (
                     SELECT 1 FROM information_schema.columns
+                    WHERE table_name='roles' AND column_name='hierarchy_level'
+                ) THEN
+                    ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
                     WHERE table_name='ordenes_medicas' AND column_name='nro_afiliado'
                 ) THEN
                     ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50);
