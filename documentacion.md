@@ -516,3 +516,5 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 
 - **Corrección de sincronización de columnas en PostgreSQL (`lifespan`):** Se añadió migración automática segura `IF NOT EXISTS` para `nro_afiliado`, `valor_estudios_no_autorizados`, `observacion_resultado_auditoria` y `debe_orden_medica` al iniciar el backend.
 - **Sincronización de Alembic con `nro_afiliado`:** Se actualizó `0001_initial_schema.py` para incluir la columna `nro_afiliado` en `ordenes_medicas`.
+
+- **Script de migración y diagnóstico (`migrar_columnas.py`):** Permite ejecutar `ALTER TABLE IF NOT EXISTS` e inspeccionar registros existentes directamente en PostgreSQL de ZimaBoard.
