@@ -131,6 +131,7 @@ export interface OrdenMedicaListItem {
   estado: EstadoOrden;
   fecha_prescripcion: string;
   mutual: string;
+  nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   cantidad_ordenes_fisicas: number;
@@ -156,6 +157,7 @@ export interface OrdenMedicaDetail {
   fecha_prescripcion: string;
   cantidad_ordenes_fisicas: number;
   mutual: string;
+  nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   fecha_vencimiento?: string | null;
@@ -194,6 +196,7 @@ export interface OrdenMedicaCreate {
   fecha_prescripcion: string;
   cantidad_ordenes_fisicas: number;
   mutual: string;
+  nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   fecha_vencimiento?: string | null;

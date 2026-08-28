@@ -22,8 +22,11 @@ from backend.app.modules.users.router import router as users_router
 def sync_sqlite_columns(connection):
     from sqlalchemy import text
     try:
+        # SQLite migrations
         res = connection.execute(text("PRAGMA table_info(ordenes_medicas)")).fetchall()
         cols = [r[1] for r in res]
+        if cols and "nro_afiliado" not in cols:
+            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50)"))
         if cols and "observacion_resultado_auditoria" not in cols:
             connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN observacion_resultado_auditoria TEXT"))
         if cols and "valor_estudios_no_autorizados" not in cols:
@@ -37,6 +40,22 @@ def sync_sqlite_columns(connection):
             connection.execute(text("ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10"))
     except Exception as err:
         logger.warning(f"Error comprobando columnas SQLite: {err}")
+
+    try:
+        # PostgreSQL migrations (si la columna no existe)
+        connection.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='ordenes_medicas' AND column_name='nro_afiliado'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50);
+                END IF;
+            END $$;
+        """))
+    except Exception:
+        pass
 
 
 @asynccontextmanager

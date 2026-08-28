@@ -106,6 +106,7 @@ const editForm = ref({
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   mutual: '',
+  nro_afiliado: '',
   observaciones_ingreso: '',
   debe_orden_medica: false,
 });
@@ -123,6 +124,7 @@ const handleOpenEditOrden = () => {
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
     mutual: orden.value.mutual || '',
+    nro_afiliado: orden.value.nro_afiliado || orden.value.paciente?.nro_afiliado || '',
     observaciones_ingreso: orden.value.observaciones_ingreso || '',
     debe_orden_medica: Boolean(orden.value.debe_orden_medica),
   };
@@ -142,6 +144,7 @@ const handleSaveEditOrden = async () => {
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
       mutual: editForm.value.mutual.trim().toUpperCase() || undefined,
+      nro_afiliado: editForm.value.nro_afiliado.trim() || null,
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
       debe_orden_medica: editForm.value.debe_orden_medica,
     };
@@ -543,15 +546,23 @@ const loadPreviousOrders = async (pacienteId: string) => {
             <p class="text-[10px] font-bold text-slate-400 uppercase">Paciente</p>
             <p class="font-bold text-slate-800 text-sm truncate">{{ orden.paciente?.nombre_completo }}</p>
             <p class="text-slate-500">DNI: {{ orden.paciente?.documento }}</p>
+            <p v-if="orden.nro_afiliado || orden.paciente?.nro_afiliado" class="text-slate-500 text-[11px]">
+              Afiliado: <span class="font-medium text-slate-700">{{ orden.nro_afiliado || orden.paciente?.nro_afiliado }}</span>
+            </p>
           </div>
           <div>
             <p class="text-[10px] font-bold text-slate-400 uppercase">Mutual & Valores</p>
             <p class="font-bold text-slate-800 text-sm truncate">{{ orden.mutual }}</p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <span class="text-blue-700 font-semibold">${{ orden.valor_copago }} copago</span>
-              <span v-if="Number(orden.valor_estudios_no_autorizados) > 0" class="text-red-600 font-semibold text-[11px]">
-                &bull; ${{ orden.valor_estudios_no_autorizados }} no autoriz.
-              </span>
+            <div class="mt-0.5 space-y-0.5">
+              <p class="text-slate-900 font-bold text-xs">
+                Total a abonar: ${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+              </p>
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span class="text-blue-700 font-medium">${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} copago</span>
+                <span v-if="Number(orden.valor_estudios_no_autorizados) > 0" class="text-red-600 font-medium">
+                  &bull; ${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} no aut.
+                </span>
+              </div>
             </div>
           </div>
 
@@ -999,8 +1010,24 @@ const loadPreviousOrders = async (pacienteId: string) => {
             />
           </div>
           <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">N° Afiliado / Credencial</label>
+            <InputText v-model="editForm.nro_afiliado" placeholder="Ej: 12345678/01" class="w-full" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nombre de Contacto</label>
             <InputText v-model="editForm.contacto_nombre" class="w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Horario Preferido</label>
+            <Dropdown
+              v-model="editForm.contacto_horario"
+              :options="opcionesHorarios"
+              placeholder="Seleccionar horario"
+              class="w-full"
+            />
           </div>
         </div>
 
@@ -1020,15 +1047,6 @@ const loadPreviousOrders = async (pacienteId: string) => {
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Correo Electrónico</label>
             <InputText v-model="editForm.contacto_email" type="email" class="w-full" />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Horario Preferido</label>
-            <Dropdown
-              v-model="editForm.contacto_horario"
-              :options="opcionesHorarios"
-              placeholder="Seleccionar horario"
-              class="w-full"
-            />
           </div>
         </div>
 

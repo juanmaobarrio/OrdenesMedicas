@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { pacientesService } from '../../services/pacientes.service';
+import { mutualesService } from '../../services/mutuales.service';
+import { ObraSocial } from '../../types/mutuales';
 import { Paciente, PacienteCreate } from '../../types/pacientes';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import Dropdown from 'primevue/dropdown';
 import Dialog from 'primevue/dialog';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
@@ -14,6 +17,7 @@ import { useToast } from 'primevue/usetoast';
 const toast = useToast();
 
 const pacientes = ref<Paciente[]>([]);
+const mutuales = ref<ObraSocial[]>([]);
 const totalRecords = ref(0);
 const isLoading = ref(false);
 const search = ref('');
@@ -55,7 +59,12 @@ const loadPacientes = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    mutuales.value = await mutualesService.list();
+  } catch (err) {
+    console.error('Error cargando mutuales:', err);
+  }
   loadPacientes();
 });
 
@@ -230,7 +239,16 @@ const onPageChange = (event: any) => {
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Obra Social / Cobertura</label>
-            <InputText v-model="form.obra_social as any" placeholder="OSDE, PAMI, etc." class="w-full" />
+            <Dropdown
+              v-model="form.obra_social as any"
+              :options="mutuales"
+              optionLabel="display_name"
+              optionValue="sigla"
+              placeholder="Seleccionar mutual..."
+              filter
+              showClear
+              class="w-full"
+            />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">N° Afiliado</label>

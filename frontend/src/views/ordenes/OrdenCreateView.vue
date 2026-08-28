@@ -70,6 +70,7 @@ const form = ref({
   fecha_prescripcion: new Date(),
   cantidad_ordenes_fisicas: 1,
   mutual: '',
+  nro_afiliado: '',
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   fecha_vencimiento: null as Date | null,
@@ -144,13 +145,16 @@ const handleSaveInlinePatient = async () => {
       telefono: created.telefono,
     };
 
-    // Auto-completar datos de contacto
+    // Auto-completar datos de contacto y cobertura
     form.value.contacto_nombre = created.nombre_completo;
     form.value.contacto_telefono = created.telefono || '';
     form.value.contacto_celular = created.telefono || '';
     form.value.contacto_email = created.email || '';
     if (created.obra_social) {
       form.value.mutual = created.obra_social;
+    }
+    if (created.nro_afiliado) {
+      form.value.nro_afiliado = created.nro_afiliado;
     }
 
     await checkPacienteOrdenesAbiertas(created.id);
@@ -215,6 +219,9 @@ const handleSelectPatient = async (e: any) => {
         form.value.mutual = fullPaciente.obra_social;
         handleMutualChange(fullPaciente.obra_social);
       }
+      if (fullPaciente.nro_afiliado) {
+        form.value.nro_afiliado = fullPaciente.nro_afiliado;
+      }
     } catch {
       form.value.contacto_nombre = p.nombre_completo;
       form.value.contacto_telefono = p.telefono || '';
@@ -222,6 +229,9 @@ const handleSelectPatient = async (e: any) => {
       if (p.obra_social) {
         form.value.mutual = p.obra_social;
         handleMutualChange(p.obra_social);
+      }
+      if (p.nro_afiliado) {
+        form.value.nro_afiliado = p.nro_afiliado;
       }
     }
     await checkPacienteOrdenesAbiertas(p.id);
@@ -256,6 +266,7 @@ const handleSubmit = async () => {
       fecha_prescripcion: formattedDate(form.value.fecha_prescripcion),
       cantidad_ordenes_fisicas: form.value.cantidad_ordenes_fisicas,
       mutual: form.value.mutual.trim().toUpperCase(),
+      nro_afiliado: form.value.nro_afiliado?.trim() || null,
       valor_copago: form.value.valor_copago,
       valor_estudios_no_autorizados: form.value.valor_estudios_no_autorizados,
       fecha_vencimiento: form.value.fecha_vencimiento ? formattedDate(form.value.fecha_vencimiento) : null,
@@ -426,6 +437,13 @@ const handleSubmit = async () => {
             />
           </div>
 
+          <!-- Nro Afiliado -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              N° Afiliado / Credencial
+            </label>
+            <InputText v-model="form.nro_afiliado" placeholder="Ej: 12345678/01" class="w-full" />
+          </div>
 
           <!-- Copago -->
           <div>
@@ -592,7 +610,16 @@ const handleSubmit = async () => {
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Obra Social / Mutual</label>
-            <InputText v-model="newPatientForm.obra_social as any" placeholder="OSDE, PAMI, etc." class="w-full" />
+            <Dropdown
+              v-model="newPatientForm.obra_social as any"
+              :options="mutuales"
+              optionLabel="display_name"
+              optionValue="sigla"
+              placeholder="Seleccionar mutual..."
+              filter
+              showClear
+              class="w-full"
+            />
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">N° Afiliado</label>

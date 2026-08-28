@@ -117,6 +117,7 @@ class OrdenMedicaService:
             fecha_prescripcion=dto.fecha_prescripcion,
             cantidad_ordenes_fisicas=dto.cantidad_ordenes_fisicas,
             mutual=dto.mutual.strip().upper(),
+            nro_afiliado=dto.nro_afiliado.strip() if dto.nro_afiliado else None,
             valor_copago=dto.valor_copago,
             valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
             fecha_vencimiento=dto.fecha_vencimiento,
@@ -184,6 +185,10 @@ class OrdenMedicaService:
         if dto.mutual is not None:
             diff["mutual"] = dto.mutual.strip().upper()
             orden.mutual = dto.mutual.strip().upper()
+
+        if dto.nro_afiliado is not None:
+            diff["nro_afiliado"] = dto.nro_afiliado.strip() if dto.nro_afiliado else None
+            orden.nro_afiliado = dto.nro_afiliado.strip() if dto.nro_afiliado else None
 
         if dto.valor_copago is not None:
             diff["valor_copago"] = str(dto.valor_copago)

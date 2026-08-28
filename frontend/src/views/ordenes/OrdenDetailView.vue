@@ -94,6 +94,7 @@ const editForm = ref({
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   mutual: '',
+  nro_afiliado: '',
   observaciones_ingreso: '',
   debe_orden_medica: false,
 });
@@ -110,6 +111,7 @@ const handleOpenEditOrden = () => {
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
     mutual: orden.value.mutual || '',
+    nro_afiliado: orden.value.nro_afiliado || orden.value.paciente?.nro_afiliado || '',
     observaciones_ingreso: orden.value.observaciones_ingreso || '',
     debe_orden_medica: Boolean(orden.value.debe_orden_medica),
   };
@@ -129,6 +131,7 @@ const handleSaveEditOrden = async () => {
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
       mutual: editForm.value.mutual.trim().toUpperCase() || undefined,
+      nro_afiliado: editForm.value.nro_afiliado.trim() || null,
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
       debe_orden_medica: editForm.value.debe_orden_medica,
     };

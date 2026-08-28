@@ -110,6 +110,9 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     mutual: Mapped[str] = mapped_column(
         String(100), nullable=False, index=True, comment="Mutual u Obra Social aplicada"
     )
+    nro_afiliado: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, comment="Numero de credencial / afiliado para la orden"
+    )
     valor_copago: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Copago a abonar por el paciente"
     )

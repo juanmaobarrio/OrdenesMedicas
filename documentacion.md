@@ -508,3 +508,8 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 
 
 - **Solución al error de validación Pydantic en `BACKEND_CORS_ORIGINS`:** Se implementó un parser resiliente en `backend/app/core/config.py` que admite comodín `*`, listas JSON o cadenas separadas por coma sin arrojar errores de validación en Docker Compose.
+
+- **Mejoras solicitadas por usuarios (Mutuales, N° Afiliado y Totales a abonar):**
+  - Se convirtió el campo de Obra Social en Pacientes a un selector `Dropdown` con búsqueda conectado al catálogo de mutuales.
+  - Se incorporó el campo `nro_afiliado` en el modelo y esquema de Órdenes Médicas, con auto-completado automático desde el paciente seleccionado.
+  - En la tabla de órdenes y en los paneles de detalle se muestra el **Valor Total a Abonar** (Bono/Copago + Estudios No Autorizados) con desglose claro de cada concepto.

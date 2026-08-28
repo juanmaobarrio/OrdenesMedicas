@@ -209,6 +209,9 @@ class OrdenMedicaBase(BaseModel):
         default=1, ge=1, le=100, description="Cantidad de ordenes/recetas fisicas"
     )
     mutual: str = Field(..., min_length=2, max_length=100, description="Mutual u Obra Social")
+    nro_afiliado: Optional[str] = Field(
+        None, max_length=50, description="Numero de credencial / afiliado"
+    )
     valor_copago: Decimal = Field(
         default=Decimal("0.00"), ge=0, description="Valor del copago a abonar"
     )
@@ -243,6 +246,7 @@ class OrdenMedicaUpdate(BaseModel):
     fecha_prescripcion: Optional[date] = None
     cantidad_ordenes_fisicas: Optional[int] = Field(None, ge=1, le=100)
     mutual: Optional[str] = Field(None, min_length=2, max_length=100)
+    nro_afiliado: Optional[str] = Field(None, max_length=50)
     valor_copago: Optional[Decimal] = Field(None, ge=0)
     valor_estudios_no_autorizados: Optional[Decimal] = Field(None, ge=0)
     fecha_vencimiento: Optional[date] = None
@@ -281,6 +285,7 @@ class OrdenMedicaListItem(BaseModel):
     estado: EstadoOrden
     fecha_prescripcion: date
     mutual: str
+    nro_afiliado: Optional[str] = None
     valor_copago: Decimal
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     cantidad_ordenes_fisicas: int
@@ -308,6 +313,7 @@ class OrdenMedicaDetail(BaseModel):
     fecha_prescripcion: date
     cantidad_ordenes_fisicas: int
     mutual: str
+    nro_afiliado: Optional[str] = None
     valor_copago: Decimal
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     fecha_vencimiento: Optional[date] = None
