@@ -28,6 +28,7 @@ import Timeline from 'primevue/timeline';
 import StatusTag from '../common/StatusTag.vue';
 import LoadingSpinner from '../common/LoadingSpinner.vue';
 import RegistrarLlamadaModal from './RegistrarLlamadaModal.vue';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 
 const props = defineProps<{
@@ -582,7 +583,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
 
 
           <div class="border-t border-slate-200 pt-2">
-            <p class="text-slate-500"><span class="font-semibold">Prescripción:</span> {{ orden.fecha_prescripcion }}</p>
+            <p class="text-slate-500"><span class="font-semibold">Prescripción:</span> {{ formatDate(orden.fecha_prescripcion) }}</p>
             <p class="text-slate-500"><span class="font-semibold">Recetas:</span> {{ orden.cantidad_ordenes_fisicas }}</p>
           </div>
           <div class="border-t border-slate-200 pt-2">
@@ -743,7 +744,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
                   >
                     <div class="flex items-center justify-between">
                       <span class="font-bold text-slate-800">{{ ll.resultado }}</span>
-                      <span class="text-slate-400 text-[10px]">{{ ll.created_at.slice(0, 16).replace('T', ' ') }}</span>
+                      <span class="text-slate-400 text-[10px]">{{ formatDateTime(ll.created_at) }}</span>
                     </div>
                     <p class="text-slate-500">Operador: {{ ll.operador?.full_name }}</p>
                     <p v-if="ll.observaciones" class="italic text-slate-700">"{{ ll.observaciones }}"</p>
@@ -824,7 +825,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
                           {{ item.estado_anterior }} ➔ <span class="font-semibold text-emerald-700">{{ item.estado_nuevo }}</span>
                         </p>
                         <p class="text-[10px] text-slate-400">
-                          {{ item.user?.full_name || 'Sistema' }} &bull; {{ item.created_at.slice(0, 16).replace('T', ' ') }}
+                          {{ item.user?.full_name || 'Sistema' }} &bull; {{ formatDateTime(item.created_at) }}
                         </p>
                       </div>
                     </template>
@@ -846,7 +847,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
                           <span class="font-mono font-bold text-slate-900">{{ po.nro_orden }}</span>
                           <StatusTag :value="po.estado" />
                         </div>
-                        <p class="text-slate-500">Prescripción: {{ po.fecha_prescripcion }} &bull; Mutual: {{ po.mutual }} &bull; Copago: ${{ po.valor_copago }}</p>
+                        <p class="text-slate-500">Prescripción: {{ formatDate(po.fecha_prescripcion) }} &bull; Mutual: {{ po.mutual }} &bull; Copago: ${{ po.valor_copago }}</p>
                         <p v-if="po.numeros_auditoria && po.numeros_auditoria.length > 0" class="text-[10px] text-slate-600 font-mono">
                           Códigos: {{ po.numeros_auditoria.join(', ') }}
                         </p>

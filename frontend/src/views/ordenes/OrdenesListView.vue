@@ -14,6 +14,7 @@ import StatusTag from '../../components/common/StatusTag.vue';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import OrdenDetailPanel from '../../components/ordenes/OrdenDetailPanel.vue';
+import { formatDate } from '../../utils/date';
 
 const route = useRoute();
 const router = useRouter();
@@ -243,7 +244,11 @@ const handlePageChange = (event: any) => {
                 </div>
               </template>
             </Column>
-            <Column v-if="!selectedOrdenId" field="fecha_prescripcion" header="Prescripción" sortable class="text-xs" />
+            <Column v-if="!selectedOrdenId" field="fecha_prescripcion" header="Prescripción" sortable class="text-xs">
+              <template #body="{ data }">
+                <span>{{ formatDate(data.fecha_prescripcion) }}</span>
+              </template>
+            </Column>
             <Column v-if="!selectedOrdenId" field="sucursal.nombre" header="Sucursal" sortable class="text-xs" />
             <Column v-if="!selectedOrdenId" header="Auditor">
               <template #body="{ data }">

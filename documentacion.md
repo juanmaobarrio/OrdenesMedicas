@@ -533,3 +533,7 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - Botón de papelera roja 🗑️ en el panel de detalle (`OrdenDetailPanel.vue`) y en la vista completa (`OrdenDetailView.vue`) con confirmación interactiva.
 
 - **Corrección de importación de `os` y `logger` en `OrdenMedicaService`:** Se añadieron los módulos faltantes en `backend/app/modules/ordenes/service.py` para prevenir error 500 al eliminar archivos adjuntos.
+
+- **Configuración de Zona Horaria Argentina (`America/Argentina/Buenos_Aires` GMT-3):**
+  - Se configuró la variable de entorno `TZ=America/Argentina/Buenos_Aires` e instalación de `tzdata` en los contenedores Docker (`postgres`, `backend`, `frontend`).
+  - Se creó la utilidad `frontend/src/utils/date.ts` con funciones `formatDateTime` y `formatDate` para representar todas las marcas temporales, historial de auditoría y fechas en la hora local oficial de Argentina (UTC-3).

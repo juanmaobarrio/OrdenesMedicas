@@ -24,6 +24,7 @@ import Timeline from 'primevue/timeline';
 import StatusTag from '../../components/common/StatusTag.vue';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModal.vue';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 
 const route = useRoute();
@@ -514,7 +515,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               <p v-if="Number(orden.valor_estudios_no_autorizados) > 0">
                 <span class="font-semibold">No Autorizados:</span> <span class="text-amber-700 font-bold">${{ orden.valor_estudios_no_autorizados }}</span>
               </p>
-              <p><span class="font-semibold">Prescripción:</span> {{ orden.fecha_prescripcion }}</p>
+              <p><span class="font-semibold">Prescripción:</span> {{ formatDate(orden.fecha_prescripcion) }}</p>
               <p><span class="font-semibold">Recetas Físicas:</span> {{ orden.cantidad_ordenes_fisicas }}</p>
               <p v-if="orden.assigned_auditor"><span class="font-semibold">Auditor:</span> {{ orden.assigned_auditor.full_name }}</p>
             </div>
@@ -739,7 +740,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
                           <StatusTag :value="prev.estado" />
                         </div>
                         <p class="text-[11px] text-slate-500">
-                          Prescripción: {{ prev.fecha_prescripcion }} &bull; Mutual: {{ prev.mutual }} &bull; Copago: ${{ prev.valor_copago }}
+                          Prescripción: {{ formatDate(prev.fecha_prescripcion) }} &bull; Mutual: {{ prev.mutual }} &bull; Copago: ${{ prev.valor_copago }}
                         </p>
                       </div>
                       <Button icon="pi pi-chevron-right" text rounded size="small" severity="secondary" />
@@ -761,7 +762,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
                   >
                     <div class="flex items-center justify-between">
                       <span class="font-bold text-slate-700">Resultado: {{ ll.resultado }}</span>
-                      <span class="text-slate-400">{{ ll.created_at.slice(0, 16).replace('T', ' ') }}</span>
+                      <span class="text-slate-400">{{ formatDateTime(ll.created_at) }}</span>
                     </div>
                     <p class="text-slate-600"><span class="font-semibold">Operador:</span> {{ ll.operador?.full_name }}</p>
                     <p v-if="ll.observaciones" class="text-slate-700 italic">"{{ ll.observaciones }}"</p>
@@ -780,7 +781,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
                           De <span class="font-semibold">{{ item.estado_anterior }}</span> a <span class="font-semibold text-emerald-700">{{ item.estado_nuevo }}</span>
                         </p>
                         <p class="text-[10px] text-slate-400">
-                          Por {{ item.user?.full_name || 'Sistema' }} &bull; {{ item.created_at.slice(0, 16).replace('T', ' ') }}
+                          Por {{ item.user?.full_name || 'Sistema' }} &bull; {{ formatDateTime(item.created_at) }}
                         </p>
                       </div>
                     </template>

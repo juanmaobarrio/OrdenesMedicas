@@ -14,6 +14,7 @@ import Dropdown from 'primevue/dropdown';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModal.vue';
+import { formatDateTime } from '../../utils/date';
 
 const router = useRouter();
 const ordenesStore = useOrdenesStore();
@@ -308,7 +309,7 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
               {{ sol.mensaje_auditor }}
             </p>
             <p class="text-[10px] text-slate-400">
-              Emitida el {{ sol.created_at.slice(0, 16).replace('T', ' ') }}
+              Emitida el {{ formatDateTime(sol.created_at) }}
             </p>
           </div>
         </div>

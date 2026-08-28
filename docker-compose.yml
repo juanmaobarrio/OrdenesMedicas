@@ -7,6 +7,7 @@ services:
     container_name: ordenes_medicas_postgres
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-ordenes_medicas_db}
@@ -35,6 +36,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
       POSTGRES_SERVER: postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -63,6 +65,8 @@ services:
       dockerfile: Dockerfile
     container_name: ordenes_medicas_frontend
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
     depends_on:
       - backend
     ports:
