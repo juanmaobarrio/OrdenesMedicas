@@ -1,0 +1,92 @@
+# ==========================================
+# GITIGNORE - SISTEMA DE GESTIÓN DE ÓRDENES MÉDICAS
+# ==========================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+env/
+
+# Node.js / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archivos de entorno y credenciales sensibles
+.env
+.env.*
+!.env.example
+!.env.production.example
+backend/.env
+frontend/.env
+
+# Bases de datos locales de desarrollo
+*.db
+*.sqlite
+*.sqlite3
+ordenes_medicas.db
+
+# Logs y trazas
+logs/*
+!logs/.gitkeep
+*.log
+
+# Almacenamiento de adjuntos / fotos de desarrollo
+uploads/*
+!uploads/.gitkeep
+
+# Capturas de pantalla de QA y scripts de pruebas temporales
+*.png
+*.jpg
+*.jpeg
+qa_*.mjs
+qa_*.js
+test_local_*.py
+debug_db.py
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
+ehthumbs.db

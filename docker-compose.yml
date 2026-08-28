@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------
+  # 1. Base de Datos Relacional PostgreSQL 16 (Alpine)
+  # ---------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ordenes_medicas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ordenes_medicas_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ordenes_medicas_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  # ---------------------------------------------------------
+  # 2. Servidor Backend FastAPI (Python 3.11 Async)
+  # ---------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ordenes_medicas_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ordenes_medicas_db}
+      SECRET_KEY: ${SECRET_KEY:-super-secret-production-key-change-this-min-32-chars}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-False}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-*}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-15}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - app_network
+
+  # ---------------------------------------------------------
+  # 3. Aplicación Web Frontend (Vue 3 + Vite + PrimeVue + Nginx)
+  # ---------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ordenes_medicas_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${APP_PORT:-80}:80"
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+
+
