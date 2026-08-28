@@ -416,6 +416,27 @@ async def descargar_adjunto(
     )
 
 
+@router.delete(
+    "/adjuntos/{adjunto_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un archivo adjunto de una orden médica",
+)
+async def eliminar_adjunto(
+    adjunto_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ip, agent = _get_client_info(request)
+    service = OrdenMedicaService(db)
+    await service.eliminar_adjunto(
+        adjunto_id=adjunto_id,
+        current_user=current_user,
+        client_ip=ip,
+        user_agent=agent,
+    )
+
+
 # ==========================================
 # CONFIGURACION DEL SISTEMA Y MOTIVOS DE CANCELACION
 # ==========================================

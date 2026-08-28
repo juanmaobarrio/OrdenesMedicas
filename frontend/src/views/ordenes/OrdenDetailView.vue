@@ -382,6 +382,19 @@ const handleUploadAdjunto = async (event: any) => {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al subir archivo', life: 4000 });
   }
 };
+
+const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
+  if (!confirm(`¿Está seguro de eliminar el archivo adjunto "${adjunto.nombre_archivo_original}"?`)) {
+    return;
+  }
+  try {
+    await ordenesService.eliminarAdjunto(adjunto.id);
+    toast.add({ severity: 'success', summary: 'Archivo Eliminado', detail: 'El archivo adjunto fue eliminado con éxito.', life: 3000 });
+    await loadOrden();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo eliminar el archivo', life: 4000 });
+  }
+};
 </script>
 
 <template>
@@ -688,6 +701,15 @@ const handleUploadAdjunto = async (event: any) => {
                         <a :href="ordenesService.getDescargarAdjuntoUrl(adj.id)" target="_blank" download>
                           <Button icon="pi pi-download" text rounded size="small" severity="secondary" title="Descargar archivo" />
                         </a>
+                        <Button
+                          icon="pi pi-trash"
+                          text
+                          rounded
+                          size="small"
+                          severity="danger"
+                          title="Eliminar archivo adjunto"
+                          @click="handleDeleteAdjunto(adj)"
+                        />
                       </div>
                     </div>
                   </div>

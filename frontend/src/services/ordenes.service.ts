@@ -133,6 +133,10 @@ export const ordenesService = {
     return response.data;
   },
 
+  async eliminarAdjunto(adjuntoId: string): Promise<void> {
+    await api.delete(`/ordenes/adjuntos/${adjuntoId}`);
+  },
+
   getDescargarAdjuntoUrl(adjuntoId: string): string {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
     return `${baseUrl}/ordenes/adjuntos/${adjuntoId}/descargar`;

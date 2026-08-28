@@ -148,6 +148,10 @@ class OrdenMedicaRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def delete_adjunto(self, adjunto: AdjuntoOrden) -> None:
+        await self.db.delete(adjunto)
+        await self.db.flush()
+
     async def create_solicitud(self, solicitud: AuditoriaSolicitud) -> AuditoriaSolicitud:
         self.db.add(solicitud)
         await self.db.flush()

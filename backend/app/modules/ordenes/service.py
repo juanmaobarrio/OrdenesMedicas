@@ -516,6 +516,52 @@ class OrdenMedicaService:
 
         return created_adjunto
 
+    async def eliminar_adjunto(
+        self,
+        adjunto_id: uuid.UUID,
+        current_user: User,
+        client_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> None:
+        adjunto = await self.repo.get_adjunto_by_id(adjunto_id)
+        if not adjunto:
+            raise EntityNotFoundException("Adjunto", adjunto_id)
+
+        orden = await self.get_by_id(adjunto.orden_id)
+
+        # Validar si la orden está en estado terminal
+        if orden.estado in [EstadoOrden.CANCELADA, EstadoOrden.DAR_DE_BAJA, EstadoOrden.CERRADA]:
+            raise ForbiddenActionException(
+                f"No se pueden eliminar adjuntos de una orden en estado final '{orden.estado.value}'"
+            )
+
+        # Borrar archivo físico del disco si existe
+        if os.path.exists(adjunto.ruta_almacenamiento):
+            try:
+                os.remove(adjunto.ruta_almacenamiento)
+            except Exception as e:
+                logger.warning(f"No se pudo eliminar el archivo físico {adjunto.ruta_almacenamiento}: {e}")
+
+        # Registrar log inmutable de auditoría antes de borrar el registro
+        await self.repo.create_audit_log(
+            AuditoriaLog(
+                orden_id=orden.id,
+                user_id=current_user.id,
+                accion="ELIMINACION_ADJUNTO",
+                estado_anterior=orden.estado.value,
+                estado_nuevo=orden.estado.value,
+                detalles={
+                    "adjunto_id": str(adjunto.id),
+                    "nombre_archivo": adjunto.nombre_archivo_original,
+                    "tamano_bytes": adjunto.tamano_bytes,
+                },
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
+        )
+
+        await self.repo.delete_adjunto(adjunto)
+
     async def registrar_llamada_paciente(
         self,
         orden_id: uuid.UUID,

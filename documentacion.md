@@ -527,3 +527,7 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - Se diseñó e implementó una vista interactiva de manual de usuario con 9 capítulos temáticos (Acceso, Pacientes, Registro de Órdenes, Expediente y Visor Popup, Ciclo de Auditoría, Llamadas a Pacientes, Dashboard/Excel, Roles Jerárquicos y API/n8n).
   - Incluye buscador rápido por palabras clave, índice de navegación interactivo y botón de impresión / guardado en PDF.
   - Accesible desde el menú lateral para todos los usuarios autenticados.
+
+- **Eliminación de archivos adjuntos:**
+  - Endpoint `DELETE /api/v1/ordenes/adjuntos/{adjunto_id}` para eliminar archivos adjuntos no deseados con remoción física del disco y registro inmutable en la bitácora de auditoría (*Audit Trail*).
+  - Botón de papelera roja 🗑️ en el panel de detalle (`OrdenDetailPanel.vue`) y en la vista completa (`OrdenDetailView.vue`) con confirmación interactiva.
