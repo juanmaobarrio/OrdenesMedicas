@@ -12,6 +12,16 @@ from backend.app.modules.users.models import Permission, Role, Sucursal, User
 
 async def seed_initial_data():
     """Siembra roles base, permisos del sistema, sucursal inicial y usuario administrador."""
+    from backend.app.core.database import engine
+    from backend.app.shared.base_model import Base
+    import backend.app.modules.users.models  # noqa
+    import backend.app.modules.pacientes.models  # noqa
+    import backend.app.modules.ordenes.models  # noqa
+
+    # Asegurar que todas las tablas y esquemas existan en PostgreSQL / SQLite
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     async with AsyncSessionLocal() as db:
         logger.info("Iniciando siembra de datos iniciales (Seed)...")
 
