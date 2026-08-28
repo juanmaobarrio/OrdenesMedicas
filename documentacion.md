@@ -520,3 +520,10 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 - **Script de migración y diagnóstico (`migrar_columnas.py`):** Permite ejecutar `ALTER TABLE IF NOT EXISTS` e inspeccionar registros existentes directamente en PostgreSQL de ZimaBoard.
 
 - **Corrección de actualización de jerarquía de roles (`hierarchy_level`):** Se mapeó `hierarchy_level` en `RoleService.update_role` y `create_role` en `backend/app/modules/users/service.py` para persistir correctamente el nivel jerárquico.
+
+- **Actualización de Documentación OpenAPI / Swagger (`/docs`):**
+  - Se añadieron metadatos enriquecidos con especificación completa de esquemas, códigos de respuesta, autenticación JWT Bearer y descripción del ciclo de vida de 8 estados de las órdenes médicas.
+- **Manual de Usuario Integrado (`/manual_usuario` y `/manual`):**
+  - Se diseñó e implementó una vista interactiva de manual de usuario con 9 capítulos temáticos (Acceso, Pacientes, Registro de Órdenes, Expediente y Visor Popup, Ciclo de Auditoría, Llamadas a Pacientes, Dashboard/Excel, Roles Jerárquicos y API/n8n).
+  - Incluye buscador rápido por palabras clave, índice de navegación interactivo y botón de impresión / guardado en PDF.
+  - Accesible desde el menú lateral para todos los usuarios autenticados.

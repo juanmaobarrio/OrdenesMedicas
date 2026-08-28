@@ -106,10 +106,72 @@ async def lifespan(app: FastAPI):
 
 
 
+OPENAPI_TAGS = [
+    {
+        "name": "Autenticacion",
+        "description": "Emisión y refresco de tokens de seguridad JWT (OAuth2 Bearer), perfil de usuario activo y cierre de sesión.",
+    },
+    {
+        "name": "Ordenes Medicas",
+        "description": "Ciclo de vida completo de prescripciones médicas, montos totales (copago + no autorizados), nro de afiliado, números de auditoría, adjuntos fotográficos/PDF y trazabilidad inmutable.",
+    },
+    {
+        "name": "Auditoria Medica",
+        "description": "Panel de evaluación clínica para auditores médicos, emisión de observaciones/requerimientos y respuestas operativas de sucursales.",
+    },
+    {
+        "name": "Pacientes",
+        "description": "Padrón centralizado de afiliados, historial clínico, búsqueda rápida para autocompletado y vinculación de Obras Sociales.",
+    },
+    {
+        "name": "Obras Sociales / Mutuales",
+        "description": "Catálogo de prestadores médicos, cálculo dinámico de días de vencimiento de prescripciones y códigos de integración.",
+    },
+    {
+        "name": "Dashboard & Reportes",
+        "description": "Métricas clave (KPIs), flujo diario de órdenes, distribución por sucursal y exportación tabular CSV para Microsoft Excel.",
+    },
+    {
+        "name": "Usuarios y Roles (RBAC)",
+        "description": "Gestión de operadores, auditores y administradores, control de jerarquía de roles (`hierarchy_level`) y asignación granular de permisos.",
+    },
+    {
+        "name": "Configuracion de Estados y Motivos",
+        "description": "Catálogo administrable de motivos de cancelación y estados del sistema con ID numérico para integraciones API / n8n.",
+    },
+    {
+        "name": "Health",
+        "description": "Monitoreo de estado operativo y verificación de salud de la plataforma.",
+    },
+]
+
+API_DESCRIPTION = """
+### 🏥 API REST - Sistema Integral de Gestión de Órdenes Médicas
+Plataforma moderna, resiliente y de alta disponibilidad para la administración, auditoría médica, bitácora de trazabilidad legal y seguimiento de prescripciones clínicas.
+
+#### 🛡️ Autenticación y Seguridad:
+* Utiliza autenticación **OAuth2 Bearer Token (JWT)** en el header `Authorization: Bearer <token>`.
+* Inicie sesión en `/api/v1/auth/login` con su usuario o correo electrónico para obtener el Access Token.
+
+#### 🔄 Estados del Ciclo de Vida de las Órdenes:
+1. `Ingreso` (1): Orden recibida en sede esperando revisión.
+2. `en Auditoria` (2): Auditor médico evaluando la prescripción o código de auditoría asignado.
+3. `Solicitudes de auditoria` (3): Observación clínica emitida; genera llamada pendiente al paciente.
+4. `Actualizada` (4): Documentación adicional incorporada por la sucursal.
+5. `Auditoria Finalizada` (5): Aprobación médica completada; genera llamada de aviso al paciente.
+6. `Dar de baja` (6): Anulación administrativa antes de toma de muestra.
+7. `Cancelada` (7): Rechazo formal con motivo obligatorio del catálogo.
+8. `Cerrada` (8): Resolución exitosa; paciente atendido.
+"""
+
+
 def create_application() -> FastAPI:
     """Fabrica de creacion y configuracion de la aplicacion FastAPI."""
     app = FastAPI(
-        title=settings.PROJECT_NAME,
+        title="Sistema de Gestión de Órdenes Médicas API",
+        description=API_DESCRIPTION,
+        version="1.3.0",
+        openapi_tags=OPENAPI_TAGS,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
         docs_url="/docs",
         redoc_url="/redoc",

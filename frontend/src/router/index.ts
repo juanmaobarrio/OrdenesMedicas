@@ -74,6 +74,15 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/config/ConfiguracionView.vue'),
         meta: { roles: ['ADMIN'] },
       },
+      {
+        path: 'manual_usuario',
+        name: 'ManualUsuario',
+        component: () => import('../views/help/ManualUsuarioView.vue'),
+      },
+      {
+        path: 'manual',
+        redirect: '/manual_usuario',
+      },
     ],
   },
   {

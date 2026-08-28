@@ -42,6 +42,7 @@ const navigationItems = computed(() => {
     },
     { label: 'Padrón de Pacientes', icon: 'pi pi-users', to: '/pacientes' },
     { label: 'Usuarios y Roles', icon: 'pi pi-user-edit', to: '/usuarios' },
+    { label: 'Manual de Usuario', icon: 'pi pi-book', to: '/manual_usuario' },
   ];
 
   if (authStore.isAdmin) {
@@ -84,6 +85,8 @@ const pageTitle = computed(() => {
       return 'Sedes y Sucursales';
     case 'Configuracion':
       return 'Configuración del Sistema';
+    case 'ManualUsuario':
+      return 'Manual de Uso del Sistema';
     default:
       return '';
   }
