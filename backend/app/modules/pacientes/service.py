@@ -141,7 +141,13 @@ class PacienteService:
             paciente.apellidos = dto.apellidos.strip().upper()
 
         if dto.fecha_nacimiento is not None:
-            paciente.fecha_nacimiento = dto.fecha_nacimiento
+            if isinstance(dto.fecha_nacimiento, str):
+                try:
+                    paciente.fecha_nacimiento = date.fromisoformat(dto.fecha_nacimiento[:10])
+                except Exception:
+                    pass
+            elif isinstance(dto.fecha_nacimiento, date):
+                paciente.fecha_nacimiento = dto.fecha_nacimiento
 
         if dto.obra_social is not None:
             paciente.obra_social = dto.obra_social.strip().upper() if dto.obra_social else None

@@ -1078,7 +1078,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
 
     <!-- Modals -->
     <!-- Modal Cambiar Estado -->
-    <Dialog v-model:visible="isCambioEstadoVisible" modal header="Cambiar Estado de la Orden" :style="{ width: '480px' }">
+    <Dialog v-model:visible="isCambioEstadoVisible" modal header="Cambiar Estado de la Orden" :style="{ width: '520px', maxWidth: '95vw' }">
       <div class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nuevo Estado</label>
@@ -1129,14 +1129,14 @@ const loadPreviousOrders = async (pacienteId: string) => {
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-blue-200/60">
-            <div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
+            <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
-              <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+              <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
-            <div>
+            <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
-              <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+              <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
           </div>
         </div>
@@ -1243,7 +1243,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
     </Dialog>
 
     <!-- Modal Editar Datos de la Orden -->
-    <Dialog v-model:visible="isEditOrdenVisible" modal header="Editar Datos de la Orden" :style="{ width: '560px' }">
+    <Dialog v-model:visible="isEditOrdenVisible" modal header="Editar Datos de la Orden" :style="{ width: '580px', maxWidth: '95vw' }">
       <div class="space-y-4">
         <!-- Códigos de Auditoría -->
         <div>
@@ -1256,14 +1256,14 @@ const loadPreviousOrders = async (pacienteId: string) => {
           </p>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Copago a Abonar ($)</label>
-            <InputNumber v-model="editForm.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" />
+            <InputNumber v-model="editForm.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
-          <div>
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Estudios No Autorizados ($)</label>
-            <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" />
+            <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
         </div>
 

@@ -502,19 +502,19 @@ const handleSubmit = async () => {
           </div>
 
           <!-- Copago -->
-          <div>
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Valor Copago a Abonar ($)
             </label>
-            <InputNumber v-model="form.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" />
+            <InputNumber v-model="form.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
 
           <!-- Valor Estudios No Autorizados -->
-          <div>
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Estudios No Autorizados ($)
             </label>
-            <InputNumber v-model="form.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" />
+            <InputNumber v-model="form.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
 
 

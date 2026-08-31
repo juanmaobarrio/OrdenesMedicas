@@ -13,6 +13,7 @@ import Dialog from 'primevue/dialog';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '../../services/api';
 
 const toast = useToast();
 
@@ -97,7 +98,7 @@ const handleOpenEdit = (paciente: Paciente) => {
     documento: paciente.documento,
     nombres: paciente.nombres,
     apellidos: paciente.apellidos,
-    fecha_nacimiento: paciente.fecha_nacimiento,
+    fecha_nacimiento: paciente.fecha_nacimiento ? String(paciente.fecha_nacimiento).slice(0, 10) : null,
     obra_social: paciente.obra_social || '',
     nro_afiliado: paciente.nro_afiliado || '',
     telefono: paciente.telefono || '',
@@ -125,17 +126,35 @@ const handleSave = async () => {
 
   isSaving.value = true;
   try {
+    const cleanFecha = form.value.fecha_nacimiento ? String(form.value.fecha_nacimiento).slice(0, 10) : null;
+    const payload = {
+      documento: form.value.documento.trim(),
+      nombres: form.value.nombres.trim(),
+      apellidos: form.value.apellidos.trim(),
+      fecha_nacimiento: cleanFecha,
+      obra_social: form.value.obra_social?.trim() || null,
+      nro_afiliado: form.value.nro_afiliado?.trim() || null,
+      telefono: form.value.telefono?.trim() || null,
+      email: form.value.email?.trim() || null,
+      is_active: form.value.is_active,
+    };
+
     if (isEditing.value && editingId.value) {
-      await pacientesService.update(editingId.value, form.value);
+      await pacientesService.update(editingId.value, payload as any);
       toast.add({ severity: 'success', summary: 'Paciente Actualizado', detail: 'Datos guardados con éxito', life: 3000 });
     } else {
-      await pacientesService.create(form.value);
+      await pacientesService.create(payload as any);
       toast.add({ severity: 'success', summary: 'Paciente Registrado', detail: 'Nuevo paciente incorporado', life: 3000 });
     }
     isDialogVisible.value = false;
     await loadPacientes();
   } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al guardar paciente', life: 4000 });
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: getErrorMessage(err, 'Error al guardar paciente'),
+      life: 4000,
+    });
   } finally {
     isSaving.value = false;
   }

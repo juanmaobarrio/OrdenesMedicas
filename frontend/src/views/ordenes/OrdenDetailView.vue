@@ -997,7 +997,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
     </template>
 
     <!-- Modal: Editar Datos de la Orden -->
-    <Dialog v-model:visible="isEditOrdenVisible" modal header="Editar Datos de la Orden Médica" :style="{ width: '600px' }">
+    <Dialog v-model:visible="isEditOrdenVisible" modal header="Editar Datos de la Orden Médica" :style="{ width: '580px', maxWidth: '95vw' }">
       <div class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -1011,15 +1011,15 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               editable
             />
           </div>
-          <div>
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Copago ($)</label>
-            <InputNumber v-model="editForm.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+            <InputNumber v-model="editForm.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
         </div>
 
-        <div>
+        <div class="min-w-0">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Estudios NO Autorizados ($)</label>
-          <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+          <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
         </div>
 
         <div class="pt-2 border-t border-slate-200">
@@ -1118,7 +1118,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
     </Dialog>
 
     <!-- Modal: Cambiar Estado -->
-    <Dialog v-model:visible="isCambioEstadoVisible" modal header="Cambiar Estado de la Orden" :style="{ width: '480px' }">
+    <Dialog v-model:visible="isCambioEstadoVisible" modal header="Cambiar Estado de la Orden" :style="{ width: '520px', maxWidth: '95vw' }">
       <div class="space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nuevo Estado</label>
@@ -1169,14 +1169,14 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-blue-200/60">
-            <div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
+            <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
-              <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+              <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
-            <div>
+            <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
-              <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+              <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
           </div>
         </div>

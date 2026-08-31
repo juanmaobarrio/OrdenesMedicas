@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
@@ -76,15 +76,22 @@ class PacienteCreate(PacienteBase):
 
 
 class PacienteUpdate(BaseModel):
-    documento: Optional[str] = Field(None, min_length=4, max_length=30)
+    documento: Optional[str] = Field(None, min_length=3, max_length=30)
     nombres: Optional[str] = Field(None, min_length=2, max_length=100)
     apellidos: Optional[str] = Field(None, min_length=2, max_length=100)
-    fecha_nacimiento: Optional[date] = None
+    fecha_nacimiento: Optional[Any] = None
     obra_social: Optional[str] = Field(None, max_length=100)
     nro_afiliado: Optional[str] = Field(None, max_length=50)
     telefono: Optional[str] = Field(None, max_length=30)
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("email", "fecha_nacimiento", "obra_social", "nro_afiliado", "telefono", "documento", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
 
 class PacienteRead(PacienteBase):
