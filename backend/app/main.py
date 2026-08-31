@@ -33,6 +33,13 @@ def sync_sqlite_columns(connection):
             connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00"))
         if cols and "debe_orden_medica" not in cols:
             connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT 0"))
+        if cols and "abona_apb" not in cols:
+            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
+
+        res_mut = connection.execute(text("PRAGMA table_info(obras_sociales)")).fetchall()
+        cols_mut = [r[1] for r in res_mut]
+        if cols_mut and "copago_default" not in cols_mut:
+            connection.execute(text("ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00"))
 
         res_roles = connection.execute(text("PRAGMA table_info(roles)")).fetchall()
         cols_roles = [r[1] for r in res_roles]
@@ -76,8 +83,30 @@ def sync_sqlite_columns(connection):
                 ) THEN
                     ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT FALSE;
                 END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='ordenes_medicas' AND column_name='abona_apb'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT FALSE;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='obras_sociales' AND column_name='copago_default'
+                ) THEN
+                    ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00;
+                END IF;
             END $$;
         """))
+        for val in ["INFORMACION"]:
+            try:
+                connection.execute(text(f"ALTER TYPE estado_solicitud_enum ADD VALUE IF NOT EXISTS '{val}';"))
+            except Exception:
+                pass
+        for val in ["CONSULTA_PACIENTE", "SEGUIMIENTO_SUCURSAL", "OTRO"]:
+            try:
+                connection.execute(text(f"ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS '{val}';"))
+            except Exception:
+                pass
     except Exception:
         pass
 
