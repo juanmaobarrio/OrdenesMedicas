@@ -40,15 +40,17 @@ async def seed_initial_data():
 
         # 2. Permisos del Sistema
         default_permissions = [
-            ("users:manage", "users", "Administracion total de usuarios y roles"),
-            ("sucursales:manage", "sucursales", "Administracion de sucursales"),
-            ("pacientes:manage", "pacientes", "Gestion y edicion de pacientes"),
-            ("ordenes:create", "ordenes", "Ingreso y carga de ordenes medicas"),
-            ("ordenes:view", "ordenes", "Visualizacion y busqueda de ordenes"),
-            ("ordenes:update", "ordenes", "Actualizacion y respuesta de ordenes"),
-            ("ordenes:audit", "ordenes", "Auditoria medica, observaciones y aprobacion"),
-            ("ordenes:calls", "ordenes", "Gestion de llamadas y aviso a pacientes"),
-            ("dashboard:view", "dashboard", "Visualizacion de reportes y KPIs"),
+            ("users:manage", "users", "Administración total de usuarios y roles"),
+            ("sucursales:manage", "sucursales", "Administración de sedes y sucursales"),
+            ("pacientes:manage", "pacientes", "Gestión y edición del padrón de pacientes"),
+            ("mutuales:manage", "mutuales", "Administración del catálogo de Obras Sociales y copagos"),
+            ("ordenes:create", "ordenes", "Ingreso y registro de nuevas órdenes médicas"),
+            ("ordenes:view", "ordenes", "Visualización y búsqueda de órdenes médicas"),
+            ("ordenes:update", "ordenes", "Modificación de datos, cambio de estado y adjuntos"),
+            ("ordenes:audit", "ordenes", "Auditoría médica, observaciones y resolución"),
+            ("ordenes:calls", "ordenes", "Bandeja y registro de llamadas a pacientes"),
+            ("dashboard:view", "dashboard", "Visualización de reportes, KPIs y exportación"),
+            ("config:manage", "config", "Configuración de motivos de cancelación y estados"),
         ]
 
         permission_map = {}
@@ -65,23 +67,29 @@ async def seed_initial_data():
         roles_config = {
             "ADMIN": {
                 "name": "Administrador General",
-                "description": "Acceso absoluto al sistema y configuraciones",
+                "description": "Acceso absoluto a todos los módulos y configuraciones",
                 "permissions": list(permission_map.values()),
+                "hierarchy_level": 100,
                 "is_system": True,
             },
             "AUDITOR": {
-                "name": "Auditor",
-                "description": "Evaluacion tecnica, solicitudes de cambio y aprobacion medica",
+                "name": "Auditor Médico",
+                "description": "Evaluación técnica, auditoría, observaciones, llamadas y gestión",
                 "permissions": [
                     permission_map["ordenes:view"],
+                    permission_map["ordenes:update"],
                     permission_map["ordenes:audit"],
+                    permission_map["ordenes:calls"],
+                    permission_map["pacientes:manage"],
                     permission_map["dashboard:view"],
+                    permission_map["mutuales:manage"],
                 ],
+                "hierarchy_level": 50,
                 "is_system": True,
             },
             "USUARIO": {
                 "name": "Operador de Sucursal",
-                "description": "Admision, carga de ordenes, adjuntos y atencion telefonica al paciente",
+                "description": "Admisión, carga de órdenes, adjuntos y atención a pacientes",
                 "permissions": [
                     permission_map["pacientes:manage"],
                     permission_map["ordenes:create"],
@@ -89,6 +97,7 @@ async def seed_initial_data():
                     permission_map["ordenes:update"],
                     permission_map["ordenes:calls"],
                 ],
+                "hierarchy_level": 10,
                 "is_system": True,
             },
         }
@@ -102,6 +111,7 @@ async def seed_initial_data():
                     code=code,
                     name=data["name"],
                     description=data["description"],
+                    hierarchy_level=data["hierarchy_level"],
                     is_system=data["is_system"],
                     permissions=data["permissions"],
                 )
@@ -109,9 +119,17 @@ async def seed_initial_data():
                 await db.flush()
                 logger.info(f"Rol '{code}' creado.")
             else:
-                if role.name != data["name"]:
-                    role.name = data["name"]
-                    await db.flush()
+                # Asegurar que los roles base tengan los permisos y niveles actualizados
+                if code == "ADMIN":
+                    role.permissions = list(permission_map.values())
+                    role.hierarchy_level = 100
+                elif code == "AUDITOR":
+                    role.permissions = data["permissions"]
+                    role.hierarchy_level = 50
+                elif code == "USUARIO":
+                    role.permissions = data["permissions"]
+                    role.hierarchy_level = 10
+                await db.flush()
             role_map[code] = role
 
         # 4. Usuario Administrador por Defecto

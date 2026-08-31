@@ -468,12 +468,12 @@ async def list_motivos_cancelacion(
     "/motivos-cancelacion",
     response_model=MotivoCancelacionRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear motivo de cancelación (Admin)",
+    summary="Crear motivo de cancelación",
 )
 async def create_motivo_cancelacion(
     dto: MotivoCancelacionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = MotivoCancelacionService(db)
     return await service.create_motivo(dto)
@@ -482,13 +482,13 @@ async def create_motivo_cancelacion(
 @config_router.put(
     "/motivos-cancelacion/{motivo_id}",
     response_model=MotivoCancelacionRead,
-    summary="Actualizar motivo de cancelación (Admin)",
+    summary="Actualizar motivo de cancelación",
 )
 async def update_motivo_cancelacion(
     motivo_id: uuid.UUID,
     dto: MotivoCancelacionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = MotivoCancelacionService(db)
     return await service.update_motivo(motivo_id, dto)
@@ -497,12 +497,12 @@ async def update_motivo_cancelacion(
 @config_router.patch(
     "/motivos-cancelacion/{motivo_id}/toggle-active",
     response_model=MotivoCancelacionRead,
-    summary="Activar o desactivar motivo de cancelación (Admin)",
+    summary="Activar o desactivar motivo de cancelación",
 )
 async def toggle_active_motivo_cancelacion(
     motivo_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = MotivoCancelacionService(db)
     return await service.toggle_active(motivo_id)
@@ -511,12 +511,12 @@ async def toggle_active_motivo_cancelacion(
 @config_router.delete(
     "/motivos-cancelacion/{motivo_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar motivo de cancelación (Admin)",
+    summary="Eliminar motivo de cancelación",
 )
 async def delete_motivo_cancelacion(
     motivo_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = MotivoCancelacionService(db)
     await service.delete_motivo(motivo_id)
@@ -543,12 +543,12 @@ async def list_estados_orden(
     "/estados",
     response_model=EstadoOrdenConfigRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear nuevo estado de orden (Admin)",
+    summary="Crear nuevo estado de orden",
 )
 async def create_estado_orden(
     dto: EstadoOrdenConfigCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = EstadoOrdenConfigService(db)
     return await service.create_estado(dto)
@@ -557,13 +557,13 @@ async def create_estado_orden(
 @config_router.put(
     "/estados/{estado_id}",
     response_model=EstadoOrdenConfigRead,
-    summary="Actualizar estado de orden (Admin)",
+    summary="Actualizar estado de orden",
 )
 async def update_estado_orden(
     estado_id: int,
     dto: EstadoOrdenConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = EstadoOrdenConfigService(db)
     return await service.update_estado(estado_id, dto)
@@ -572,12 +572,12 @@ async def update_estado_orden(
 @config_router.patch(
     "/estados/{estado_id}/toggle-active",
     response_model=EstadoOrdenConfigRead,
-    summary="Activar o desactivar estado de orden (Admin)",
+    summary="Activar o desactivar estado de orden",
 )
 async def toggle_active_estado_orden(
     estado_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = EstadoOrdenConfigService(db)
     return await service.toggle_active(estado_id)
@@ -586,12 +586,12 @@ async def toggle_active_estado_orden(
 @config_router.delete(
     "/estados/{estado_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar estado de orden (Admin)",
+    summary="Eliminar estado de orden",
 )
 async def delete_estado_orden(
     estado_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("config:manage")),
 ):
     service = EstadoOrdenConfigService(db)
     await service.delete_estado(estado_id)

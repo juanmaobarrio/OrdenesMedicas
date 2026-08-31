@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import get_db
-from backend.app.modules.auth.dependencies import get_current_user
+from backend.app.modules.auth.dependencies import get_current_user, require_permission
 from backend.app.modules.pacientes.schemas import (
     ObraSocialCreate,
     ObraSocialRead,
@@ -84,7 +84,7 @@ async def search_pacientes(
 async def create_paciente(
     dto: PacienteCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("pacientes:manage")),
 ):
     service = PacienteService(db)
     return await service.create_paciente(dto)
@@ -127,7 +127,7 @@ async def update_paciente(
     paciente_id: uuid.UUID,
     dto: PacienteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("pacientes:manage")),
 ):
     service = PacienteService(db)
     return await service.update_paciente(paciente_id, dto)
@@ -159,7 +159,7 @@ async def list_mutuales(
 async def create_mutual(
     dto: ObraSocialCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("mutuales:manage")),
 ):
     service = ObraSocialService(db)
     return await service.create_mutual(dto)
@@ -188,7 +188,7 @@ async def update_mutual(
     mutual_id: uuid.UUID,
     dto: ObraSocialUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("mutuales:manage")),
 ):
     service = ObraSocialService(db)
     return await service.update_mutual(mutual_id, dto)
@@ -202,7 +202,7 @@ async def update_mutual(
 async def toggle_active_mutual(
     mutual_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("mutuales:manage")),
 ):
     service = ObraSocialService(db)
     return await service.toggle_active(mutual_id)

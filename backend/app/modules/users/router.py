@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import get_db
-from backend.app.modules.auth.dependencies import get_current_user, require_roles
+from backend.app.modules.auth.dependencies import get_current_user, require_permission, require_roles
 from backend.app.modules.users.models import User
 from backend.app.modules.users.schemas import (
     PermissionRead,
@@ -46,12 +46,12 @@ async def list_sucursales(
     "/sucursales",
     response_model=SucursalRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear nueva sucursal (Solo Administrador)",
+    summary="Crear nueva sucursal (Admin o sucursales:manage)",
 )
 async def create_sucursal(
     dto: SucursalCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("sucursales:manage")),
 ):
     service = SucursalService(db)
     return await service.create_sucursal(dto)
@@ -77,12 +77,12 @@ async def list_roles(
     "/roles",
     response_model=RoleRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear un nuevo rol personalizado (Solo Administrador)",
+    summary="Crear un nuevo rol personalizado",
 )
 async def create_role(
     dto: RoleCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = RoleService(db)
     return await service.create_role(dto)
@@ -91,11 +91,11 @@ async def create_role(
 @router.get(
     "/permissions",
     response_model=List[PermissionRead],
-    summary="Listar catalogo de permisos del sistema (Solo Administrador)",
+    summary="Listar catalogo de permisos del sistema",
 )
 async def list_permissions(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = RoleService(db)
     return await service.list_permissions()
@@ -104,13 +104,13 @@ async def list_permissions(
 @router.put(
     "/roles/{role_id}",
     response_model=RoleRead,
-    summary="Actualizar rol y permisos asignados (Solo Administrador)",
+    summary="Actualizar rol y permisos asignados",
 )
 async def update_role(
     role_id: uuid.UUID,
     dto: RoleUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = RoleService(db)
     return await service.update_role(role_id, dto)
@@ -119,12 +119,12 @@ async def update_role(
 @router.delete(
     "/roles/{role_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Eliminar rol personalizado (Solo Administrador)",
+    summary="Eliminar rol personalizado",
 )
 async def delete_role(
     role_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = RoleService(db)
     await service.delete_role(role_id)
@@ -158,7 +158,7 @@ async def list_users(
 async def create_user(
     dto: UserCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = UserService(db)
     return await service.create_user(dto, current_user=current_user)
@@ -181,13 +181,13 @@ async def get_user(
 @router.put(
     "/users/{user_id}",
     response_model=UserRead,
-    summary="Actualizar datos de usuario (Solo Administrador)",
+    summary="Actualizar datos de usuario",
 )
 async def update_user(
     user_id: uuid.UUID,
     dto: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = UserService(db)
     return await service.update_user(user_id, dto)
@@ -196,12 +196,12 @@ async def update_user(
 @router.patch(
     "/users/{user_id}/toggle-active",
     response_model=UserRead,
-    summary="Activar o desactivar usuario (Solo Administrador)",
+    summary="Activar o desactivar usuario",
 )
 async def toggle_active_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = UserService(db)
     return await service.toggle_active(user_id)
@@ -210,13 +210,13 @@ async def toggle_active_user(
 @router.post(
     "/users/{user_id}/reset-password",
     status_code=status.HTTP_200_OK,
-    summary="Restablecer contraseña de usuario (Solo Administrador)",
+    summary="Restablecer contraseña de usuario",
 )
 async def reset_password_by_admin(
     user_id: uuid.UUID,
     dto: UserResetPasswordAdmin,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN"])),
+    current_user: User = Depends(require_permission("users:manage")),
 ):
     service = UserService(db)
     await service.reset_password_by_admin(user_id, dto.new_password)

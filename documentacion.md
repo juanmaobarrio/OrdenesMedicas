@@ -159,18 +159,18 @@ Cada módulo dentro de `app/modules/<dominio>/` cuenta con la siguiente segregac
 | `POST` | `/api/v1/auth/refresh` | Renovación de token de acceso mediante refresh token | Público |
 | `GET` | `/api/v1/auth/me` | Obtener perfil y permisos de la sesión actual | Autenticado |
 | `GET` | `/api/v1/sucursales` | Listar sucursales (con filtro opcional `only_active`) | Autenticado |
-| `POST` | `/api/v1/sucursales` | Crear una nueva sucursal | Rol: `ADMIN` |
-| `GET` | `/api/v1/roles` | Listar roles del sistema y sus permisos asociados | Autenticado |
-| `POST` | `/api/v1/roles` | Crear un nuevo rol con permisos | Rol: `ADMIN` |
-| `PUT` | `/api/v1/roles/{id}` | Actualizar rol y permisos asignados | Rol: `ADMIN` |
-| `DELETE` | `/api/v1/roles/{id}` | Eliminar rol personalizado | Rol: `ADMIN` |
-| `GET` | `/api/v1/permissions` | Listar catálogo de permisos atómicos | Rol: `ADMIN` |
-| `GET` | `/api/v1/users` | Listar usuarios con filtros por sucursal, rol y estado activo/inactivo | Autenticado |
-| `POST` | `/api/v1/users` | Registrar un nuevo usuario con control de jerarquía de rol | Autenticado |
+| `POST` | `/api/v1/sucursales` | Crear una nueva sucursal | Permiso: `sucursales:manage` |
+| `GET` | `/api/v1/roles` | Listar roles del sistema y sus permisos asociados | Permiso: `users:manage` |
+| `POST` | `/api/v1/roles` | Crear un nuevo rol con permisos | Permiso: `users:manage` |
+| `PUT` | `/api/v1/roles/{id}` | Actualizar rol y permisos asignados | Permiso: `users:manage` |
+| `DELETE` | `/api/v1/roles/{id}` | Eliminar rol personalizado | Permiso: `users:manage` |
+| `GET` | `/api/v1/permissions` | Listar catálogo de permisos atómicos | Permiso: `users:manage` |
+| `GET` | `/api/v1/users` | Listar usuarios con filtros por sucursal, rol y estado | Permiso: `users:manage` |
+| `POST` | `/api/v1/users` | Registrar un nuevo usuario con control de jerarquía | Permiso: `users:manage` |
 | `GET` | `/api/v1/users/{id}` | Obtener detalle completo de un usuario | Autenticado |
-| `PUT` | `/api/v1/users/{id}` | Actualizar datos de un usuario | Rol: `ADMIN` |
-| `PATCH` | `/api/v1/users/{id}/toggle-active` | Activar o inactivar cuenta de usuario | Rol: `ADMIN` |
-| `POST` | `/api/v1/users/{id}/reset-password` | Restablecer contraseña por el Administrador (sin clave anterior) | Rol: `ADMIN` |
+| `PUT` | `/api/v1/users/{id}` | Actualizar datos de un usuario (permite sucursal `null`) | Permiso: `users:manage` |
+| `PATCH` | `/api/v1/users/{id}/toggle-active` | Activar o inactivar cuenta de usuario | Permiso: `users:manage` |
+| `POST` | `/api/v1/users/{id}/reset-password` | Restablecer contraseña por el Administrador | Permiso: `users:manage` |
 | `POST` | `/api/v1/users/{id}/change-password` | Actualización de contraseña propia | Autenticado |
 
 ---
@@ -325,8 +325,8 @@ Crea el esquema completo con integridad referencial:
 ### 8.3 Semillero Inicial de Datos (`backend/app/core/seed.py`)
 Script ejecutable para inicializar la base de datos con:
 - **Sucursal Predeterminada:** `"Sede Central"` (`codigo="CENTRAL"`).
-- **Catálogo de Permisos:** `users:manage`, `sucursales:manage`, `pacientes:manage`, `ordenes:create`, `ordenes:view`, `ordenes:update`, `ordenes:audit`, `ordenes:calls`, `dashboard:view`.
-- **Roles Base:** `ADMIN` (acceso total), `AUDITOR` (auditoría médica), `USUARIO` (operador de sucursal).
+- **Catálogo de los 11 Permisos Atómicos:** `dashboard:view`, `ordenes:view`, `ordenes:create`, `ordenes:update`, `ordenes:audit`, `ordenes:calls`, `pacientes:manage`, `mutuales:manage`, `sucursales:manage`, `users:manage`, `config:manage`.
+- **Roles Base:** `ADMIN` (Nivel 100 - acceso total), `AUDITOR` (Nivel 50 - auditoría médica y gestión), `USUARIO` (Nivel 10 - operador de sucursal).
 - **Superusuario Inicial:**
   - **Usuario:** `admin`
   - **Contraseña:** `admin123456`

@@ -73,13 +73,19 @@ const navigationItems = computed(() => {
     items.push({ label: 'Usuarios y Roles', icon: 'pi pi-user-edit', to: '/usuarios' });
   }
 
-  // Módulos de administración global
-  if (authStore.isAdmin) {
-    items.push(
-      { label: 'Obras Sociales', icon: 'pi pi-id-card', to: '/obras-sociales' },
-      { label: 'Sucursales', icon: 'pi pi-building', to: '/sucursales' },
-      { label: 'Configuración', icon: 'pi pi-cog', to: '/configuracion' }
-    );
+  // Obras Sociales: si tiene 'mutuales:manage' o es Admin
+  if (authStore.isAdmin || authStore.hasPermission('mutuales:manage')) {
+    items.push({ label: 'Obras Sociales', icon: 'pi pi-id-card', to: '/obras-sociales' });
+  }
+
+  // Sucursales: si tiene 'sucursales:manage' o es Admin
+  if (authStore.isAdmin || authStore.hasPermission('sucursales:manage')) {
+    items.push({ label: 'Sucursales', icon: 'pi pi-building', to: '/sucursales' });
+  }
+
+  // Configuración: si tiene 'config:manage' o es Admin
+  if (authStore.isAdmin || authStore.hasPermission('config:manage')) {
+    items.push({ label: 'Configuración', icon: 'pi pi-cog', to: '/configuracion' });
   }
 
   // Manual de Usuario accesible para todos

@@ -17,8 +17,17 @@ function getDefaultRoute(authStore: any): string {
   if (authStore.hasPermission('pacientes:manage')) {
     return '/pacientes';
   }
+  if (authStore.hasPermission('mutuales:manage')) {
+    return '/obras-sociales';
+  }
   if (authStore.hasPermission('users:manage')) {
     return '/usuarios';
+  }
+  if (authStore.hasPermission('sucursales:manage')) {
+    return '/sucursales';
+  }
+  if (authStore.hasPermission('config:manage')) {
+    return '/configuracion';
   }
   return '/manual_usuario';
 }
@@ -80,7 +89,7 @@ const routes: RouteRecordRaw[] = [
         path: 'obras-sociales',
         name: 'ObrasSocialesList',
         component: () => import('../views/mutuales/ObrasSocialesListView.vue'),
-        meta: { roles: ['ADMIN'] },
+        meta: { permission: 'mutuales:manage' },
       },
       {
         path: 'mutuales',
@@ -96,13 +105,13 @@ const routes: RouteRecordRaw[] = [
         path: 'sucursales',
         name: 'SucursalesList',
         component: () => import('../views/users/SucursalesListView.vue'),
-        meta: { roles: ['ADMIN'] },
+        meta: { permission: 'sucursales:manage' },
       },
       {
         path: 'configuracion',
         name: 'Configuracion',
         component: () => import('../views/config/ConfiguracionView.vue'),
-        meta: { roles: ['ADMIN'] },
+        meta: { permission: 'config:manage' },
       },
       {
         path: 'manual_usuario',
