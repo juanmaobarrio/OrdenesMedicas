@@ -294,6 +294,12 @@ class OrdenMedicaCambioEstado(BaseModel):
     observacion_resultado: Optional[str] = Field(
         None, description="Observacion o resultado comunicado al paciente al finalizar auditoria"
     )
+    valor_copago: Optional[Decimal] = Field(
+        None, ge=0, description="Monto actualizado del copago al finalizar auditoria"
+    )
+    valor_estudios_no_autorizados: Optional[Decimal] = Field(
+        None, ge=0, description="Monto de estudios no autorizados al finalizar auditoria"
+    )
 
 
 class OrdenMedicaAsignarAuditor(BaseModel):

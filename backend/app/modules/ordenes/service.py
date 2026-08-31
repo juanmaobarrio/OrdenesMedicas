@@ -324,6 +324,12 @@ class OrdenMedicaService:
                 orden.observacion_resultado_auditoria = dto.motivo
             orden.llamada_finalizada_completada = False
 
+        # Si se modificó copago o no autorizados al cambiar estado (ej: al finalizar auditoría)
+        if dto.valor_copago is not None:
+            orden.valor_copago = dto.valor_copago
+        if dto.valor_estudios_no_autorizados is not None:
+            orden.valor_estudios_no_autorizados = dto.valor_estudios_no_autorizados
+
         # Si pasa a 'Solicitudes de auditoria', habilitar llamada
         if final_estado_enum == EstadoOrden.SOLICITUDES_AUDITORIA:
             orden.llamada_solicitud_completada = False
@@ -338,6 +344,10 @@ class OrdenMedicaService:
             detalles_log["motivo"] = dto.motivo
         if dto.observacion_resultado:
             detalles_log["observacion_resultado"] = dto.observacion_resultado
+        if dto.valor_copago is not None:
+            detalles_log["valor_copago"] = str(dto.valor_copago)
+        if dto.valor_estudios_no_autorizados is not None:
+            detalles_log["valor_estudios_no_autorizados"] = str(dto.valor_estudios_no_autorizados)
         if dto.motivo_cancelacion_id:
             detalles_log["motivo_cancelacion_id"] = str(dto.motivo_cancelacion_id)
         if dto.estado_id:

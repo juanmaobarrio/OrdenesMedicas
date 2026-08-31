@@ -54,6 +54,17 @@ const selectedNuevoEstado = ref<EstadoOrden>('en Auditoria');
 const selectedMotivoCancelacion = ref<string>('');
 const motivoEstadoDetalle = ref('');
 const observacionResultadoAuditoria = ref('');
+const finalCopago = ref(0);
+const finalEstudiosNoAutorizados = ref(0);
+
+const openCambiarEstadoModal = () => {
+  if (orden.value) {
+    finalCopago.value = Number(orden.value.valor_copago || 0);
+    finalEstudiosNoAutorizados.value = Number(orden.value.valor_estudios_no_autorizados || 0);
+    observacionResultadoAuditoria.value = orden.value.observacion_resultado_auditoria || '';
+  }
+  isCambioEstadoVisible.value = true;
+};
 
 const isSolicitudVisible = ref(false);
 const motivoSolicitud = ref('Falta diagnóstico');
@@ -337,7 +348,9 @@ const handleCambiarEstado = async () => {
       selectedNuevoEstado.value,
       motivoFinal,
       null,
-      selectedNuevoEstado.value === 'Auditoria Finalizada' ? observacionResultadoAuditoria.value.trim() : null
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? observacionResultadoAuditoria.value.trim() : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalCopago.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizados.value : null
     );
     toast.add({
       severity: 'success',
@@ -579,7 +592,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
             icon="pi pi-sync"
             severity="secondary"
             size="small"
-            @click="isCambioEstadoVisible = true"
+            @click="openCambiarEstadoModal"
           />
 
           <!-- Editar Datos -->
@@ -725,7 +738,33 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               <!-- Tab 0: Solicitudes de Auditoría -->
               <TabPanel value="0">
                 <div class="p-4 space-y-4">
-                  <div v-if="orden.solicitudes.length === 0" class="text-center py-8 text-sm text-slate-400">
+                  <!-- Resolución Final de Auditoría (Verde / Éxito) -->
+                  <div
+                    v-if="orden.observacion_resultado_auditoria"
+                    class="p-4 rounded-xl border border-emerald-300 bg-emerald-50/90 space-y-2 text-xs shadow-sm"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <i class="pi pi-check-circle text-emerald-600 text-base"></i>
+                        <span class="font-bold text-emerald-950 uppercase tracking-wide">
+                          Resolución Final de Auditoría Médica
+                        </span>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">
+                        Aprobada / Resuelta
+                      </span>
+                    </div>
+                    <p class="text-slate-800 bg-white p-3 rounded-lg border border-emerald-200 leading-relaxed font-medium">
+                      {{ orden.observacion_resultado_auditoria }}
+                    </p>
+                    <div class="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 pt-1 border-t border-emerald-200/60">
+                      <span>Copago: <strong>${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                      <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">No Autorizados: <strong>${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                      <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                    </div>
+                  </div>
+
+                  <div v-if="orden.solicitudes.length === 0 && !orden.observacion_resultado_auditoria" class="text-center py-8 text-sm text-slate-400">
                     No hay observaciones de auditoría registradas.
                   </div>
                   <div
@@ -1128,6 +1167,17 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               class="w-full text-xs"
               placeholder="Ej: Aprobada 100%. Se autorizan todas las prácticas solicitadas..."
             />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-blue-200/60">
+            <div>
+              <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
+              <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
+              <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" />
+            </div>
           </div>
         </div>
 
