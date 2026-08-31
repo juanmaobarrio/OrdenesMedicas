@@ -622,7 +622,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
 
         <!-- Auditor Action: Emitir Observación -->
         <Button
-          v-if="authStore.isAdmin || authStore.isAuditor"
+          v-if="authStore.isAdmin || authStore.isAuditor || authStore.hasPermission('ordenes:audit')"
           label="Observación del Auditor"
           icon="pi pi-exclamation-triangle"
           severity="warn"
@@ -650,9 +650,9 @@ const loadPreviousOrders = async (pacienteId: string) => {
         />
 
 
-        <!-- Asignar Auditor (Admin) -->
+        <!-- Asignar Auditor (Admin o con permiso) -->
         <Button
-          v-if="authStore.isAdmin"
+          v-if="authStore.isAdmin || authStore.hasPermission('ordenes:audit')"
           icon="pi pi-user-plus"
           label="Auditor"
           text

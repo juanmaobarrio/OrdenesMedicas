@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.core.exceptions import AppException
-from backend.app.modules.auth.dependencies import get_current_user, require_roles
+from backend.app.modules.auth.dependencies import get_current_user, require_permission, require_roles
 from backend.app.modules.ordenes.models import EstadoOrden
 from backend.app.modules.ordenes.schemas import (
     AdjuntoOrdenRead,
@@ -259,7 +259,7 @@ async def asignar_auditor(
     dto: OrdenMedicaAsignarAuditor,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN", "AUDITOR"])),
+    current_user: User = Depends(require_permission("ordenes:audit")),
 ):
     ip, agent = _get_client_info(request)
     service = OrdenMedicaService(db)
@@ -275,14 +275,14 @@ async def asignar_auditor(
     "/{orden_id}/solicitudes",
     response_model=AuditoriaSolicitudRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear solicitud u observacion medica (Auditor)",
+    summary="Crear solicitud u observacion medica (Auditor o con permiso ordenes:audit)",
 )
 async def agregar_solicitud_auditoria(
     orden_id: uuid.UUID,
     dto: AuditoriaSolicitudCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["ADMIN", "AUDITOR"])),
+    current_user: User = Depends(require_permission("ordenes:audit")),
 ):
     ip, agent = _get_client_info(request)
     service = OrdenMedicaService(db)

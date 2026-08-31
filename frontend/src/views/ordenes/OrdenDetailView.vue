@@ -578,7 +578,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
 
           <!-- Auditor Action: Emitir Observacion -->
           <Button
-            v-if="authStore.isAdmin || authStore.isAuditor"
+            v-if="authStore.isAdmin || authStore.isAuditor || authStore.hasPermission('ordenes:audit')"
             label="Observación del Auditor"
             icon="pi pi-exclamation-triangle"
             severity="warn"
@@ -607,7 +607,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
 
           <!-- Asignar Auditor -->
           <Button
-            v-if="authStore.isAdmin"
+            v-if="authStore.isAdmin || authStore.hasPermission('ordenes:audit')"
             icon="pi pi-user-plus"
             label="Asignar Auditor"
             text
