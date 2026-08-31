@@ -49,6 +49,7 @@ class TipoEstadoOrden(str, enum.Enum):
 class EstadoSolicitudAuditoria(str, enum.Enum):
     """Estados de una solicitud/observacion de auditoria."""
     PENDIENTE = "PENDIENTE"
+    INFORMACION = "INFORMACION"
     RESPONDIDA = "RESPONDIDA"
     CERRADA = "CERRADA"
 
@@ -57,6 +58,9 @@ class TipoLlamadaPaciente(str, enum.Enum):
     """Tipos de llamada/notificacion al paciente segun la etapa."""
     SOLICITUD_AUDITORIA = "SOLICITUD_AUDITORIA"
     AUDITORIA_FINALIZADA = "AUDITORIA_FINALIZADA"
+    CONSULTA_PACIENTE = "CONSULTA_PACIENTE"
+    SEGUIMIENTO_SUCURSAL = "SEGUIMIENTO_SUCURSAL"
+    OTRO = "OTRO"
 
 
 class ResultadoLlamada(str, enum.Enum):
@@ -132,6 +136,11 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Control de orden fisica adeudada (recibida por mail/digital)
     debe_orden_medica: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, comment="Indica si el paciente debe la orden fisica original"
+    )
+
+    # Control de Acto Profesional Bioquímico (APB)
+    abona_apb: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="Indica si el paciente abona Acto Profesional Bioquímico (APB)"
     )
 
 

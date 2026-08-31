@@ -33,6 +33,7 @@ const form = ref<ObraSocialCreate>({
   nombre: '',
   codigo_externo: '',
   dias_vencimiento: 30,
+  copago_default: 0,
   activa: true,
 });
 
@@ -83,6 +84,7 @@ const openNewDialog = () => {
     nombre: '',
     codigo_externo: '',
     dias_vencimiento: 30,
+    copago_default: 0,
     activa: true,
   };
   isDialogVisible.value = true;
@@ -97,6 +99,7 @@ const openEditDialog = (m: ObraSocial) => {
     nombre: m.nombre,
     codigo_externo: m.codigo_externo || '',
     dias_vencimiento: m.dias_vencimiento,
+    copago_default: m.copago_default !== undefined && m.copago_default !== null ? Number(m.copago_default) : 0,
     activa: m.activa,
   };
   isDialogVisible.value = true;
@@ -121,6 +124,7 @@ const handleSave = async () => {
         nombre: form.value.nombre.trim(),
         codigo_externo: form.value.codigo_externo?.trim() || null,
         dias_vencimiento: form.value.dias_vencimiento,
+        copago_default: form.value.copago_default !== undefined && form.value.copago_default !== null ? Number(form.value.copago_default) : 0,
         activa: form.value.activa,
       };
       await mutualesService.update(editingId.value, updatePayload);
@@ -137,6 +141,7 @@ const handleSave = async () => {
         nombre: form.value.nombre.trim(),
         codigo_externo: form.value.codigo_externo?.trim() || null,
         dias_vencimiento: form.value.dias_vencimiento,
+        copago_default: form.value.copago_default !== undefined && form.value.copago_default !== null ? Number(form.value.copago_default) : 0,
         activa: form.value.activa,
       };
       await mutualesService.create(createPayload);
@@ -254,6 +259,14 @@ const handleToggleActive = async (m: ObraSocial) => {
           </template>
         </Column>
 
+        <Column field="copago_default" header="Copago Default" sortable>
+          <template #body="{ data }">
+            <span class="font-mono text-xs font-semibold text-emerald-700">
+              ${{ Number(data.copago_default || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </span>
+          </template>
+        </Column>
+
         <Column field="activa" header="Estado" sortable>
           <template #body="{ data }">
             <Tag :value="data.activa ? 'ACTIVA' : 'INACTIVA'" :severity="data.activa ? 'success' : 'secondary'"
@@ -317,10 +330,18 @@ const handleToggleActive = async (m: ObraSocial) => {
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Código Externo (Opcional)
+              Copago Predeterminado ($)
             </label>
-            <InputText v-model="form.codigo_externo as any" placeholder="Ej: 1040" class="w-full text-xs" />
+            <InputNumber v-model="form.copago_default as any" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" placeholder="$ 0,00" />
+            <p class="text-[10px] text-slate-400 mt-0.5">Valor sugerido al cargar orden</p>
           </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+            Código Externo (Opcional)
+          </label>
+          <InputText v-model="form.codigo_externo as any" placeholder="Ej: 1040" class="w-full text-xs" />
         </div>
 
         <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">

@@ -11,8 +11,13 @@ export type EstadoOrden =
   | 'Cancelada'
   | 'Cerrada';
 
-export type EstadoSolicitud = 'PENDIENTE' | 'RESPONDIDA' | 'CERRADA';
-export type TipoLlamada = 'SOLICITUD_AUDITORIA' | 'AUDITORIA_FINALIZADA';
+export type EstadoSolicitud = 'PENDIENTE' | 'INFORMACION' | 'RESPONDIDA' | 'CERRADA';
+export type TipoLlamada =
+  | 'SOLICITUD_AUDITORIA'
+  | 'AUDITORIA_FINALIZADA'
+  | 'CONSULTA_PACIENTE'
+  | 'SEGUIMIENTO_SUCURSAL'
+  | 'OTRO';
 export type ResultadoLlamada = 'EXITOSA' | 'NO_CONTESTA' | 'NUMERO_ERRONEO' | 'REINTENTAR';
 
 export interface AdjuntoOrden {
@@ -134,6 +139,7 @@ export interface OrdenMedicaListItem {
   nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
+  abona_apb?: boolean;
   cantidad_ordenes_fisicas: number;
 
   numeros_auditoria: string[];
@@ -160,6 +166,7 @@ export interface OrdenMedicaDetail {
   nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
+  abona_apb?: boolean;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
@@ -196,9 +203,10 @@ export interface OrdenMedicaCreate {
   fecha_prescripcion: string;
   cantidad_ordenes_fisicas: number;
   mutual: string;
-  nro_afiliado?: string | null;
+  nro_afiliado: string;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
+  abona_apb?: boolean;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];

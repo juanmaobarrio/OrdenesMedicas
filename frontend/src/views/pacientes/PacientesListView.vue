@@ -108,8 +108,18 @@ const handleOpenEdit = (paciente: Paciente) => {
 };
 
 const handleSave = async () => {
-  if (!form.value.documento.trim() || !form.value.nombres.trim() || !form.value.apellidos.trim()) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Documento, Nombres y Apellidos son obligatorios', life: 3000 });
+  if (
+    !form.value.documento.trim() ||
+    !form.value.nombres.trim() ||
+    !form.value.apellidos.trim() ||
+    !form.value.fecha_nacimiento
+  ) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Atención',
+      detail: 'Documento, Nombres, Apellidos y Fecha de Nacimiento son obligatorios',
+      life: 3500,
+    });
     return;
   }
 
@@ -220,7 +230,9 @@ const onPageChange = (event: any) => {
             <InputText v-model="form.documento" placeholder="Sin puntos" class="w-full" />
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha de Nacimiento</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Fecha de Nacimiento <span class="text-red-500">*</span>
+            </label>
             <InputText v-model="form.fecha_nacimiento as any" type="date" class="w-full" />
           </div>
         </div>

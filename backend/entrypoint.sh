@@ -11,8 +11,9 @@ elif [ -f "alembic.ini" ]; then
     alembic upgrade head || echo "Aviso: Continuando con inicialización ORM..."
 fi
 
-# Ejecutar siembra de datos iniciales
-echo "Verificando / sembrando datos iniciales del sistema..."
+# Ejecutar siembra de datos iniciales y verificación de columnas
+echo "Verificando / sembrando datos iniciales y columnas del sistema..."
+python -m backend.app.core.migrar_columnas || true
 python -m backend.app.core.seed || {
     echo "Advertencia: Error durante la siembra de datos."
 }

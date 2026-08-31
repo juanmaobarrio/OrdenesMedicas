@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from backend.app.modules.ordenes.models import (
     EstadoOrden,
@@ -104,6 +104,10 @@ class AdjuntoOrdenRead(BaseModel):
 class AuditoriaSolicitudCreate(BaseModel):
     motivo_solicitud: str = Field(..., min_length=3, max_length=150)
     mensaje_auditor: str = Field(..., min_length=5)
+    es_informativa: bool = Field(
+        default=False,
+        description="Si es True, la observación es de carácter Informativo (color azul) y no genera llamada pendiente",
+    )
 
 
 class AuditoriaSolicitudResponder(BaseModel):
@@ -131,13 +135,17 @@ class AuditoriaSolicitudRead(BaseModel):
 # ==========================================
 class RegistroLlamadaCreate(BaseModel):
     tipo_llamada: TipoLlamadaPaciente = Field(
-        ..., description="Etapa correspondiente: SOLICITUD_AUDITORIA o AUDITORIA_FINALIZADA"
+        ..., description="Etapa correspondiente o tipo de llamada"
     )
     resultado: ResultadoLlamada = Field(
         ..., description="Resultado del contacto: EXITOSA, NO_CONTESTA, NUMERO_ERRONEO, REINTENTAR"
     )
     observaciones: Optional[str] = Field(
         None, description="Observaciones adicionales sobre la comunicacion"
+    )
+    completar_aviso_pendiente: bool = Field(
+        default=True,
+        description="Si es True y la llamada fue EXITOSA, da por cumplido cualquier aviso pendiente al paciente de esta orden",
     )
 
 
@@ -218,8 +226,10 @@ class OrdenMedicaBase(BaseModel):
     valor_estudios_no_autorizados: Decimal = Field(
         default=Decimal("0.00"), ge=0, description="Valor total de los estudios no autorizados"
     )
+    abona_apb: bool = Field(
+        default=False, description="Indica si el paciente abona Acto Profesional Bioquímico (APB)"
+    )
     fecha_vencimiento: Optional[date] = Field(
-
         None, description="Fecha de vencimiento de la prescripcion"
     )
     numeros_auditoria: List[str] = Field(
@@ -239,7 +249,17 @@ class OrdenMedicaBase(BaseModel):
 
 
 class OrdenMedicaCreate(OrdenMedicaBase):
-    pass
+    nro_afiliado: str = Field(..., min_length=1, max_length=50, description="Numero de credencial obligatorio")
+    contacto_nombre: str = Field(..., min_length=2, max_length=150, description="Nombre de contacto obligatorio")
+    contacto_horario: str = Field(..., min_length=1, max_length=100, description="Horario de contacto obligatorio")
+
+    @model_validator(mode="after")
+    def validate_contact_numbers(self):
+        tel = (self.contacto_telefono or "").strip()
+        cel = (self.contacto_celular or "").strip()
+        if not tel and not cel:
+            raise ValueError("Debe ingresar al menos un número de contacto (Teléfono fijo o Celular/WhatsApp)")
+        return self
 
 
 class OrdenMedicaUpdate(BaseModel):
@@ -249,6 +269,7 @@ class OrdenMedicaUpdate(BaseModel):
     nro_afiliado: Optional[str] = Field(None, max_length=50)
     valor_copago: Optional[Decimal] = Field(None, ge=0)
     valor_estudios_no_autorizados: Optional[Decimal] = Field(None, ge=0)
+    abona_apb: Optional[bool] = None
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: Optional[List[str]] = None
@@ -288,6 +309,7 @@ class OrdenMedicaListItem(BaseModel):
     nro_afiliado: Optional[str] = None
     valor_copago: Decimal
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
+    abona_apb: bool = False
     cantidad_ordenes_fisicas: int
 
     numeros_auditoria: List[str]
@@ -316,6 +338,7 @@ class OrdenMedicaDetail(BaseModel):
     nro_afiliado: Optional[str] = None
     valor_copago: Decimal
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
+    abona_apb: bool = False
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: List[str]

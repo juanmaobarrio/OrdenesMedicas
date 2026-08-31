@@ -122,6 +122,7 @@ class OrdenMedicaService:
             nro_afiliado=dto.nro_afiliado.strip() if dto.nro_afiliado else None,
             valor_copago=dto.valor_copago,
             valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+            abona_apb=dto.abona_apb,
             fecha_vencimiento=dto.fecha_vencimiento,
             numeros_auditoria=dto.numeros_auditoria,
             debe_orden_medica=dto.debe_orden_medica,
@@ -199,6 +200,10 @@ class OrdenMedicaService:
         if dto.valor_estudios_no_autorizados is not None:
             diff["valor_estudios_no_autorizados"] = str(dto.valor_estudios_no_autorizados)
             orden.valor_estudios_no_autorizados = dto.valor_estudios_no_autorizados
+
+        if dto.abona_apb is not None:
+            diff["abona_apb"] = dto.abona_apb
+            orden.abona_apb = dto.abona_apb
 
         if dto.fecha_vencimiento is not None:
             diff["fecha_vencimiento"] = str(dto.fecha_vencimiento)
@@ -398,37 +403,61 @@ class OrdenMedicaService:
         orden = await self.get_by_id(orden_id)
         estado_anterior = orden.estado
 
+        es_info = bool(dto.es_informativa)
+        estado_sol = EstadoSolicitudAuditoria.INFORMACION if es_info else EstadoSolicitudAuditoria.PENDIENTE
+
         solicitud = AuditoriaSolicitud(
             orden_id=orden_id,
             auditor_id=current_user.id,
             motivo_solicitud=dto.motivo_solicitud.strip(),
             mensaje_auditor=dto.mensaje_auditor.strip(),
-            estado=EstadoSolicitudAuditoria.PENDIENTE,
+            estado=estado_sol,
         )
         created_solicitud = await self.repo.create_solicitud(solicitud)
 
-        # Transicionar orden a Solicitudes de auditoria y marcar llamada pendiente
-        orden.estado = EstadoOrden.SOLICITUDES_AUDITORIA
-        orden.llamada_solicitud_completada = False
-        await self.db.flush()
+        if not es_info:
+            # Transicionar orden a Solicitudes de auditoria y marcar llamada pendiente
+            orden.estado = EstadoOrden.SOLICITUDES_AUDITORIA
+            orden.llamada_solicitud_completada = False
+            await self.db.flush()
 
-
-        await self.repo.create_audit_log(
-            AuditoriaLog(
-                orden_id=orden.id,
-                user_id=current_user.id,
-                accion="NUEVA_SOLICITUD_AUDITORIA",
-                estado_anterior=estado_anterior.value,
-                estado_nuevo=EstadoOrden.SOLICITUDES_AUDITORIA.value,
-                detalles={
-                    "solicitud_id": str(created_solicitud.id),
-                    "motivo": dto.motivo_solicitud,
-                    "mensaje": dto.mensaje_auditor,
-                },
-                ip_address=client_ip,
-                user_agent=user_agent,
+            await self.repo.create_audit_log(
+                AuditoriaLog(
+                    orden_id=orden.id,
+                    user_id=current_user.id,
+                    accion="NUEVA_SOLICITUD_AUDITORIA",
+                    estado_anterior=estado_anterior.value,
+                    estado_nuevo=EstadoOrden.SOLICITUDES_AUDITORIA.value,
+                    detalles={
+                        "solicitud_id": str(created_solicitud.id),
+                        "motivo": dto.motivo_solicitud,
+                        "mensaje": dto.mensaje_auditor,
+                        "es_informativa": False,
+                    },
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
             )
-        )
+        else:
+            # Es solo informativa: NO altera estado ni genera llamada pendiente
+            await self.db.flush()
+            await self.repo.create_audit_log(
+                AuditoriaLog(
+                    orden_id=orden.id,
+                    user_id=current_user.id,
+                    accion="NUEVA_OBSERVACION_INFORMATIVA",
+                    estado_anterior=estado_anterior.value,
+                    estado_nuevo=estado_anterior.value,
+                    detalles={
+                        "solicitud_id": str(created_solicitud.id),
+                        "motivo": dto.motivo_solicitud,
+                        "mensaje": dto.mensaje_auditor,
+                        "es_informativa": True,
+                    },
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                )
+            )
 
         return (await self.repo.get_solicitud_by_id(created_solicitud.id)) or created_solicitud
 
@@ -597,6 +626,17 @@ class OrdenMedicaService:
                 orden.llamada_finalizada_completada = True
                 orden.llamada_finalizada_fecha = now
                 orden.llamada_finalizada_observacion = dto.observaciones
+
+            # Si el operador marcó completar aviso pendiente (o si el paciente llamó y se resolvió el aviso)
+            if dto.completar_aviso_pendiente:
+                if not orden.llamada_solicitud_completada:
+                    orden.llamada_solicitud_completada = True
+                    orden.llamada_solicitud_fecha = now
+                    orden.llamada_solicitud_observacion = dto.observaciones
+                if not orden.llamada_finalizada_completada and orden.estado == EstadoOrden.AUDITORIA_FINALIZADA:
+                    orden.llamada_finalizada_completada = True
+                    orden.llamada_finalizada_fecha = now
+                    orden.llamada_finalizada_observacion = dto.observaciones
 
         await self.db.flush()
 

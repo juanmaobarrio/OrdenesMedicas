@@ -5,6 +5,7 @@ export interface ObraSocial {
   nombre: string;
   codigo_externo?: string | null;
   dias_vencimiento: number;
+  copago_default?: number;
   activa: boolean;
   display_name: string;
   created_at?: string;
@@ -17,6 +18,7 @@ export interface ObraSocialCreate {
   nombre: string;
   codigo_externo?: string | null;
   dias_vencimiento: number;
+  copago_default?: number;
   activa?: boolean;
 }
 
@@ -25,5 +27,6 @@ export interface ObraSocialUpdate {
   nombre?: string;
   codigo_externo?: string | null;
   dias_vencimiento?: number;
+  copago_default?: number;
   activa?: boolean;
 }

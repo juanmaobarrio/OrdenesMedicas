@@ -13,7 +13,7 @@ export function formatDateTime(dateStr?: string | Date | null): string {
   try {
     const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
     if (isNaN(date.getTime())) return String(dateStr);
-    
+
     return date.toLocaleString('es-AR', {
       timeZone: TIMEZONE_ARGENTINA,
       day: '2-digit',

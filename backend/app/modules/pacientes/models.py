@@ -1,7 +1,8 @@
 import uuid
 from datetime import date
+from decimal import Decimal
 from typing import Optional
-from sqlalchemy import Boolean, Date, Integer, String
+from sqlalchemy import Boolean, Date, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -52,6 +53,9 @@ class ObraSocial(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     dias_vencimiento: Mapped[int] = mapped_column(
         Integer, default=30, nullable=False, comment="Dias de validez/vencimiento de la orden"
+    )
+    copago_default: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Valor de copago predeterminado"
     )
     activa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

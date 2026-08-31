@@ -80,11 +80,13 @@ export const ordenesService = {
   async crearSolicitud(
     ordenId: string,
     motivo_solicitud: string,
-    mensaje_auditor: string
+    mensaje_auditor: string,
+    es_informativa: boolean = false
   ): Promise<AuditoriaSolicitud> {
     const response = await api.post<AuditoriaSolicitud>(`/ordenes/${ordenId}/solicitudes`, {
       motivo_solicitud,
       mensaje_auditor,
+      es_informativa,
     });
     return response.data;
   },
@@ -114,6 +116,7 @@ export const ordenesService = {
       tipo_llamada: TipoLlamada;
       resultado: ResultadoLlamada;
       observaciones?: string;
+      completar_aviso_pendiente?: boolean;
     }
   ): Promise<RegistroLlamada> {
     const response = await api.post<RegistroLlamada>(

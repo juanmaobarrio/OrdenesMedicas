@@ -106,6 +106,7 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
 
 #### C. Crear una Nueva Orden Médica
 - **Endpoint:** `POST /api/v1/ordenes`
+- **Campos Obligatorios:** `paciente_id`, `sucursal_id`, `fecha_prescripcion`, `cantidad_ordenes_fisicas` (>0), `mutual`, `nro_afiliado`, `contacto_nombre`, `contacto_horario`, y al menos un teléfono (`contacto_telefono` o `contacto_celular`).
 - **Request Body:**
 ```json
 {
@@ -114,8 +115,10 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
   "fecha_prescripcion": "2026-08-27",
   "cantidad_ordenes_fisicas": 1,
   "mutual": "OSDE",
-  "valor_copago": 0,
+  "nro_afiliado": "12345678/01",
+  "valor_copago": 2500.00,
   "valor_estudios_no_autorizados": 0,
+  "abona_apb": true,
   "fecha_vencimiento": "2026-09-26",
   "numeros_auditoria": ["AUT-1002", "AUT-1003"],
   "debe_orden_medica": true,
@@ -165,11 +168,15 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
 
 #### E. Emitir Observación del Auditor
 - **Endpoint:** `POST /api/v1/ordenes/{id}/solicitudes`
-- Pasa la orden automáticamente al estado `Solicitudes de auditoria` y la incorpora a la bandeja de llamadas.
+- **Tipos de Observación:**
+  - **Solicitud de Auditoría (`es_informativa: false`):** Pasa la orden a `Solicitudes de auditoria` y la incorpora a la bandeja de llamadas pendientes para contactar al paciente.
+  - **Solo Información (`es_informativa: true`):** Queda con estado `INFORMACION` (color azul en el expediente), **no altera el estado de la orden** y **no genera llamada pendiente**.
+
 ```json
 {
-  "motivo_solicitud": "Falta diagnóstico",
-  "mensaje_auditor": "El médico solicitante debe aclarar diagnóstico presuntivo para autorizar la práctica 66001."
+  "motivo_solicitud": "Falta diagnóstico presuntivo",
+  "mensaje_auditor": "El médico solicitante debe aclarar diagnóstico para autorizar la práctica 66001.",
+  "es_informativa": false
 }
 ```
 
@@ -194,20 +201,27 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
   - `observacion_resultado_auditoria`: Mensaje de resolución del auditor
   - `solicitudes_pendientes`: Lista de observaciones detalladas del auditor
 
-#### B. Registrar Resultado de la Notificación / Llamada
+#### B. Registrar Resultado de la Notificación / Llamada / Consulta Directa
 - **Endpoint:** `POST /api/v1/ordenes/{id}/registrar-llamada`
-- **Nota importante:** Registrar una llamada exitosa **saca la orden de la lista de llamadas pendientes**, pero **no altera el estado de la orden médica**.
+- **Tipos de Llamada (`tipo_llamada`):**
+  - `SOLICITUD_AUDITORIA`: Aviso al paciente sobre requerimiento médico.
+  - `AUDITORIA_FINALIZADA`: Aviso al paciente sobre aprobación/resolución médica.
+  - `CONSULTA_PACIENTE`: Consulta entrante del paciente hacia el laboratorio.
+  - `SEGUIMIENTO_SUCURSAL`: Seguimiento interno de la sucursal.
+  - `OTRO`: Otro motivo de comunicación.
+- **Resolución de Avisos Pendientes:** Si `completar_aviso_pendiente: true` y el resultado es `EXITOSA`, el sistema **da por cumplido cualquier aviso pendiente y remueve la orden de la bandeja de Llamadas Pendientes**.
 
 ```json
 {
-  "tipo_llamada": "AUDITORIA_FINALIZADA",
+  "tipo_llamada": "CONSULTA_PACIENTE",
   "resultado": "EXITOSA",
-  "observaciones": "Notificación enviada automáticamente por workflow n8n vía Email y WhatsApp."
+  "observaciones": "El paciente llamó consultando por el estado. Se le informó la observación del auditor y se comprometió a acercar la documentación.",
+  "completar_aviso_pendiente": true
 }
 ```
 
 Valores válidos para `resultado`:
-- `EXITOSA`: Contacto efectivo (remueve de la bandeja de pendientes).
+- `EXITOSA`: Contacto efectivo (remueve de la bandeja de pendientes si correspondía).
 - `NO_CONTESTA`: No respondió (permanece en pendientes para reintentar).
 - `NUMERO_ERRONEO`: Teléfono inválido.
 - `REINTENTAR`: Solicita nuevo intento.
@@ -221,6 +235,7 @@ Valores válidos para `resultado`:
 
 #### B. Registrar Paciente
 - **Endpoint:** `POST /api/v1/pacientes`
+- **Campos Obligatorios:** `documento`, `nombres`, `apellidos`, `fecha_nacimiento` (Formato `YYYY-MM-DD`).
 ```json
 {
   "documento": "40123456",
@@ -254,7 +269,9 @@ Valores válidos para `resultado`:
 #### A. Obras Sociales / Mutuales
 - `GET /api/v1/mutuales?only_active=true`
 - `POST /api/v1/mutuales`
+  - Body: `{ "codigo": "OSDE", "sigla": "OSDE", "nombre": "OSDE Binario", "dias_vencimiento": 30, "copago_default": 2500.00, "activa": true }`
 - `PUT /api/v1/mutuales/{id}`
+  - Body: `{ "nombre": "OSDE Binario", "dias_vencimiento": 30, "copago_default": 3000.00 }`
 - `PATCH /api/v1/mutuales/{id}/toggle-active`
 
 #### B. Motivos de Cancelación

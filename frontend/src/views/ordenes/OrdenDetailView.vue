@@ -58,6 +58,7 @@ const observacionResultadoAuditoria = ref('');
 const isSolicitudVisible = ref(false);
 const motivoSolicitud = ref('Falta diagnóstico');
 const mensajeSolicitud = ref('');
+const esInformativa = ref(false);
 
 const isResponderVisible = ref(false);
 const selectedSolicitudId = ref<string | null>(null);
@@ -67,6 +68,46 @@ const isAsignarAuditorVisible = ref(false);
 const selectedAuditorId = ref<string | null>(null);
 
 const isLlamadaModalVisible = ref(false);
+const isDirectLlamadaVisible = ref(false);
+const directLlamadaForm = ref({
+  tipo_llamada: 'CONSULTA_PACIENTE' as any,
+  resultado: 'EXITOSA' as any,
+  observaciones: '',
+  completar_aviso_pendiente: true,
+});
+
+const opcionesTiposLlamada = [
+  { label: '📞 Consulta del Paciente (Entrante)', value: 'CONSULTA_PACIENTE' },
+  { label: '📤 Aviso / Seguimiento de Sucursal (Saliente)', value: 'SEGUIMIENTO_SUCURSAL' },
+  { label: '⚠️ Aviso de Solicitud de Auditoría', value: 'SOLICITUD_AUDITORIA' },
+  { label: '✅ Aviso de Auditoría Finalizada', value: 'AUDITORIA_FINALIZADA' },
+  { label: '📝 Otro Motivo de Contacto', value: 'OTRO' },
+];
+
+const opcionesResultadosLlamada = [
+  { label: 'Contacto Exitoso (EXITOSA)', value: 'EXITOSA' },
+  { label: 'No Contesta (NO_CONTESTA)', value: 'NO_CONTESTA' },
+  { label: 'Número Erróneo / Inexistente (NUMERO_ERRONEO)', value: 'NUMERO_ERRONEO' },
+  { label: 'Reintentar más tarde (REINTENTAR)', value: 'REINTENTAR' },
+];
+
+const formatTipoLlamada = (tipo: string) => {
+  switch (tipo) {
+    case 'CONSULTA_PACIENTE':
+      return 'Consulta del Paciente';
+    case 'SEGUIMIENTO_SUCURSAL':
+      return 'Seguimiento de Sucursal';
+    case 'SOLICITUD_AUDITORIA':
+      return 'Solicitud de Auditoría';
+    case 'AUDITORIA_FINALIZADA':
+      return 'Auditoría Finalizada';
+    case 'OTRO':
+      return 'Otro Contacto';
+    default:
+      return tipo;
+  }
+};
+
 const isEditOrdenVisible = ref(false);
 const isActionLoading = ref(false);
 const activeTab = ref('0');
@@ -94,6 +135,7 @@ const editForm = ref({
   numeros_auditoria: [] as string[],
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
+  abona_apb: false,
   mutual: '',
   nro_afiliado: '',
   observaciones_ingreso: '',
@@ -111,6 +153,7 @@ const handleOpenEditOrden = () => {
     numeros_auditoria: [...(orden.value.numeros_auditoria || [])],
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
+    abona_apb: Boolean(orden.value.abona_apb),
     mutual: orden.value.mutual || '',
     nro_afiliado: orden.value.nro_afiliado || orden.value.paciente?.nro_afiliado || '',
     observaciones_ingreso: orden.value.observaciones_ingreso || '',
@@ -131,6 +174,7 @@ const handleSaveEditOrden = async () => {
       numeros_auditoria: editForm.value.numeros_auditoria,
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
+      abona_apb: editForm.value.abona_apb,
       mutual: editForm.value.mutual.trim().toUpperCase() || undefined,
       nro_afiliado: editForm.value.nro_afiliado.trim() || null,
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
@@ -325,14 +369,77 @@ const handleCrearSolicitud = async () => {
   }
   isActionLoading.value = true;
   try {
-    await ordenesService.crearSolicitud(ordenId, motivoSolicitud.value, mensajeSolicitud.value);
-    toast.add({ severity: 'success', summary: 'Observación Emitida', detail: 'Se notificó la solicitud de auditoría.', life: 3000 });
+    await ordenesService.crearSolicitud(
+      ordenId,
+      motivoSolicitud.value,
+      mensajeSolicitud.value,
+      esInformativa.value
+    );
+    toast.add({
+      severity: esInformativa.value ? 'info' : 'success',
+      summary: esInformativa.value ? 'Información Guardada' : 'Observación Emitida',
+      detail: esInformativa.value
+        ? 'Se registró la observación de carácter informativo.'
+        : 'Se notificó la solicitud de auditoría.',
+      life: 3000,
+    });
     isSolicitudVisible.value = false;
     motivoSolicitud.value = 'Falta diagnóstico';
     mensajeSolicitud.value = '';
+    esInformativa.value = false;
     await loadOrden();
   } catch (err: any) {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al crear solicitud', life: 4000 });
+  } finally {
+    isActionLoading.value = false;
+  }
+};
+
+const openDirectLlamadaModal = () => {
+  directLlamadaForm.value = {
+    tipo_llamada: 'CONSULTA_PACIENTE',
+    resultado: 'EXITOSA',
+    observaciones: '',
+    completar_aviso_pendiente: true,
+  };
+  isDirectLlamadaVisible.value = true;
+};
+
+const handleSaveDirectLlamada = async () => {
+  if (!directLlamadaForm.value.observaciones?.trim()) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Atención',
+      detail: 'Ingrese el detalle u observaciones de la conversación',
+      life: 3000,
+    });
+    return;
+  }
+  isActionLoading.value = true;
+  try {
+    await ordenesService.registrarLlamada(ordenId, {
+      tipo_llamada: directLlamadaForm.value.tipo_llamada,
+      resultado: directLlamadaForm.value.resultado,
+      observaciones: directLlamadaForm.value.observaciones.trim(),
+      completar_aviso_pendiente: directLlamadaForm.value.completar_aviso_pendiente,
+    });
+    toast.add({
+      severity: 'success',
+      summary: 'Llamada Registrada',
+      detail: directLlamadaForm.value.completar_aviso_pendiente && directLlamadaForm.value.resultado === 'EXITOSA'
+        ? 'Se guardó el contacto y se resolvió el aviso pendiente del paciente.'
+        : 'Se guardó el contacto en el historial de la orden.',
+      life: 3500,
+    });
+    isDirectLlamadaVisible.value = false;
+    await loadOrden();
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err.response?.data?.detail || 'No se pudo registrar la llamada',
+      life: 4000,
+    });
   } finally {
     isActionLoading.value = false;
   }
@@ -510,7 +617,17 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               <p class="text-xs text-slate-500">DNI: {{ orden.paciente?.documento }}</p>
             </div>
             <div class="text-xs text-slate-600 space-y-1.5 pt-2 border-t border-slate-100">
-              <p><span class="font-semibold">Obra Social:</span> {{ orden.mutual }}</p>
+              <div class="flex items-center gap-1.5">
+                <span class="font-semibold">Obra Social:</span>
+                <span class="font-bold text-slate-800">{{ orden.mutual }}</span>
+                <span
+                  v-if="orden.abona_apb"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200"
+                  title="Abona Acto Profesional Bioquímico"
+                >
+                  🧪 APB
+                </span>
+              </div>
               <p><span class="font-semibold">Copago:</span> <span class="text-emerald-700 font-bold">${{ orden.valor_copago }}</span></p>
               <p v-if="Number(orden.valor_estudios_no_autorizados) > 0">
                 <span class="font-semibold">No Autorizados:</span> <span class="text-amber-700 font-bold">${{ orden.valor_estudios_no_autorizados }}</span>
@@ -614,22 +731,38 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
                   <div
                     v-for="sol in orden.solicitudes"
                     :key="sol.id"
-                    class="p-4 rounded-xl border border-slate-200 space-y-3"
-                    :class="sol.estado === 'PENDIENTE' ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50'"
+                    class="p-4 rounded-xl border space-y-3"
+                    :class="{
+                      'bg-blue-50/70 border-blue-300 text-blue-900': sol.estado === 'INFORMACION',
+                      'bg-amber-50/50 border-amber-200': sol.estado === 'PENDIENTE',
+                      'bg-slate-50 border-slate-200': sol.estado !== 'INFORMACION' && sol.estado !== 'PENDIENTE',
+                    }"
                   >
                     <div class="flex items-center justify-between">
                       <div>
-                        <span class="text-xs font-bold text-amber-800 uppercase">{{ sol.motivo_solicitud }}</span>
+                        <span
+                          class="text-xs font-bold uppercase"
+                          :class="sol.estado === 'INFORMACION' ? 'text-blue-950' : 'text-amber-800'"
+                        >
+                          {{ sol.motivo_solicitud }}
+                        </span>
                         <p class="text-xs text-slate-500">Por Dr/a. {{ sol.auditor?.full_name }} &bull; {{ sol.created_at.slice(0, 16).replace('T', ' ') }}</p>
                       </div>
                       <span
-                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                        :class="sol.estado === 'PENDIENTE' ? 'bg-amber-200 text-amber-900' : 'bg-emerald-100 text-emerald-800'"
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1"
+                        :class="{
+                          'bg-blue-100 text-blue-800 border border-blue-200': sol.estado === 'INFORMACION',
+                          'bg-amber-200 text-amber-900': sol.estado === 'PENDIENTE',
+                          'bg-emerald-100 text-emerald-800': sol.estado === 'RESPONDIDA' || sol.estado === 'CERRADA',
+                        }"
                       >
-                        {{ sol.estado }}
+                        <i v-if="sol.estado === 'INFORMACION'" class="pi pi-info-circle text-[9px]"></i>
+                        <i v-else-if="sol.estado === 'PENDIENTE'" class="pi pi-clock text-[9px]"></i>
+                        <i v-else class="pi pi-check text-[9px]"></i>
+                        {{ sol.estado === 'INFORMACION' ? 'INFORMACIÓN' : sol.estado }}
                       </span>
                     </div>
-                    <p class="text-sm text-slate-700 bg-white p-3 rounded border border-slate-200">{{ sol.mensaje_auditor }}</p>
+                    <p class="text-sm text-slate-700 bg-white p-3 rounded border border-slate-200 leading-relaxed">{{ sol.mensaje_auditor }}</p>
 
                     <!-- Respuesta si existe -->
                     <div v-if="sol.respuesta_operador" class="p-3 bg-emerald-50 rounded border border-emerald-200 space-y-1">
@@ -637,7 +770,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
                       <p class="text-xs text-slate-700">{{ sol.respuesta_operador }}</p>
                     </div>
 
-                    <!-- Boton para responder si esta pendiente -->
+                    <!-- Boton para responder solo si esta pendiente -->
                     <div v-else-if="sol.estado === 'PENDIENTE'" class="pt-2">
                       <Button
                         label="Responder Observación"
@@ -752,20 +885,50 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               <!-- Tab 3: Registro de Llamadas -->
               <TabPanel value="3">
                 <div class="p-4 space-y-3">
+                  <!-- Header bar para registrar llamada manual -->
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div>
+                      <span class="font-bold text-slate-700 text-xs block">Historial de Llamadas y Consultas</span>
+                      <span class="text-[10px] text-slate-400">Comunicaciones registradas con el paciente</span>
+                    </div>
+                    <Button
+                      label="+ Registrar Llamada"
+                      icon="pi pi-phone"
+                      size="small"
+                      severity="primary"
+                      @click="openDirectLlamadaModal"
+                    />
+                  </div>
+
                   <div v-if="orden.llamadas_registro.length === 0" class="text-center py-8 text-sm text-slate-400">
                     No hay registros de llamadas a este paciente.
                   </div>
                   <div
                     v-for="ll in orden.llamadas_registro"
                     :key="ll.id"
-                    class="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1 text-xs"
+                    class="p-3 rounded-lg border border-slate-200 bg-white space-y-1.5 text-xs shadow-sm"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="font-bold text-slate-700">Resultado: {{ ll.resultado }}</span>
-                      <span class="text-slate-400">{{ formatDateTime(ll.created_at) }}</span>
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                          :class="{
+                            'bg-emerald-100 text-emerald-800 border border-emerald-200': ll.resultado === 'EXITOSA',
+                            'bg-amber-100 text-amber-800 border border-amber-200': ll.resultado === 'NO_CONTESTA',
+                            'bg-red-100 text-red-800 border border-red-200': ll.resultado === 'NUMERO_ERRONEO',
+                            'bg-blue-100 text-blue-800 border border-blue-200': ll.resultado === 'REINTENTAR',
+                          }"
+                        >
+                          {{ ll.resultado }}
+                        </span>
+                        <span class="font-bold text-slate-700 text-[11px]">
+                          {{ formatTipoLlamada(ll.tipo_llamada) }}
+                        </span>
+                      </div>
+                      <span class="text-slate-400 text-[10px]">{{ formatDateTime(ll.created_at) }}</span>
                     </div>
-                    <p class="text-slate-600"><span class="font-semibold">Operador:</span> {{ ll.operador?.full_name }}</p>
-                    <p v-if="ll.observaciones" class="text-slate-700 italic">"{{ ll.observaciones }}"</p>
+                    <p class="text-slate-500 text-[11px]">Operador: <span class="font-medium text-slate-700">{{ ll.operador?.full_name || 'Sistema' }}</span></p>
+                    <p v-if="ll.observaciones" class="italic text-slate-800 bg-slate-50 p-2 rounded border border-slate-100">"{{ ll.observaciones }}"</p>
                   </div>
                 </div>
               </TabPanel>
@@ -851,12 +1014,21 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
           <Textarea v-model="editForm.observaciones_ingreso" rows="3" class="w-full text-xs" />
         </div>
 
-        <!-- Checkbox Debe Orden Medica Fisica -->
-        <div class="p-3 bg-red-50 rounded-lg border border-red-200 flex items-center space-x-2">
-          <Checkbox v-model="editForm.debe_orden_medica" binary inputId="editDebeOrdenFisicaView" />
-          <label for="editDebeOrdenFisicaView" class="text-xs font-bold text-red-900 cursor-pointer">
-            ⚠️ Paciente DEBE la Orden Médica Física (Recibida digital/mail)
-          </label>
+        <!-- Checkbox APB y Debe Orden Medica Fisica -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div class="p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center space-x-2">
+            <Checkbox v-model="editForm.abona_apb" binary inputId="editAbonaApbView" />
+            <label for="editAbonaApbView" class="text-xs font-bold text-blue-900 cursor-pointer">
+              🧪 Abona APB (Acto Profesional Bioquímico)
+            </label>
+          </div>
+
+          <div class="p-3 bg-red-50 rounded-lg border border-red-200 flex items-center space-x-2">
+            <Checkbox v-model="editForm.debe_orden_medica" binary inputId="editDebeOrdenFisicaView" />
+            <label for="editDebeOrdenFisicaView" class="text-xs font-bold text-red-900 cursor-pointer">
+              ⚠️ Paciente DEBE Orden Médica Física
+            </label>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -975,23 +1147,57 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
     <Dialog v-model:visible="isSolicitudVisible" modal header="Emitir Observación del Auditor" :style="{ width: '500px' }">
       <div class="space-y-4">
         <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Carácter de la Observación <span class="text-red-500">*</span></label>
+          <div class="grid grid-cols-2 gap-2">
+            <div
+              class="p-2.5 rounded-lg border cursor-pointer transition flex items-start gap-2 text-xs"
+              :class="!esInformativa ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-sm ring-1 ring-amber-400' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'"
+              @click="esInformativa = false"
+            >
+              <i class="pi pi-exclamation-triangle text-amber-600 text-base mt-0.5 flex-shrink-0"></i>
+              <div>
+                <span class="font-bold block text-xs">Solicitud Auditoría</span>
+                <span class="text-[10px] text-amber-700 block mt-0.5">Requiere llamada al paciente y pasa orden a Solicitudes</span>
+              </div>
+            </div>
+            <div
+              class="p-2.5 rounded-lg border cursor-pointer transition flex items-start gap-2 text-xs"
+              :class="esInformativa ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-sm ring-1 ring-blue-400' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'"
+              @click="esInformativa = true"
+            >
+              <i class="pi pi-info-circle text-blue-600 text-base mt-0.5 flex-shrink-0"></i>
+              <div>
+                <span class="font-bold block text-xs">Solo Información</span>
+                <span class="text-[10px] text-blue-700 block mt-0.5">Nota interna azul: no genera llamada ni altera estado</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Motivo Principal <span class="text-red-500">*</span></label>
           <Dropdown
             v-model="motivoSolicitud"
-            :options="['Falta diagnóstico', 'Firma/Sello ilegible', 'Estudio no coincide con pedido', 'Falta resumen clínico', 'Otro']"
+            :options="['Falta diagnóstico', 'Firma/Sello ilegible', 'Estudio no coincide con pedido', 'Falta resumen clínico', 'Nota técnica/Informativa', 'Otro']"
             editable
             placeholder="Seleccione o escriba el motivo..."
-            class="w-full"
+            class="w-full text-xs"
           />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Mensaje para la Sucursal <span class="text-red-500">*</span></label>
-          <Textarea v-model="mensajeSolicitud" rows="4" class="w-full" placeholder="Detalle qué documentación o corrección es requerida..." />
+          <Textarea v-model="mensajeSolicitud" rows="4" class="w-full text-xs" placeholder="Detalle qué documentación o corrección es requerida..." />
         </div>
       </div>
       <template #footer>
         <Button label="Cancelar" text severity="secondary" @click="isSolicitudVisible = false" />
-        <Button label="Emitir Solicitud" severity="warn" :loading="isActionLoading" @click="handleCrearSolicitud" />
+        <Button
+          :label="esInformativa ? 'Guardar Información' : 'Emitir Solicitud'"
+          :severity="esInformativa ? 'info' : 'warn'"
+          :icon="esInformativa ? 'pi pi-info-circle' : 'pi pi-exclamation-triangle'"
+          :loading="isActionLoading"
+          @click="handleCrearSolicitud"
+        />
       </template>
     </Dialog>
 
@@ -1037,5 +1243,70 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
       :tipoLlamada="orden.estado === 'Solicitudes de auditoria' ? 'SOLICITUD_AUDITORIA' : 'AUDITORIA_FINALIZADA'"
       @success="loadOrden"
     />
+
+    <!-- Modal Registrar Llamada Directa / Manual -->
+    <Dialog v-model:visible="isDirectLlamadaVisible" modal header="Registrar Contacto Telefónico / Consulta" :style="{ width: '480px' }">
+      <div class="space-y-4 text-xs">
+        <!-- Banner si hay un aviso pendiente de auditoría -->
+        <div
+          v-if="
+            orden &&
+            ((orden.estado === 'Solicitudes de auditoria' && !orden.llamada_solicitud_completada) ||
+             (orden.estado === 'Auditoria Finalizada' && !orden.llamada_finalizada_completada))
+          "
+          class="p-3 bg-amber-50 rounded-lg border border-amber-300 text-amber-900 space-y-2"
+        >
+          <div class="flex items-start gap-2">
+            <i class="pi pi-bell text-amber-600 text-sm mt-0.5 flex-shrink-0"></i>
+            <div>
+              <p class="font-bold text-xs">Esta orden tiene un aviso de auditoría pendiente</p>
+              <p class="text-[11px] text-amber-800">
+                {{ orden.estado === 'Solicitudes de auditoria' ? 'Observación de auditoría pendiente de comunicar.' : 'Resolución de auditoría finalizada pendiente de comunicar.' }}
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 pt-1 border-t border-amber-200">
+            <Checkbox v-model="directLlamadaForm.completar_aviso_pendiente" binary inputId="checkCompletarAvisoView" />
+            <label for="checkCompletarAvisoView" class="text-xs font-bold text-amber-950 cursor-pointer">
+              Dar por comunicado el aviso y quitar de Llamadas Pendientes
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 uppercase mb-1">Tipo de Contacto <span class="text-red-500">*</span></label>
+          <Dropdown
+            v-model="directLlamadaForm.tipo_llamada"
+            :options="opcionesTiposLlamada"
+            optionLabel="label"
+            optionValue="value"
+            class="w-full text-xs"
+          />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 uppercase mb-1">Resultado del Contacto <span class="text-red-500">*</span></label>
+          <Dropdown
+            v-model="directLlamadaForm.resultado"
+            :options="opcionesResultadosLlamada"
+            optionLabel="label"
+            optionValue="value"
+            class="w-full text-xs"
+          />
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 uppercase mb-1">Detalle / Conversación con el Paciente <span class="text-red-500">*</span></label>
+          <Textarea
+            v-model="directLlamadaForm.observaciones"
+            rows="4"
+            class="w-full text-xs"
+            placeholder="Describa la consulta recibida o la gestión realizada con el paciente..."
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Cancelar" text severity="secondary" @click="isDirectLlamadaVisible = false" />
+        <Button label="Guardar Llamada" icon="pi pi-check" severity="primary" :loading="isActionLoading" @click="handleSaveDirectLlamada" />
+      </template>
+    </Dialog>
   </div>
 </template>

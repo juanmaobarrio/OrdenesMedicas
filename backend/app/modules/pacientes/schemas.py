@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -13,6 +14,7 @@ class ObraSocialBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150, description="Nombre o razon social completa")
     codigo_externo: Optional[str] = Field(None, max_length=50)
     dias_vencimiento: int = Field(default=30, ge=1, le=365, description="Dias de validez de la orden")
+    copago_default: Decimal = Field(default=Decimal("0.00"), ge=0, description="Valor de copago por defecto")
     activa: bool = Field(default=True, description="Estado de operacion")
 
 
@@ -25,6 +27,7 @@ class ObraSocialUpdate(BaseModel):
     nombre: Optional[str] = Field(None, min_length=2, max_length=150)
     codigo_externo: Optional[str] = None
     dias_vencimiento: Optional[int] = Field(None, ge=1, le=365)
+    copago_default: Optional[Decimal] = Field(None, ge=0)
     activa: Optional[bool] = None
 
 
@@ -69,7 +72,7 @@ class PacienteBase(BaseModel):
 
 
 class PacienteCreate(PacienteBase):
-    pass
+    fecha_nacimiento: date = Field(..., description="Fecha de nacimiento obligatoria (YYYY-MM-DD)")
 
 
 class PacienteUpdate(BaseModel):

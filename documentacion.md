@@ -134,6 +134,7 @@ Cada módulo dentro de `app/modules/<dominio>/` cuenta con la siguiente segregac
 
 ### 5.1 Modelo Relacional (ERD)
 - **`Sucursal` (`sucursales`):** `id` (UUIDv4), `nombre` (VARCHAR 100), `codigo` (VARCHAR 20, UNIQUE), `activa` (BOOLEAN).
+- **`ObraSocial` (`obras_sociales`):** `id` (UUIDv4), `codigo` (VARCHAR 50, UNIQUE), `sigla` (VARCHAR 50), `nombre` (VARCHAR 150), `codigo_externo` (VARCHAR 50 NULLABLE), `dias_vencimiento` (INTEGER), `copago_default` (NUMERIC(12,2) DEFAULT 0.00), `activa` (BOOLEAN).
 - **`Permission` (`permissions`):** `id` (UUIDv4), `code` (VARCHAR 80, UNIQUE), `module` (VARCHAR 50), `description` (VARCHAR 255).
 - **`Role` (`roles`):** `id` (UUIDv4), `code` (VARCHAR 50, UNIQUE), `name` (VARCHAR 100), `description` (VARCHAR 255), `is_system` (BOOLEAN).
 - **`role_permissions`:** Tabla intermedia `role_id` (FK roles.id ON DELETE CASCADE) + `permission_id` (FK permissions.id ON DELETE CASCADE).
@@ -182,7 +183,7 @@ Cada módulo dentro de `app/modules/<dominio>/` cuenta con la siguiente segregac
   - `documento`: VARCHAR(30), único e indexado (DNI/Pasaporte/Cédula).
   - `nombres`: VARCHAR(100), no nulo (almacenado en Title Case).
   - `apellidos`: VARCHAR(100), no nulo (almacenado en UPPERCASE).
-  - `fecha_nacimiento`: DATE nullable (YYYY-MM-DD).
+  - `fecha_nacimiento`: DATE (Obligatoria para altas, formato YYYY-MM-DD).
   - `obra_social`: VARCHAR(100), indexado nullable (almacenado en UPPERCASE).
   - `nro_afiliado`: VARCHAR(50), nullable.
   - `telefono`: VARCHAR(30), nullable.
@@ -227,7 +228,11 @@ Cada módulo dentro de `app/modules/<dominio>/` cuenta con la siguiente segregac
   - `fecha_prescripcion`: DATE (Fecha en que el profesional médico emitió la orden).
   - `cantidad_ordenes_fisicas`: INTEGER (Cantidad de cupones / recetas físicas).
   - `mutual`: VARCHAR(100), indexado (Obra social / Prepaga).
+  - `nro_afiliado`: VARCHAR(50), nullable (Obligatorio en alta de orden).
   - `valor_copago`: NUMERIC(12, 2) (Copago a abonar por el paciente).
+  - `valor_estudios_no_autorizados`: NUMERIC(12, 2) (Monto de prácticas no autorizadas).
+  - `abona_apb`: BOOLEAN (Indica si abona Acto Profesional Bioquímico).
+  - `debe_orden_medica`: BOOLEAN (Indica si adeuda receta física original).
   - `fecha_vencimiento`: DATE nullable (Fecha límite de validez).
   - `numeros_auditoria`: JSONB (Array de códigos / números de auditoría autorizados).
   - **Datos de Contacto:** `contacto_nombre`, `contacto_horario`, `contacto_telefono`, `contacto_celular`, `contacto_email`.
@@ -245,12 +250,12 @@ Cada módulo dentro de `app/modules/<dominio>/` cuenta con la siguiente segregac
   - `auditor_id`: UUIDv4 (FK `users.id`).
   - `motivo_solicitud`: VARCHAR(150), `mensaje_auditor`: TEXT.
   - `respuesta_operador`: TEXT nullable, `respondido_por_id`: UUIDv4 nullable, `fecha_respuesta`: TIMESTAMPTZ nullable.
-  - `estado`: Enum `estado_solicitud_enum` (`PENDIENTE`, `RESPONDIDA`, `CERRADA`).
+  - `estado`: Enum `estado_solicitud_enum` (`PENDIENTE`, `INFORMACION`, `RESPONDIDA`, `CERRADA`).
 
 - **`RegistroLlamadaPaciente` (`ordenes_llamadas_pacientes`):**
-  - Registro histórico de llamados de aviso al paciente.
-  - `id`: UUIDv4, `orden_id`: UUIDv4, `user_id`: UUIDv4 (operador que realizó la llamada).
-  - `tipo_llamada`: Enum `tipo_llamada_enum` (`SOLICITUD_AUDITORIA`, `AUDITORIA_FINALIZADA`).
+  - Registro histórico de llamados de aviso y consultas del paciente.
+  - `id`: UUIDv4, `orden_id`: UUIDv4, `user_id`: UUIDv4 (operador que realizó o atendió la llamada).
+  - `tipo_llamada`: Enum `tipo_llamada_enum` (`SOLICITUD_AUDITORIA`, `AUDITORIA_FINALIZADA`, `CONSULTA_PACIENTE`, `SEGUIMIENTO_SUCURSAL`, `OTRO`).
   - `resultado`: Enum `resultado_llamada_enum` (`EXITOSA`, `NO_CONTESTA`, `NUMERO_ERRONEO`, `REINTENTAR`).
   - `observaciones`: TEXT (detalle de lo conversado).
 
@@ -537,3 +542,33 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 - **Configuración de Zona Horaria Argentina (`America/Argentina/Buenos_Aires` GMT-3):**
   - Se configuró la variable de entorno `TZ=America/Argentina/Buenos_Aires` e instalación de `tzdata` en los contenedores Docker (`postgres`, `backend`, `frontend`).
   - Se creó la utilidad `frontend/src/utils/date.ts` con funciones `formatDateTime` y `formatDate` para representar todas las marcas temporales, historial de auditoría y fechas en la hora local oficial de Argentina (UTC-3).
+
+
+---
+
+## 14. ACTUALIZACIONES RECIENTES EN EL FLUJO DE AUDITORÍA Y ÓRDENES
+
+### 14.1 Observaciones de Auditoría Informativas vs Requerimientos
+- **Tipo de Observación:** Se incorporó el estado `INFORMACION` al enum `EstadoSolicitudAuditoria`.
+- **Comportamiento en Flujo:** Al emitir una observación como *Solo Información* (`es_informativa: true`), la misma se registra con estado `INFORMACION` (color azul con badge identificatorio), **no altera el estado de la orden médica** y **no genera una llamada pendiente**. Si es una *Solicitud de Auditoría* regular, pasa la orden a `Solicitudes de auditoria` y genera la llamada obligatoria correspondiente.
+
+### 14.2 Registro Directo de Comunicaciones y Consultas Telefónicas
+- **Nuevos Tipos de Llamada:** Se extendió el catálogo `TipoLlamadaPaciente` con `CONSULTA_PACIENTE`, `SEGUIMIENTO_SUCURSAL` y `OTRO`.
+- **Botón "+ Registrar Llamada" en Expediente:** Permite asentar en la pestaña de *Llamadas* del detalle de la orden cualquier comunicación entrante del paciente o seguimiento interno de la sucursal, con selección de resultado y observaciones detalladas.
+
+### 14.3 Copago Predeterminado por Obra Social / Mutual
+- **Catálogo de Mutuales:** Se agregó la columna `copago_default` en `obras_sociales` y en su interfaz de administración.
+- **Carga Automática:** Al seleccionar la Obra Social en el formulario de alta de órdenes, el valor de copago se completa automáticamente con el sugerido por la mutual, manteniéndose 100% editable por el operador.
+
+### 14.4 Validación Estricta de Campos Obligatorios
+- **Alta de Pacientes:** Documento, Nombres, Apellidos y Fecha de Nacimiento son obligatorios tanto en el catálogo como en el modal inline.
+- **Alta de Órdenes Médicas:** Fecha de prescripción, Paciente, Mutual, N° Afiliado / Credencial, Cantidad de recetas físicas (> 0), Sucursal emisora, Nombre de contacto, Teléfono (fijo o celular al menos uno) y Horario preferido de contacto.
+
+### 14.5 Control de Acto Profesional Bioquímico (APB)
+- Se añadió la columna booleana `abona_apb` a `ordenes_medicas`.
+- Selector interactivo en el formulario de alta y en el modal de edición de la orden, visible además como badge distintivo `🧪 APB` en el expediente.
+
+
+### 14.6 Resolución de Avisos Pendientes al Registrar Llamadas del Paciente
+- **Flujo de Comunicación Bidireccional:** Si una orden posee un aviso pendiente (por observación de auditoría o resolución final) y el paciente se comunica con el laboratorio (`CONSULTA_PACIENTE` u otro tipo de llamada), el operador puede marcar la casilla **"Dar por comunicado el aviso y quitar de Llamadas Pendientes"** (activa por defecto en llamadas exitosas).
+- **Efecto Inmediato:** Al guardar el registro, el sistema registra la conversación completa en el historial, marca `llamada_solicitud_completada = True` (o `llamada_finalizada_completada = True`), y **remueve automáticamente la orden de la bandeja de Llamadas Pendientes**, manteniendo inalterado el ciclo de vida de la orden médica.

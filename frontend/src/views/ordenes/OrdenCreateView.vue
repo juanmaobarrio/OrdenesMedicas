@@ -73,6 +73,7 @@ const form = ref({
   nro_afiliado: '',
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
+  abona_apb: false,
   fecha_vencimiento: null as Date | null,
   numeros_auditoria: [] as string[],
   debe_orden_medica: false,
@@ -115,8 +116,18 @@ const openCreatePatientModal = (queryText = '') => {
 };
 
 const handleSaveInlinePatient = async () => {
-  if (!newPatientForm.value.documento.trim() || !newPatientForm.value.nombres.trim() || !newPatientForm.value.apellidos.trim()) {
-    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Documento, Nombres y Apellidos son obligatorios', life: 3000 });
+  if (
+    !newPatientForm.value.documento.trim() ||
+    !newPatientForm.value.nombres.trim() ||
+    !newPatientForm.value.apellidos.trim() ||
+    !newPatientForm.value.fecha_nacimiento
+  ) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Atención',
+      detail: 'Documento, Nombres, Apellidos y Fecha de Nacimiento son obligatorios',
+      life: 3500,
+    });
     return;
   }
 
@@ -190,12 +201,19 @@ const handleMutualChange = (mutualSigla?: string) => {
       m.sigla?.toUpperCase() === sig.trim().toUpperCase() ||
       m.codigo?.toUpperCase() === sig.trim().toUpperCase()
   );
-  if (mut && form.value.fecha_prescripcion) {
-    const baseDate = new Date(form.value.fecha_prescripcion);
-    const dias = mut.dias_vencimiento || 30;
-    form.value.fecha_vencimiento = new Date(
-      baseDate.getTime() + dias * 24 * 60 * 60 * 1000
-    );
+  if (mut) {
+    // 1. Días de vencimiento
+    if (form.value.fecha_prescripcion) {
+      const baseDate = new Date(form.value.fecha_prescripcion);
+      const dias = mut.dias_vencimiento || 30;
+      form.value.fecha_vencimiento = new Date(
+        baseDate.getTime() + dias * 24 * 60 * 60 * 1000
+      );
+    }
+    // 2. Copago por defecto sugerido
+    if (mut.copago_default !== undefined && mut.copago_default !== null) {
+      form.value.valor_copago = Number(mut.copago_default);
+    }
   }
 };
 
@@ -246,8 +264,45 @@ const handleSubmit = async () => {
     return;
   }
 
-  if (!form.value.mutual.trim()) {
+  if (!form.value.fecha_prescripcion) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'La fecha de prescripción médica es obligatoria', life: 3000 });
+    return;
+  }
+
+  if (!form.value.mutual?.trim()) {
     toast.add({ severity: 'warn', summary: 'Atención', detail: 'Debe indicar la mutual u obra social', life: 3000 });
+    return;
+  }
+
+  if (!form.value.nro_afiliado?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'El número de credencial / afiliado es obligatorio', life: 3000 });
+    return;
+  }
+
+  if (!form.value.cantidad_ordenes_fisicas || form.value.cantidad_ordenes_fisicas < 1) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'La cantidad de recetas físicas debe ser mayor a 0', life: 3000 });
+    return;
+  }
+
+  if (!form.value.contacto_nombre?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'El nombre de contacto es obligatorio', life: 3000 });
+    return;
+  }
+
+  const tel = form.value.contacto_telefono?.trim();
+  const cel = form.value.contacto_celular?.trim();
+  if (!tel && !cel) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Atención',
+      detail: 'Debe ingresar al menos un número de contacto (Teléfono fijo o Celular / WhatsApp)',
+      life: 3500,
+    });
+    return;
+  }
+
+  if (!form.value.contacto_horario?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Debe seleccionar el horario preferido de contacto', life: 3000 });
     return;
   }
 
@@ -266,19 +321,20 @@ const handleSubmit = async () => {
       fecha_prescripcion: formattedDate(form.value.fecha_prescripcion),
       cantidad_ordenes_fisicas: form.value.cantidad_ordenes_fisicas,
       mutual: form.value.mutual.trim().toUpperCase(),
-      nro_afiliado: form.value.nro_afiliado?.trim() || null,
+      nro_afiliado: form.value.nro_afiliado.trim(),
       valor_copago: form.value.valor_copago,
       valor_estudios_no_autorizados: form.value.valor_estudios_no_autorizados,
+      abona_apb: form.value.abona_apb,
       fecha_vencimiento: form.value.fecha_vencimiento ? formattedDate(form.value.fecha_vencimiento) : null,
       debe_orden_medica: form.value.debe_orden_medica,
 
       numeros_auditoria: form.value.numeros_auditoria,
-      contacto_nombre: form.value.contacto_nombre.trim() || null,
-      contacto_horario: form.value.contacto_horario.trim() || null,
-      contacto_telefono: form.value.contacto_telefono.trim() || null,
-      contacto_celular: form.value.contacto_celular.trim() || null,
-      contacto_email: form.value.contacto_email.trim() || null,
-      observaciones_ingreso: form.value.observaciones_ingreso.trim() || null,
+      contacto_nombre: form.value.contacto_nombre.trim(),
+      contacto_horario: form.value.contacto_horario.trim(),
+      contacto_telefono: form.value.contacto_telefono?.trim() || null,
+      contacto_celular: form.value.contacto_celular?.trim() || null,
+      contacto_email: form.value.contacto_email?.trim() || null,
+      observaciones_ingreso: form.value.observaciones_ingreso?.trim() || null,
     };
 
     const newOrder = await ordenesService.create(payload as any);
@@ -440,7 +496,7 @@ const handleSubmit = async () => {
           <!-- Nro Afiliado -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              N° Afiliado / Credencial
+              N° Afiliado / Credencial <span class="text-red-500">*</span>
             </label>
             <InputText v-model="form.nro_afiliado" placeholder="Ej: 12345678/01" class="w-full" />
           </div>
@@ -465,7 +521,7 @@ const handleSubmit = async () => {
           <!-- Cantidad Cupones -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Cantidad de Recetas Físicas
+              Cantidad de Recetas Físicas <span class="text-red-500">*</span>
             </label>
             <InputNumber v-model="form.cantidad_ordenes_fisicas" :min="1" :max="50" showButtons class="w-full" />
           </div>
@@ -502,16 +558,31 @@ const handleSubmit = async () => {
           <Chips v-model="form.numeros_auditoria" placeholder="Ej: AUT-1029, AUT-1030..." class="w-full" />
         </div>
 
-        <!-- Checkbox: Paciente Debe Orden Medica Fisica -->
-        <div class="p-3.5 bg-red-50/80 rounded-xl border border-red-200 flex items-start space-x-3">
-          <Checkbox v-model="form.debe_orden_medica" binary inputId="debeOrdenFisica" />
-          <div>
-            <label for="debeOrdenFisica" class="text-xs font-bold text-red-900 cursor-pointer block">
-              ⚠️ Paciente DEBE la Orden Médica Física (Recibida por mail / digital)
-            </label>
-            <p class="text-[11px] text-red-700 mt-0.5">
-              Al activar este aviso, el sistema alertará con un signo rojo en el listado y avisará al operador de llamadas para exigir la receta física original el día del estudio.
-            </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <!-- Checkbox: Acto Profesional Bioquímico (APB) -->
+          <div class="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-start space-x-3">
+            <Checkbox v-model="form.abona_apb" binary inputId="abonaApb" />
+            <div>
+              <label for="abonaApb" class="text-xs font-bold text-blue-900 cursor-pointer block">
+                🧪 Abona APB (Acto Profesional Bioquímico)
+              </label>
+              <p class="text-[11px] text-blue-700 mt-0.5">
+                Marque si el paciente debe abonar el Acto Profesional Bioquímico según el convenio mutual.
+              </p>
+            </div>
+          </div>
+
+          <!-- Checkbox: Paciente Debe Orden Medica Fisica -->
+          <div class="p-3.5 bg-red-50/80 rounded-xl border border-red-200 flex items-start space-x-3">
+            <Checkbox v-model="form.debe_orden_medica" binary inputId="debeOrdenFisica" />
+            <div>
+              <label for="debeOrdenFisica" class="text-xs font-bold text-red-900 cursor-pointer block">
+                ⚠️ Paciente DEBE la Orden Médica Física
+              </label>
+              <p class="text-[11px] text-red-700 mt-0.5">
+                Alerta roja para exigir la receta física original el día de la atención.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -525,22 +596,30 @@ const handleSubmit = async () => {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nombre de Contacto</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Nombre de Contacto <span class="text-red-500">*</span>
+            </label>
             <InputText v-model="form.contacto_nombre" placeholder="Nombre de quien retira o familiar" class="w-full" />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Teléfono Fijo</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Teléfono Fijo <span class="text-slate-400 font-normal text-[10px]">(o Celular)</span>
+            </label>
             <InputText v-model="form.contacto_telefono" placeholder="Ej: 11-4455-6677" class="w-full" />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Celular / WhatsApp</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Celular / WhatsApp <span class="text-slate-400 font-normal text-[10px]">(o Fijo)</span>
+            </label>
             <InputText v-model="form.contacto_celular" placeholder="Ej: 11-9876-5432" class="w-full" />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Horario Preferido</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Horario Preferido <span class="text-red-500">*</span>
+            </label>
             <Dropdown
               v-model="form.contacto_horario"
               :options="opcionesHorarios"
@@ -591,7 +670,9 @@ const handleSubmit = async () => {
             <InputText v-model="newPatientForm.documento" placeholder="Sin puntos" class="w-full" />
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha Nacimiento</label>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Fecha Nacimiento <span class="text-red-500">*</span>
+            </label>
             <InputText v-model="newPatientForm.fecha_nacimiento as any" type="date" class="w-full" />
           </div>
         </div>
