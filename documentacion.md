@@ -572,3 +572,8 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 ### 14.6 Resolución de Avisos Pendientes al Registrar Llamadas del Paciente
 - **Flujo de Comunicación Bidireccional:** Si una orden posee un aviso pendiente (por observación de auditoría o resolución final) y el paciente se comunica con el laboratorio (`CONSULTA_PACIENTE` u otro tipo de llamada), el operador puede marcar la casilla **"Dar por comunicado el aviso y quitar de Llamadas Pendientes"** (activa por defecto en llamadas exitosas).
 - **Efecto Inmediato:** Al guardar el registro, el sistema registra la conversación completa en el historial, marca `llamada_solicitud_completada = True` (o `llamada_finalizada_completada = True`), y **remueve automáticamente la orden de la bandeja de Llamadas Pendientes**, manteniendo inalterado el ciclo de vida de la orden médica.
+
+
+### 14.7 Edición de Valores al Finalizar Auditoría y Tarjeta Verde de Resolución
+- **Ajuste de Montos en Transición:** Al pasar una orden al estado `Auditoria Finalizada`, el auditor médico puede ajustar en el mismo modal tanto el **Copago Final ($)** como los **Estudios No Autorizados ($)**, permitiendo reflejar con exactitud lo autorizado por la mutual.
+- **Tarjeta Verde de Éxito en Observaciones:** La pestaña *Observaciones* del expediente muestra en la parte superior una tarjeta verde destacada con la **Resolución Final de Auditoría Médica**, el mensaje textual del auditor y el desglose económico de lo que el paciente debe abonar.

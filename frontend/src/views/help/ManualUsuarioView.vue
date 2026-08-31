@@ -300,7 +300,9 @@ const scrollToChapter = (id: string) => {
               <div class="p-2.5 bg-indigo-50/60 rounded border border-indigo-200 flex items-start gap-2">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">5. Auditoria
                   Finalizada</span>
-                <p class="text-slate-600">Auditoría aprobada y resuelta con observación de resultado. <strong>Entra en la Bandeja de Llamadas para confirmar la atención al paciente.</strong></p>
+                <p class="text-slate-600">
+                  Auditoría aprobada y resuelta con observación médica. <strong>Permite al auditor ajustar el Copago Final ($) y Estudios No Autorizados ($)</strong>, entra en la Bandeja de Llamadas para convocar al paciente y muestra una <strong>Tarjeta Verde destacada</strong> en la pestaña de Observaciones.
+                </p>
               </div>
               <div class="p-2.5 bg-emerald-50/60 rounded border border-emerald-200 flex items-start gap-2">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">6. Cerrada

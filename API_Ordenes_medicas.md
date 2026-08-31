@@ -135,11 +135,13 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
 - **Endpoint:** `POST /api/v1/ordenes/{id}/estado`
 - **Casos de Uso Principales (Soporta `estado_id` numérico o `nuevo_estado` en texto):**
 
-**1. Marcar como "Auditoria Finalizada" (Aprobada) usando `estado_id: 5`:**
+**1. Marcar como "Auditoria Finalizada" (Aprobada) usando `estado_id: 5` (permite ajustar copago y no autorizados):**
 ```json
 {
   "estado_id": 5,
-  "observacion_resultado": "Auditoría Aprobada 100%. Se autorizan las 3 prácticas sin copago."
+  "observacion_resultado": "Auditoría Aprobada 100%. Se autorizan las 3 prácticas sin copago.",
+  "valor_copago": 1500.00,
+  "valor_estudios_no_autorizados": 0.00
 }
 ```
 
