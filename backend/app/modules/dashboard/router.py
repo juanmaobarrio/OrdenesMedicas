@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import get_db
-from backend.app.modules.auth.dependencies import get_current_user, require_roles
+from backend.app.modules.auth.dependencies import get_current_user, require_permission, require_roles
 from backend.app.modules.dashboard.schemas import (
     DashboardChartsResponse,
     KpiMetricsResponse,
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard y Reportes"])
 async def get_dashboard_kpis(
     sucursal_id: Optional[uuid.UUID] = Query(None, description="Filtrar por sucursal"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("dashboard:view")),
 ):
     filtro_sucursal = sucursal_id
     if not current_user.is_superuser and current_user.role and current_user.role.code == "USUARIO":
@@ -42,7 +42,7 @@ async def get_dashboard_kpis(
 async def get_dashboard_charts(
     sucursal_id: Optional[uuid.UUID] = Query(None, description="Filtrar por sucursal"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("dashboard:view")),
 ):
     filtro_sucursal = sucursal_id
     if not current_user.is_superuser and current_user.role and current_user.role.code == "USUARIO":
@@ -63,7 +63,7 @@ async def export_ordenes_csv(
     fecha_desde: Optional[date] = Query(None, description="Fecha de prescripcion desde"),
     fecha_hasta: Optional[date] = Query(None, description="Fecha de prescripcion hasta"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("dashboard:view")),
 ):
     filtro_sucursal = sucursal_id
     if not current_user.is_superuser and current_user.role and current_user.role.code == "USUARIO":

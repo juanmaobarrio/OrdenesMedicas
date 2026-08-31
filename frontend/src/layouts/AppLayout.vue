@@ -29,22 +29,51 @@ const handleLogout = () => {
 };
 
 const navigationItems = computed(() => {
-  const items = [
-    { label: 'Dashboard', icon: 'pi pi-chart-bar', to: '/dashboard' },
-    { label: 'Órdenes Médicas', icon: 'pi pi-file', to: '/ordenes' },
-    { label: 'Nueva Orden', icon: 'pi pi-plus-circle', to: '/ordenes/nueva' },
-    {
+  const items: Array<{
+    label: string;
+    icon: string;
+    to: string;
+    badge?: number;
+    badgeSeverity?: string;
+  }> = [];
+
+  // Dashboard: solo si tiene permiso 'dashboard:view' o es administrador
+  if (authStore.isAdmin || authStore.hasPermission('dashboard:view')) {
+    items.push({ label: 'Dashboard', icon: 'pi pi-chart-bar', to: '/dashboard' });
+  }
+
+  // Órdenes Médicas: si tiene permiso de visualización
+  if (authStore.isAdmin || authStore.hasPermission('ordenes:view')) {
+    items.push({ label: 'Órdenes Médicas', icon: 'pi pi-file', to: '/ordenes' });
+  }
+
+  // Nueva Orden: si tiene permiso de creación
+  if (authStore.isAdmin || authStore.hasPermission('ordenes:create')) {
+    items.push({ label: 'Nueva Orden', icon: 'pi pi-plus-circle', to: '/ordenes/nueva' });
+  }
+
+  // Llamadas a Pacientes: si tiene permiso de llamadas
+  if (authStore.isAdmin || authStore.hasPermission('ordenes:calls')) {
+    items.push({
       label: 'Llamadas a Pacientes',
       icon: 'pi pi-phone',
       to: '/llamadas-pendientes',
       badge: pendingCallsCount.value > 0 ? pendingCallsCount.value : undefined,
       badgeSeverity: 'danger',
-    },
-    { label: 'Padrón de Pacientes', icon: 'pi pi-users', to: '/pacientes' },
-    { label: 'Usuarios y Roles', icon: 'pi pi-user-edit', to: '/usuarios' },
-    { label: 'Manual de Usuario', icon: 'pi pi-book', to: '/manual_usuario' },
-  ];
+    });
+  }
 
+  // Padrón de Pacientes: si tiene permiso de pacientes
+  if (authStore.isAdmin || authStore.hasPermission('pacientes:manage')) {
+    items.push({ label: 'Padrón de Pacientes', icon: 'pi pi-users', to: '/pacientes' });
+  }
+
+  // Usuarios y Roles: si tiene permiso de administración de usuarios
+  if (authStore.isAdmin || authStore.hasPermission('users:manage')) {
+    items.push({ label: 'Usuarios y Roles', icon: 'pi pi-user-edit', to: '/usuarios' });
+  }
+
+  // Módulos de administración global
   if (authStore.isAdmin) {
     items.push(
       { label: 'Obras Sociales', icon: 'pi pi-id-card', to: '/obras-sociales' },
@@ -52,6 +81,9 @@ const navigationItems = computed(() => {
       { label: 'Configuración', icon: 'pi pi-cog', to: '/configuracion' }
     );
   }
+
+  // Manual de Usuario accesible para todos
+  items.push({ label: 'Manual de Usuario', icon: 'pi pi-book', to: '/manual_usuario' });
 
   return items;
 });
