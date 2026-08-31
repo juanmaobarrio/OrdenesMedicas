@@ -107,3 +107,11 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         """Devuelve el nombre y apellido completo concatenado."""
         return f"{self.first_name} {self.last_name}".strip()
 
+    @property
+    def role_code(self) -> Optional[str]:
+        return self.role.code if self.role else None
+
+    @property
+    def sucursal_nombre(self) -> Optional[str]:
+        return self.sucursal.nombre if self.sucursal else None
+
