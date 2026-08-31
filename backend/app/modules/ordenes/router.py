@@ -136,9 +136,10 @@ async def list_ordenes(
     for o in items:
         cant_adj = len(o.adjuntos) if o.adjuntos else 0
         cant_sol_pend = (
-            len([s for s in o.solicitudes if s.estado.value == "PENDIENTE"])
-            if o.solicitudes
-            else 0
+            len([
+                s for s in (o.solicitudes or [])
+                if (s.estado.value if hasattr(s.estado, "value") else str(s.estado)) == "PENDIENTE"
+            ])
         )
         item_dict = {
             "id": o.id,
@@ -148,10 +149,11 @@ async def list_ordenes(
             "mutual": o.mutual,
             "nro_afiliado": o.nro_afiliado,
             "valor_copago": o.valor_copago,
-            "valor_estudios_no_autorizados": o.valor_estudios_no_autorizados,
+            "valor_estudios_no_autorizados": o.valor_estudios_no_autorizados or Decimal("0.00"),
+            "abona_apb": getattr(o, "abona_apb", False) or False,
             "cantidad_ordenes_fisicas": o.cantidad_ordenes_fisicas,
-            "numeros_auditoria": o.numeros_auditoria,
-            "debe_orden_medica": o.debe_orden_medica,
+            "numeros_auditoria": o.numeros_auditoria or [],
+            "debe_orden_medica": getattr(o, "debe_orden_medica", False) or False,
             "paciente": o.paciente,
             "sucursal": o.sucursal,
             "created_by_user": o.created_by_user,

@@ -50,6 +50,12 @@ from backend.app.modules.users.models import User
 from backend.app.modules.users.repository import SucursalRepository, UserRepository
 
 
+def _enum_str(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    return v.value if hasattr(v, "value") else str(v)
+
+
 class OrdenMedicaService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -171,9 +177,9 @@ class OrdenMedicaService:
         orden = await self.get_by_id(orden_id)
 
         # Bloquear modificaciones si la orden ya esta cerrada, cancelada o dada de baja
-        if orden.estado in [EstadoOrden.CANCELADA, EstadoOrden.DAR_DE_BAJA, EstadoOrden.CERRADA]:
+        if _enum_str(orden.estado) in [EstadoOrden.CANCELADA.value, EstadoOrden.DAR_DE_BAJA.value, EstadoOrden.CERRADA.value]:
             raise ForbiddenActionException(
-                f"No se puede modificar una orden en estado final '{orden.estado.value}'"
+                f"No se puede modificar una orden en estado final '{_enum_str(orden.estado)}'"
             )
 
         diff = {}
@@ -646,11 +652,11 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="REGISTRO_LLAMADA_PACIENTE",
-                estado_anterior=orden.estado.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(orden.estado),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={
-                    "tipo_llamada": dto.tipo_llamada.value,
-                    "resultado": dto.resultado.value,
+                    "tipo_llamada": _enum_str(dto.tipo_llamada),
+                    "resultado": _enum_str(dto.resultado),
                     "exitoso": comunicacion_exitosa,
                     "observaciones": dto.observaciones,
                 },
