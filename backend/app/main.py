@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -174,6 +175,36 @@ def create_application() -> FastAPI:
     )
 
 
+
+    # Manejo de errores de validación de Pydantic / FastAPI
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        errors = exc.errors()
+        messages = []
+        for err in errors:
+            loc = err.get("loc", [])
+            field = str(loc[-1]) if loc else ""
+            msg = err.get("msg", "")
+            err_type = err.get("type", "")
+
+            if field == "password" and ("string_too_short" in err_type or "at least" in msg or "characters" in msg):
+                messages.append("La contraseña debe tener al menos 6 caracteres.")
+            elif field == "email" and "value_error" in err_type:
+                messages.append("El formato del correo electrónico ingresado no es válido.")
+            elif field == "username" and "string_too_short" in err_type:
+                messages.append("El nombre de usuario debe tener al menos 3 caracteres.")
+            elif field == "documento" and "string_too_short" in err_type:
+                messages.append("El número de documento debe tener al menos 4 caracteres.")
+            elif "missing" in err_type:
+                messages.append(f"El campo '{field}' es obligatorio.")
+            else:
+                messages.append(f"{field}: {msg}" if field else msg)
+
+        formatted_detail = " ".join(messages) if messages else "Los datos enviados son inválidos."
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": formatted_detail},
+        )
 
     # Manejo global de excepciones personalizadas
     @app.exception_handler(AppException)

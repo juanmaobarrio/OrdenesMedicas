@@ -21,6 +21,7 @@ import TabPanel from 'primevue/tabpanel';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import { useToast } from 'primevue/usetoast';
+import { getErrorMessage } from '../../services/api';
 
 const toast = useToast();
 const authStore = useAuthStore();
@@ -190,14 +191,24 @@ const handleOpenEditUser = (u: UserDetail) => {
 
 const handleSaveUser = async () => {
   if (
-    !userForm.value.username ||
-    !userForm.value.email ||
+    !userForm.value.username?.trim() ||
+    !userForm.value.email?.trim() ||
     (!isEditingUser.value && !userForm.value.password) ||
-    !userForm.value.first_name ||
-    !userForm.value.last_name ||
+    !userForm.value.first_name?.trim() ||
+    !userForm.value.last_name?.trim() ||
     !userForm.value.role_id
   ) {
     toast.add({ severity: 'warn', summary: 'Atención', detail: 'Complete todos los campos obligatorios', life: 3000 });
+    return;
+  }
+
+  if (!isEditingUser.value && userForm.value.password.length < 6) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Contraseña muy corta',
+      detail: 'La contraseña debe tener al menos 6 caracteres',
+      life: 3500,
+    });
     return;
   }
 
@@ -205,9 +216,9 @@ const handleSaveUser = async () => {
   try {
     if (isEditingUser.value && editingUserId.value) {
       await usersService.updateUser(editingUserId.value, {
-        email: userForm.value.email,
-        first_name: userForm.value.first_name,
-        last_name: userForm.value.last_name,
+        email: userForm.value.email.trim().toLowerCase(),
+        first_name: userForm.value.first_name.trim(),
+        last_name: userForm.value.last_name.trim(),
         role_id: userForm.value.role_id,
         sucursal_id: userForm.value.sucursal_id,
         is_active: userForm.value.is_active,
@@ -229,7 +240,12 @@ const handleSaveUser = async () => {
     isUserDialogVisible.value = false;
     await loadData();
   } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al guardar usuario', life: 4000 });
+    toast.add({
+      severity: 'error',
+      summary: 'Error al Guardar Usuario',
+      detail: getErrorMessage(err, 'No se pudo registrar o actualizar el usuario'),
+      life: 4500,
+    });
   } finally {
     isSavingUser.value = false;
   }
@@ -275,7 +291,12 @@ const handleSaveResetPassword = async () => {
     });
     isResetPasswordDialogVisible.value = false;
   } catch (err: any) {
-    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo restablecer la contraseña', life: 4000 });
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: getErrorMessage(err, 'No se pudo restablecer la contraseña'),
+      life: 4000,
+    });
   } finally {
     isSavingResetPassword.value = false;
   }

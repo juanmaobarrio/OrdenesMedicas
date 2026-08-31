@@ -101,3 +101,35 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/**
+ * Transforma respuestas de error de la API (strings, arrays de Pydantic o errores genéricos) en mensajes claros en español.
+ */
+export function getErrorMessage(error: any, defaultMsg = 'Ocurrió un error inesperado'): string {
+  if (!error) return defaultMsg;
+  const data = error.response?.data;
+  if (!data) return error.message || defaultMsg;
+
+  if (typeof data.detail === 'string') {
+    return data.detail;
+  }
+
+  if (Array.isArray(data.detail)) {
+    return data.detail
+      .map((item: any) => {
+        const loc = item.loc || [];
+        const field = loc.length > 0 ? String(loc[loc.length - 1]) : '';
+        const msg = item.msg || item.message || '';
+        if (field === 'password') {
+          return 'La contraseña debe tener al menos 6 caracteres.';
+        }
+        if (field === 'email') return 'El correo electrónico no es válido.';
+        if (field === 'username') return `Nombre de usuario: ${msg}`;
+        return field ? `${field}: ${msg}` : msg;
+      })
+      .join(' ');
+  }
+
+  if (typeof data === 'string') return data;
+  return defaultMsg;
+}
