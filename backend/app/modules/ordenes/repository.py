@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -64,7 +64,7 @@ class OrdenMedicaRepository:
         self,
         skip: int = 0,
         limit: int = 50,
-        estado: Optional[EstadoOrden] = None,
+        estado: Optional[Any] = None,
         sucursal_id: Optional[uuid.UUID] = None,
         paciente_id: Optional[uuid.UUID] = None,
         auditor_id: Optional[uuid.UUID] = None,
@@ -76,7 +76,6 @@ class OrdenMedicaRepository:
         """Consulta paginada de ordenes con filtros multiples."""
         base_stmt = (
             select(OrdenMedica)
-            .outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
             .options(
                 selectinload(OrdenMedica.paciente),
                 selectinload(OrdenMedica.sucursal),
@@ -86,11 +85,12 @@ class OrdenMedicaRepository:
                 selectinload(OrdenMedica.solicitudes),
             )
         )
-        count_stmt = select(func.count(OrdenMedica.id)).outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
+        count_stmt = select(func.count(OrdenMedica.id))
 
         filters = []
         if estado:
-            filters.append(OrdenMedica.estado == estado)
+            estado_val = estado.value if hasattr(estado, "value") else str(estado)
+            filters.append(OrdenMedica.estado == estado_val)
         if sucursal_id:
             filters.append(OrdenMedica.sucursal_id == sucursal_id)
         if paciente_id:
@@ -105,6 +105,8 @@ class OrdenMedicaRepository:
             filters.append(OrdenMedica.fecha_prescripcion <= fecha_hasta)
 
         if search:
+            base_stmt = base_stmt.outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
+            count_stmt = count_stmt.outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
             pattern = f"%{search.strip()}%"
             filters.append(
                 or_(
@@ -127,7 +129,7 @@ class OrdenMedicaRepository:
             .limit(limit)
         )
         result = await self.db.execute(query_stmt)
-        items = result.scalars().all()
+        items = result.scalars().unique().all()
 
         return items, total_count
 

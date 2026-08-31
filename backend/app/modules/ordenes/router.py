@@ -2,7 +2,9 @@ import os
 import shutil
 import uuid
 from datetime import date
-from typing import List, Optional
+from decimal import Decimal
+from typing import Any, List, Optional
+from loguru import logger
 from fastapi import (
     APIRouter,
     Depends,
@@ -102,7 +104,7 @@ async def list_llamadas_pendientes(
 async def list_ordenes(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    estado: Optional[EstadoOrden] = Query(None, description="Filtrar por estado del ciclo de vida"),
+    estado: Optional[str] = Query(None, description="Filtrar por estado del ciclo de vida"),
     sucursal_id: Optional[uuid.UUID] = Query(None, description="Filtrar por sucursal"),
     paciente_id: Optional[uuid.UUID] = Query(None, description="Filtrar por paciente"),
     auditor_id: Optional[uuid.UUID] = Query(None, description="Filtrar por auditor asignado"),
