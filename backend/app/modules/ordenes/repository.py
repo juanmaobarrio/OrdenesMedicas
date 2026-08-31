@@ -76,7 +76,7 @@ class OrdenMedicaRepository:
         """Consulta paginada de ordenes con filtros multiples."""
         base_stmt = (
             select(OrdenMedica)
-            .join(OrdenMedica.paciente)
+            .outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
             .options(
                 selectinload(OrdenMedica.paciente),
                 selectinload(OrdenMedica.sucursal),
@@ -86,7 +86,7 @@ class OrdenMedicaRepository:
                 selectinload(OrdenMedica.solicitudes),
             )
         )
-        count_stmt = select(func.count(OrdenMedica.id)).join(OrdenMedica.paciente)
+        count_stmt = select(func.count(OrdenMedica.id)).outerjoin(Paciente, OrdenMedica.paciente_id == Paciente.id)
 
         filters = []
         if estado:

@@ -303,27 +303,27 @@ class OrdenMedicaAsignarAuditor(BaseModel):
 class OrdenMedicaListItem(BaseModel):
     id: uuid.UUID
     nro_orden: str
-    estado: EstadoOrden
-    fecha_prescripcion: date
-    mutual: str
+    estado: Any = "Ingreso"
+    fecha_prescripcion: Any
+    mutual: Optional[str] = "S/D"
     nro_afiliado: Optional[str] = None
-    valor_copago: Decimal
+    valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
-    cantidad_ordenes_fisicas: int
+    cantidad_ordenes_fisicas: int = 1
 
-    numeros_auditoria: List[str]
+    numeros_auditoria: List[str] = Field(default_factory=list)
     debe_orden_medica: bool = False
-    paciente: PacienteRead
-    sucursal: SucursalRead
-    created_by_user: UserReadSummary
+    paciente: Optional[PacienteRead] = None
+    sucursal: Optional[SucursalRead] = None
+    created_by_user: Optional[UserReadSummary] = None
     assigned_auditor: Optional[UserReadSummary] = None
     cant_adjuntos: int = 0
     cant_solicitudes_pendientes: int = 0
     llamada_solicitud_completada: bool = False
     llamada_finalizada_completada: bool = False
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -331,17 +331,17 @@ class OrdenMedicaListItem(BaseModel):
 class OrdenMedicaDetail(BaseModel):
     id: uuid.UUID
     nro_orden: str
-    estado: EstadoOrden
-    fecha_prescripcion: date
-    cantidad_ordenes_fisicas: int
-    mutual: str
+    estado: Any = "Ingreso"
+    fecha_prescripcion: Any
+    cantidad_ordenes_fisicas: int = 1
+    mutual: Optional[str] = "S/D"
     nro_afiliado: Optional[str] = None
-    valor_copago: Decimal
+    valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
     fecha_vencimiento: Optional[date] = None
 
-    numeros_auditoria: List[str]
+    numeros_auditoria: List[str] = Field(default_factory=list)
     debe_orden_medica: bool = False
     contacto_nombre: Optional[str] = None
     contacto_horario: Optional[str] = None
@@ -357,9 +357,9 @@ class OrdenMedicaDetail(BaseModel):
     llamada_finalizada_completada: bool = False
     llamada_finalizada_fecha: Optional[datetime] = None
     llamada_finalizada_observacion: Optional[str] = None
-    paciente: PacienteRead
-    sucursal: SucursalRead
-    created_by_user: UserReadSummary
+    paciente: Optional[PacienteRead] = None
+    sucursal: Optional[SucursalRead] = None
+    created_by_user: Optional[UserReadSummary] = None
     assigned_auditor: Optional[UserReadSummary] = None
     adjuntos: List[AdjuntoOrdenRead] = []
     solicitudes: List[AuditoriaSolicitudRead] = []
