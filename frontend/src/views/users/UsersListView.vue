@@ -220,7 +220,7 @@ const handleSaveUser = async () => {
         first_name: userForm.value.first_name.trim(),
         last_name: userForm.value.last_name.trim(),
         role_id: userForm.value.role_id,
-        sucursal_id: userForm.value.sucursal_id,
+        sucursal_id: userForm.value.sucursal_id ? userForm.value.sucursal_id : null,
         is_active: userForm.value.is_active,
       } as any);
       toast.add({ severity: 'success', summary: 'Usuario Actualizado', detail: 'Datos guardados correctamente', life: 3000 });
@@ -639,7 +639,7 @@ const handleSaveRole = async () => {
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Sucursal (Opcional)</label>
-            <Dropdown v-model="userForm.sucursal_id" :options="sucursales" optionLabel="nombre" optionValue="id" placeholder="Todas" showClear class="w-full text-xs" />
+            <Dropdown v-model="userForm.sucursal_id" :options="sucursales" optionLabel="nombre" optionValue="id" placeholder="Todas las sucursales" showClear class="w-full text-xs" />
           </div>
         </div>
       </div>

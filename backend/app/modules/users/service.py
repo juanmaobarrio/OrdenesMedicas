@@ -208,11 +208,14 @@ class UserService:
                 raise EntityNotFoundException("Rol", dto.role_id)
             user.role_id = dto.role_id
 
-        if dto.sucursal_id is not None:
-            sucursal = await self.sucursal_repo.get_by_id(dto.sucursal_id)
-            if not sucursal:
-                raise EntityNotFoundException("Sucursal", dto.sucursal_id)
-            user.sucursal_id = dto.sucursal_id
+        if "sucursal_id" in dto.model_fields_set:
+            if dto.sucursal_id is not None:
+                sucursal = await self.sucursal_repo.get_by_id(dto.sucursal_id)
+                if not sucursal:
+                    raise EntityNotFoundException("Sucursal", dto.sucursal_id)
+                user.sucursal_id = dto.sucursal_id
+            else:
+                user.sucursal_id = None
 
         await self.db.flush()
         return await self.get_user_by_id(user_id)
