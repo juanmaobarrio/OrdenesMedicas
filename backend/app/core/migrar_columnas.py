@@ -30,14 +30,21 @@ async def fix_and_inspect():
                     pass
         else:
             # PostgreSQL
-            await conn.execute(text("""
-                ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS nro_afiliado VARCHAR(50);
-                ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00;
-                ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS observacion_resultado_auditoria TEXT;
-                ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE;
-                ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE;
-                ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00;
-            """))
+            postgres_statements = [
+                "ALTER TABLE roles ADD COLUMN IF NOT EXISTS hierarchy_level INTEGER DEFAULT 10;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS nro_afiliado VARCHAR(50);",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS observacion_resultado_auditoria TEXT;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00;",
+            ]
+            for stmt in postgres_statements:
+                try:
+                    await conn.execute(text(stmt))
+                    print(f"  + Ejecutado en PostgreSQL: {stmt}")
+                except Exception as e:
+                    print(f"  - Aviso en PostgreSQL '{stmt}': {e}")
             # Agregar valores a los tipos Enum en Postgres si no existen
             for val in ["INFORMACION"]:
                 try:

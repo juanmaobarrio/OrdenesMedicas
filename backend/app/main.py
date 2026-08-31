@@ -19,96 +19,53 @@ from backend.app.modules.users.router import router as users_router
 
 
 
-def sync_sqlite_columns(connection):
+def sync_database_columns(connection):
     from sqlalchemy import text
-    try:
-        # SQLite migrations
-        res = connection.execute(text("PRAGMA table_info(ordenes_medicas)")).fetchall()
-        cols = [r[1] for r in res]
-        if cols and "nro_afiliado" not in cols:
-            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50)"))
-        if cols and "observacion_resultado_auditoria" not in cols:
-            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN observacion_resultado_auditoria TEXT"))
-        if cols and "valor_estudios_no_autorizados" not in cols:
-            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00"))
-        if cols and "debe_orden_medica" not in cols:
-            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT 0"))
-        if cols and "abona_apb" not in cols:
-            connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
+    dialect = connection.dialect.name
 
-        res_mut = connection.execute(text("PRAGMA table_info(obras_sociales)")).fetchall()
-        cols_mut = [r[1] for r in res_mut]
-        if cols_mut and "copago_default" not in cols_mut:
-            connection.execute(text("ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00"))
+    if dialect == "sqlite":
+        try:
+            # SQLite migrations
+            res = connection.execute(text("PRAGMA table_info(ordenes_medicas)")).fetchall()
+            cols = [r[1] for r in res]
+            if cols and "nro_afiliado" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50)"))
+            if cols and "observacion_resultado_auditoria" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN observacion_resultado_auditoria TEXT"))
+            if cols and "valor_estudios_no_autorizados" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00"))
+            if cols and "debe_orden_medica" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT 0"))
+            if cols and "abona_apb" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
 
-        res_roles = connection.execute(text("PRAGMA table_info(roles)")).fetchall()
-        cols_roles = [r[1] for r in res_roles]
-        if cols_roles and "hierarchy_level" not in cols_roles:
-            connection.execute(text("ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10"))
-    except Exception as err:
-        logger.warning(f"Error comprobando columnas SQLite: {err}")
+            res_mut = connection.execute(text("PRAGMA table_info(obras_sociales)")).fetchall()
+            cols_mut = [r[1] for r in res_mut]
+            if cols_mut and "copago_default" not in cols_mut:
+                connection.execute(text("ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00"))
 
-    try:
-        # PostgreSQL migrations (si la columna no existe)
-        connection.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='roles' AND column_name='hierarchy_level'
-                ) THEN
-                    ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='ordenes_medicas' AND column_name='nro_afiliado'
-                ) THEN
-                    ALTER TABLE ordenes_medicas ADD COLUMN nro_afiliado VARCHAR(50);
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='ordenes_medicas' AND column_name='valor_estudios_no_autorizados'
-                ) THEN
-                    ALTER TABLE ordenes_medicas ADD COLUMN valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='ordenes_medicas' AND column_name='observacion_resultado_auditoria'
-                ) THEN
-                    ALTER TABLE ordenes_medicas ADD COLUMN observacion_resultado_auditoria TEXT;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='ordenes_medicas' AND column_name='debe_orden_medica'
-                ) THEN
-                    ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='ordenes_medicas' AND column_name='abona_apb'
-                ) THEN
-                    ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT FALSE;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='obras_sociales' AND column_name='copago_default'
-                ) THEN
-                    ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00;
-                END IF;
-            END $$;
-        """))
-        for val in ["INFORMACION"]:
+            res_roles = connection.execute(text("PRAGMA table_info(roles)")).fetchall()
+            cols_roles = [r[1] for r in res_roles]
+            if cols_roles and "hierarchy_level" not in cols_roles:
+                connection.execute(text("ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10"))
+        except Exception as err:
+            logger.warning(f"Error comprobando columnas SQLite: {err}")
+
+    elif dialect == "postgresql":
+        postgres_statements = [
+            "ALTER TABLE roles ADD COLUMN IF NOT EXISTS hierarchy_level INTEGER DEFAULT 10",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS nro_afiliado VARCHAR(50)",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_estudios_no_autorizados NUMERIC(12, 2) DEFAULT 0.00",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS observacion_resultado_auditoria TEXT",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00",
+        ]
+        for stmt in postgres_statements:
             try:
-                connection.execute(text(f"ALTER TYPE estado_solicitud_enum ADD VALUE IF NOT EXISTS '{val}';"))
-            except Exception:
-                pass
-        for val in ["CONSULTA_PACIENTE", "SEGUIMIENTO_SUCURSAL", "OTRO"]:
-            try:
-                connection.execute(text(f"ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS '{val}';"))
-            except Exception:
-                pass
-    except Exception:
-        pass
+                connection.execute(text(stmt))
+            except Exception as e:
+                logger.warning(f"Aviso ejecutando '{stmt}': {e}")
 
 
 @asynccontextmanager
@@ -125,7 +82,7 @@ async def lifespan(app: FastAPI):
         import backend.app.modules.ordenes.models  # noqa
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            await conn.run_sync(sync_sqlite_columns)
+            await conn.run_sync(sync_database_columns)
         from backend.app.core.seed import seed_initial_data
         await seed_initial_data()
     except Exception as e:
