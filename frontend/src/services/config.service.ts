@@ -1,5 +1,6 @@
 import api from './api';
 import {
+  ConfiguracionAPB,
   EstadoOrdenConfig,
   EstadoOrdenConfigCreate,
   EstadoOrdenConfigUpdate,
@@ -61,5 +62,16 @@ export const configService = {
 
   async deleteEstado(id: number): Promise<void> {
     await api.delete(`/config/estados/${id}`);
+  },
+
+  // Acto Profesional Bioquímico (APB) General
+  async getValorApb(): Promise<ConfiguracionAPB> {
+    const response = await api.get<ConfiguracionAPB>('/config/apb');
+    return response.data;
+  },
+
+  async updateValorApb(valor_apb: number): Promise<ConfiguracionAPB> {
+    const response = await api.put<ConfiguracionAPB>('/config/apb', { valor_apb });
+    return response.data;
   },
 };

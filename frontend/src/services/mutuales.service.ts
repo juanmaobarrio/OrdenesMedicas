@@ -28,4 +28,14 @@ export const mutualesService = {
     const response = await api.patch<ObraSocial>(`/mutuales/${id}/toggle-active`);
     return response.data;
   },
+
+  async getValorApb(): Promise<{ valor_apb: number; descripcion?: string; updated_at?: string }> {
+    const response = await api.get('/config/apb');
+    return response.data;
+  },
+
+  async updateValorApb(valor_apb: number): Promise<{ valor_apb: number; descripcion?: string; updated_at?: string }> {
+    const response = await api.put('/config/apb', { valor_apb });
+    return response.data;
+  },
 };

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { pacientesService } from '../../services/pacientes.service';
 import { ordenesService } from '../../services/ordenes.service';
 import { usersService } from '../../services/users.service';
 import { mutualesService } from '../../services/mutuales.service';
+import { configService } from '../../services/config.service';
 import { useAuthStore } from '../../stores/auth.store';
 import { ObraSocial, PacienteSearchResult, Sucursal } from '../../types';
 
@@ -74,6 +75,7 @@ const form = ref({
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   abona_apb: false,
+  valor_apb: 0,
   fecha_vencimiento: null as Date | null,
   numeros_auditoria: [] as string[],
   debe_orden_medica: false,
@@ -83,6 +85,49 @@ const form = ref({
   contacto_celular: '',
   contacto_email: '',
   observaciones_ingreso: '',
+});
+
+const valorApbVigente = ref(0);
+
+const currentMutualCoberturaApb = computed(() => {
+  const sig = form.value.mutual;
+  if (!sig) return 0;
+  const mut = mutuales.value.find(
+    (m) =>
+      m.sigla?.toUpperCase() === sig.trim().toUpperCase() ||
+      m.codigo?.toUpperCase() === sig.trim().toUpperCase()
+  );
+  return mut && mut.porcentaje_cobertura_apb !== undefined && mut.porcentaje_cobertura_apb !== null
+    ? Number(mut.porcentaje_cobertura_apb)
+    : 0;
+});
+
+const recalcularApb = () => {
+  if (!form.value.abona_apb) {
+    form.value.valor_apb = 0;
+    return;
+  }
+  const cob = currentMutualCoberturaApb.value;
+  const pctPaciente = Math.max(0, 100 - cob) / 100;
+  form.value.valor_apb = Math.round(valorApbVigente.value * pctPaciente * 100) / 100;
+};
+
+watch(
+  () => form.value.abona_apb,
+  (newVal) => {
+    if (newVal) {
+      recalcularApb();
+    } else {
+      form.value.valor_apb = 0;
+    }
+  }
+);
+
+const totalAbonar = computed(() => {
+  const copago = Number(form.value.valor_copago || 0);
+  const noAut = Number(form.value.valor_estudios_no_autorizados || 0);
+  const apb = form.value.abona_apb ? Number(form.value.valor_apb || 0) : 0;
+  return copago + noAut + apb;
 });
 
 // Inline Create Patient State
@@ -191,6 +236,13 @@ onMounted(async () => {
   if (!form.value.sucursal_id && sucursales.value.length > 0) {
     form.value.sucursal_id = sucursales.value[0].id;
   }
+
+  try {
+    const apbRes = await configService.getValorApb();
+    valorApbVigente.value = Number(apbRes.valor_apb) || 0;
+  } catch (err) {
+    console.warn('No se pudo cargar valor de APB:', err);
+  }
 });
 
 const handleMutualChange = (mutualSigla?: string) => {
@@ -213,6 +265,10 @@ const handleMutualChange = (mutualSigla?: string) => {
     // 2. Copago por defecto sugerido
     if (mut.copago_default !== undefined && mut.copago_default !== null) {
       form.value.valor_copago = Number(mut.copago_default);
+    }
+    // 3. Si abona APB, recalcular según el porcentaje de cobertura de la mutual
+    if (form.value.abona_apb) {
+      recalcularApb();
     }
   }
 };
@@ -325,6 +381,7 @@ const handleSubmit = async () => {
       valor_copago: form.value.valor_copago,
       valor_estudios_no_autorizados: form.value.valor_estudios_no_autorizados,
       abona_apb: form.value.abona_apb,
+      valor_apb: form.value.abona_apb ? form.value.valor_apb : 0,
       fecha_vencimiento: form.value.fecha_vencimiento ? formattedDate(form.value.fecha_vencimiento) : null,
       debe_orden_medica: form.value.debe_orden_medica,
 
@@ -562,13 +619,34 @@ const handleSubmit = async () => {
           <!-- Checkbox: Acto Profesional Bioquímico (APB) -->
           <div class="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 flex items-start space-x-3">
             <Checkbox v-model="form.abona_apb" binary inputId="abonaApb" />
-            <div>
+            <div class="flex-1">
               <label for="abonaApb" class="text-xs font-bold text-blue-900 cursor-pointer block">
                 🧪 Abona APB (Acto Profesional Bioquímico)
               </label>
               <p class="text-[11px] text-blue-700 mt-0.5">
                 Marque si el paciente debe abonar el Acto Profesional Bioquímico según el convenio mutual.
               </p>
+
+              <!-- Selector / Detalle del valor APB calculado -->
+              <div v-if="form.abona_apb" class="mt-2.5 pt-2 border-t border-blue-200/80">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="text-xs font-semibold text-blue-950 uppercase">Valor APB a Abonar ($):</span>
+                  <InputNumber
+                    v-model="form.valor_apb"
+                    mode="currency"
+                    currency="ARS"
+                    locale="es-AR"
+                    class="w-36 text-xs"
+                    inputClass="w-full text-right text-xs font-bold text-blue-900 bg-white"
+                    :min="0"
+                  />
+                </div>
+                <p class="text-[10px] text-blue-700/80 mt-1">
+                  Base APB: ${{ valorApbVigente.toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+                  <span v-if="currentMutualCoberturaApb > 0"> &bull; Mutual cubre {{ currentMutualCoberturaApb }}% (paciente {{ 100 - currentMutualCoberturaApb }}%)</span>
+                  <span v-else> &bull; Mutual no cubre APB (100% paciente)</span>
+                </p>
+              </div>
             </div>
           </div>
 
@@ -583,6 +661,29 @@ const handleSubmit = async () => {
                 Alerta roja para exigir la receta física original el día de la atención.
               </p>
             </div>
+          </div>
+        </div>
+
+        <!-- Resumen Total a Abonar -->
+        <div class="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-slate-50 rounded-xl border border-emerald-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div>
+            <span class="text-xs font-bold text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="pi pi-wallet text-emerald-600"></i> Total Estimado a Abonar por el Paciente:
+            </span>
+            <div class="text-[11px] text-emerald-800 flex flex-wrap gap-x-2 mt-0.5">
+              <span>Copago/Bono: <strong>${{ Number(form.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+              <span v-if="Number(form.valor_estudios_no_autorizados || 0) > 0">
+                + No autorizados: <strong>${{ Number(form.valor_estudios_no_autorizados || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong>
+              </span>
+              <span v-if="form.abona_apb && Number(form.valor_apb || 0) > 0">
+                + APB: <strong>${{ Number(form.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong>
+              </span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="text-xl font-extrabold text-emerald-900 font-mono">
+              ${{ totalAbonar.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </span>
           </div>
         </div>
       </div>

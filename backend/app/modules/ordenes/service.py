@@ -1,8 +1,10 @@
 import os
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, Optional, Sequence, Tuple
 from loguru import logger
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.exceptions import (
@@ -15,6 +17,7 @@ from backend.app.modules.ordenes.models import (
     AdjuntoOrden,
     AuditoriaLog,
     AuditoriaSolicitud,
+    ConfiguracionSistema,
     EstadoOrden,
     EstadoOrdenConfig,
     EstadoSolicitudAuditoria,
@@ -33,6 +36,8 @@ from backend.app.modules.ordenes.repository import (
 from backend.app.modules.ordenes.schemas import (
     AuditoriaSolicitudCreate,
     AuditoriaSolicitudResponder,
+    ConfiguracionAPBRead,
+    ConfiguracionAPBUpdate,
     EstadoOrdenConfigCreate,
     EstadoOrdenConfigUpdate,
     MotivoCancelacionCreate,
@@ -129,6 +134,7 @@ class OrdenMedicaService:
             valor_copago=dto.valor_copago,
             valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
             abona_apb=dto.abona_apb,
+            valor_apb=dto.valor_apb if dto.abona_apb else Decimal("0.00"),
             fecha_vencimiento=dto.fecha_vencimiento,
             numeros_auditoria=dto.numeros_auditoria,
             debe_orden_medica=dto.debe_orden_medica,
@@ -158,6 +164,7 @@ class OrdenMedicaService:
                     "sucursal": sucursal.nombre,
                     "mutual": dto.mutual,
                     "copago": str(dto.valor_copago),
+                    "apb": str(dto.valor_apb if dto.abona_apb else Decimal("0.00")),
                 },
                 ip_address=client_ip,
                 user_agent=user_agent,
@@ -210,6 +217,10 @@ class OrdenMedicaService:
         if dto.abona_apb is not None:
             diff["abona_apb"] = dto.abona_apb
             orden.abona_apb = dto.abona_apb
+
+        if dto.valor_apb is not None:
+            diff["valor_apb"] = str(dto.valor_apb)
+            orden.valor_apb = dto.valor_apb
 
         if dto.fecha_vencimiento is not None:
             diff["fecha_vencimiento"] = str(dto.fecha_vencimiento)
@@ -329,6 +340,8 @@ class OrdenMedicaService:
             orden.valor_copago = dto.valor_copago
         if dto.valor_estudios_no_autorizados is not None:
             orden.valor_estudios_no_autorizados = dto.valor_estudios_no_autorizados
+        if dto.valor_apb is not None:
+            orden.valor_apb = dto.valor_apb
 
         # Si pasa a 'Solicitudes de auditoria', habilitar llamada
         if final_estado_enum == EstadoOrden.SOLICITUDES_AUDITORIA:
@@ -348,6 +361,8 @@ class OrdenMedicaService:
             detalles_log["valor_copago"] = str(dto.valor_copago)
         if dto.valor_estudios_no_autorizados is not None:
             detalles_log["valor_estudios_no_autorizados"] = str(dto.valor_estudios_no_autorizados)
+        if dto.valor_apb is not None:
+            detalles_log["valor_apb"] = str(dto.valor_apb)
         if dto.motivo_cancelacion_id:
             detalles_log["motivo_cancelacion_id"] = str(dto.motivo_cancelacion_id)
         if dto.estado_id:
@@ -870,5 +885,55 @@ class EstadoOrdenConfigService:
         if estado.es_sistema:
             raise ForbiddenActionException("No se pueden eliminar estados base del sistema")
         await self.repo.delete(estado)
+
+
+class ConfiguracionSistemaService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_config_apb(self) -> ConfiguracionAPBRead:
+        stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "VALOR_APB")
+        res = await self.db.execute(stmt)
+        cfg = res.scalar_one_or_none()
+        if not cfg:
+            cfg = ConfiguracionSistema(
+                clave="VALOR_APB",
+                valor="0.00",
+                descripcion="Valor vigente de referencia del Acto Profesional Bioquímico (APB)",
+            )
+            self.db.add(cfg)
+            await self.db.commit()
+            await self.db.refresh(cfg)
+        try:
+            val = Decimal(cfg.valor)
+        except Exception:
+            val = Decimal("0.00")
+        return ConfiguracionAPBRead(
+            valor_apb=val,
+            descripcion=cfg.descripcion,
+            updated_at=cfg.updated_at,
+        )
+
+    async def update_valor_apb(self, dto: ConfiguracionAPBUpdate) -> ConfiguracionAPBRead:
+        stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "VALOR_APB")
+        res = await self.db.execute(stmt)
+        cfg = res.scalar_one_or_none()
+        if not cfg:
+            cfg = ConfiguracionSistema(
+                clave="VALOR_APB",
+                valor=str(dto.valor_apb),
+                descripcion="Valor vigente de referencia del Acto Profesional Bioquímico (APB)",
+            )
+            self.db.add(cfg)
+        else:
+            cfg.valor = str(dto.valor_apb)
+        await self.db.commit()
+        await self.db.refresh(cfg)
+        return ConfiguracionAPBRead(
+            valor_apb=Decimal(cfg.valor),
+            descripcion=cfg.descripcion,
+            updated_at=cfg.updated_at,
+        )
+
 
 

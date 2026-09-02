@@ -39,6 +39,7 @@ class ObraSocialService:
             codigo_externo=dto.codigo_externo.strip() if dto.codigo_externo else None,
             dias_vencimiento=dto.dias_vencimiento,
             copago_default=dto.copago_default,
+            porcentaje_cobertura_apb=dto.porcentaje_cobertura_apb,
             activa=dto.activa,
         )
         return await self.repo.create(mutual)
@@ -56,6 +57,8 @@ class ObraSocialService:
             update_data["dias_vencimiento"] = dto.dias_vencimiento
         if dto.copago_default is not None:
             update_data["copago_default"] = dto.copago_default
+        if dto.porcentaje_cobertura_apb is not None:
+            update_data["porcentaje_cobertura_apb"] = dto.porcentaje_cobertura_apb
         if dto.activa is not None:
             update_data["activa"] = dto.activa
 

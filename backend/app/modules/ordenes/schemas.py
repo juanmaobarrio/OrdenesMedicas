@@ -229,6 +229,9 @@ class OrdenMedicaBase(BaseModel):
     abona_apb: bool = Field(
         default=False, description="Indica si el paciente abona Acto Profesional Bioquímico (APB)"
     )
+    valor_apb: Decimal = Field(
+        default=Decimal("0.00"), ge=0, description="Monto de APB a abonar por el paciente"
+    )
     fecha_vencimiento: Optional[date] = Field(
         None, description="Fecha de vencimiento de la prescripcion"
     )
@@ -270,6 +273,7 @@ class OrdenMedicaUpdate(BaseModel):
     valor_copago: Optional[Decimal] = Field(None, ge=0)
     valor_estudios_no_autorizados: Optional[Decimal] = Field(None, ge=0)
     abona_apb: Optional[bool] = None
+    valor_apb: Optional[Decimal] = Field(None, ge=0)
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: Optional[List[str]] = None
@@ -300,6 +304,9 @@ class OrdenMedicaCambioEstado(BaseModel):
     valor_estudios_no_autorizados: Optional[Decimal] = Field(
         None, ge=0, description="Monto de estudios no autorizados al finalizar auditoria"
     )
+    valor_apb: Optional[Decimal] = Field(
+        None, ge=0, description="Monto actualizado del APB al finalizar auditoria"
+    )
 
 
 class OrdenMedicaAsignarAuditor(BaseModel):
@@ -316,6 +323,7 @@ class OrdenMedicaListItem(BaseModel):
     valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
+    valor_apb: Decimal = Decimal("0.00")
     cantidad_ordenes_fisicas: int = 1
 
     numeros_auditoria: List[str] = Field(default_factory=list)
@@ -345,6 +353,7 @@ class OrdenMedicaDetail(BaseModel):
     valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
+    valor_apb: Decimal = Decimal("0.00")
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: List[str] = Field(default_factory=list)
@@ -379,3 +388,17 @@ class OrdenMedicaDetail(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# ==========================================
+# CONFIGURACION SISTEMA / APB
+# ==========================================
+class ConfiguracionAPBRead(BaseModel):
+    valor_apb: Decimal = Field(..., description="Valor base vigente del Acto Profesional Bioquímico (APB)")
+    descripcion: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConfiguracionAPBUpdate(BaseModel):
+    valor_apb: Decimal = Field(..., ge=0, description="Nuevo valor de referencia del Acto Profesional Bioquímico (APB)")

@@ -577,3 +577,21 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
 ### 14.7 Edición de Valores al Finalizar Auditoría y Tarjeta Verde de Resolución
 - **Ajuste de Montos en Transición:** Al pasar una orden al estado `Auditoria Finalizada`, el auditor médico puede ajustar en el mismo modal tanto el **Copago Final ($)** como los **Estudios No Autorizados ($)**, permitiendo reflejar con exactitud lo autorizado por la mutual.
 - **Tarjeta Verde de Éxito en Observaciones:** La pestaña *Observaciones* del expediente muestra en la parte superior una tarjeta verde destacada con la **Resolución Final de Auditoría Médica**, el mensaje textual del auditor y el desglose económico de lo que el paciente debe abonar.
+
+
+### 14.8 Gestión Integral del Acto Profesional Bioquímico (APB) y Total a Abonar
+- **Valor Base Fijo y Actualizable de APB:**
+  - Se incorporó la tabla `configuracion_sistema` (clave-valor) para persistir parámetros generales del laboratorio, con la clave `VALOR_APB`.
+  - Endpoints REST protegidos: `GET /api/v1/config/apb` y `PUT /api/v1/config/apb` (requiere permiso `config:manage` o `mutuales:manage`).
+  - Tarjeta interactiva en la vista de **Obras Sociales y Mutuales** (`/obras-sociales`) y pestaña dedicada en **Configuración** (`/configuracion`) con indicador del valor base vigente, fecha de última modificación y modal rápido para su actualización.
+- **Porcentaje de Cobertura de APB por Mutual:**
+  - Se agregó la columna `porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00` en la tabla `obras_sociales`.
+  - Editable en el formulario de alta y edición de mutuales (rango 0% a 100%). Si la mutual cubre el 100%, el paciente abona $0; si cubre el 0%, abona la totalidad del valor base; si cubre un porcentaje intermedio (ej: 80%), el paciente abona la porción restante (ej: 20%).
+  - Columna visible en el listado de obras sociales con badge distintivo.
+- **Cálculo Automático y Registro en la Orden Médica:**
+  - Se incorporó la columna `valor_apb NUMERIC(12, 2) DEFAULT 0.00` en `ordenes_medicas` para congelar históricamente el importe cobrado a la fecha de emisión.
+  - Al marcar **"Abona APB"** en el alta de orden, el sistema calcula de inmediato el valor aplicando: `valor_apb = valor_base * (1 - porcentaje_cobertura / 100)`, mostrándolo en pantalla con desglose explicativo y permitiendo su ajuste manual si fuese necesario.
+- **Fórmula Unificada del Total a Abonar:**
+  - El monto total a abonar por el paciente se consolida de forma estricta y transparente en todas las vistas:
+    $$\text{Total a Abonar} = \text{Copago/Bono} + \text{Estudios No Autorizados} + \text{APB}$$
+  - Visible en el formulario de creación (tarjeta resumen en tiempo real), tabla de órdenes (columna de Valores), panel lateral de expediente, vista completa de orden, modal de edición, modal de finalización de auditoría y reportes exportados en CSV/Excel.

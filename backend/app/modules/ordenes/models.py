@@ -142,6 +142,9 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     abona_apb: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, comment="Indica si el paciente abona Acto Profesional Bioquímico (APB)"
     )
+    valor_apb: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Monto de APB a abonar por el paciente"
+    )
 
 
     # Datos de contacto para seguimiento
@@ -350,5 +353,18 @@ class RegistroLlamadaPaciente(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Relaciones ORM
     orden: Mapped[OrdenMedica] = relationship("OrdenMedica", back_populates="llamadas_registro")
     operador: Mapped[User] = relationship("User", lazy="selectin")
+
+
+class ConfiguracionSistema(Base):
+    """Parámetros de configuración general del sistema (clave-valor)."""
+    __tablename__ = "configuracion_sistema"
+
+    clave: Mapped[str] = mapped_column(String(100), primary_key=True, index=True)
+    valor: Mapped[str] = mapped_column(String(255), nullable=False)
+    descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
 
 

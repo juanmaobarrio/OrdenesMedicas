@@ -19,7 +19,9 @@ async def fix_and_inspect():
                 ("ordenes_medicas", "observacion_resultado_auditoria", "TEXT"),
                 ("ordenes_medicas", "debe_orden_medica", "BOOLEAN DEFAULT 0"),
                 ("ordenes_medicas", "abona_apb", "BOOLEAN DEFAULT 0"),
+                ("ordenes_medicas", "valor_apb", "NUMERIC(12, 2) DEFAULT 0.00"),
                 ("obras_sociales", "copago_default", "NUMERIC(12, 2) DEFAULT 0.00"),
+                ("obras_sociales", "porcentaje_cobertura_apb", "NUMERIC(5, 2) DEFAULT 0.00"),
             ]
             for table, col, col_type in columns_to_add:
                 try:
@@ -28,6 +30,18 @@ async def fix_and_inspect():
                 except Exception as e:
                     # Columna ya existe
                     pass
+
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS configuracion_sistema (
+                    clave VARCHAR(100) PRIMARY KEY,
+                    valor VARCHAR(255) NOT NULL,
+                    descripcion VARCHAR(255),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+            row = (await conn.execute(text("SELECT clave FROM configuracion_sistema WHERE clave = 'VALOR_APB';"))).fetchone()
+            if not row:
+                await conn.execute(text("INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)');"))
         else:
             # PostgreSQL
             postgres_statements = [
@@ -37,7 +51,22 @@ async def fix_and_inspect():
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS observacion_resultado_auditoria TEXT;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00;",
                 "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00;",
+                "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00;",
+                """
+                CREATE TABLE IF NOT EXISTS configuracion_sistema (
+                    clave VARCHAR(100) PRIMARY KEY,
+                    valor VARCHAR(255) NOT NULL,
+                    descripcion VARCHAR(255),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                """,
+                """
+                INSERT INTO configuracion_sistema (clave, valor, descripcion)
+                VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')
+                ON CONFLICT (clave) DO NOTHING;
+                """,
             ]
             for stmt in postgres_statements:
                 try:

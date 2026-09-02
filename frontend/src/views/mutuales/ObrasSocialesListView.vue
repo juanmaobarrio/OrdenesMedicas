@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { mutualesService } from '../../services/mutuales.service';
 import { ObraSocial, ObraSocialCreate, ObraSocialUpdate } from '../../types/mutuales';
+import { formatDateTime } from '../../utils/date';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -27,6 +28,13 @@ const isEditing = ref(false);
 const isSaving = ref(false);
 const editingId = ref<string | null>(null);
 
+// APB General Config State
+const valorApbVigente = ref(0);
+const apbUpdatedAt = ref<string | null>(null);
+const isApbDialogVisible = ref(false);
+const apbFormValue = ref(0);
+const isSavingApb = ref(false);
+
 const form = ref<ObraSocialCreate>({
   codigo: '',
   sigla: '',
@@ -34,8 +42,49 @@ const form = ref<ObraSocialCreate>({
   codigo_externo: '',
   dias_vencimiento: 30,
   copago_default: 0,
+  porcentaje_cobertura_apb: 0,
   activa: true,
 });
+
+const loadApb = async () => {
+  try {
+    const res = await mutualesService.getValorApb();
+    valorApbVigente.value = Number(res.valor_apb) || 0;
+    apbUpdatedAt.value = res.updated_at || null;
+  } catch (err: any) {
+    console.warn('No se pudo cargar el valor de APB:', err);
+  }
+};
+
+const openApbDialog = () => {
+  apbFormValue.value = valorApbVigente.value;
+  isApbDialogVisible.value = true;
+};
+
+const handleSaveApb = async () => {
+  isSavingApb.value = true;
+  try {
+    const res = await mutualesService.updateValorApb(apbFormValue.value);
+    valorApbVigente.value = Number(res.valor_apb) || 0;
+    apbUpdatedAt.value = res.updated_at || null;
+    toast.add({
+      severity: 'success',
+      summary: 'Valor APB Actualizado',
+      detail: `El nuevo valor base de APB es $ ${valorApbVigente.value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+      life: 3500,
+    });
+    isApbDialogVisible.value = false;
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err.response?.data?.detail || 'No se pudo actualizar el valor de APB',
+      life: 4000,
+    });
+  } finally {
+    isSavingApb.value = false;
+  }
+};
 
 const loadMutuales = async () => {
   isLoading.value = true;
@@ -55,6 +104,7 @@ const loadMutuales = async () => {
 
 onMounted(() => {
   loadMutuales();
+  loadApb();
 });
 
 const filteredMutuales = computed(() => {
@@ -85,6 +135,7 @@ const openNewDialog = () => {
     codigo_externo: '',
     dias_vencimiento: 30,
     copago_default: 0,
+    porcentaje_cobertura_apb: 0,
     activa: true,
   };
   isDialogVisible.value = true;
@@ -100,6 +151,7 @@ const openEditDialog = (m: ObraSocial) => {
     codigo_externo: m.codigo_externo || '',
     dias_vencimiento: m.dias_vencimiento,
     copago_default: m.copago_default !== undefined && m.copago_default !== null ? Number(m.copago_default) : 0,
+    porcentaje_cobertura_apb: m.porcentaje_cobertura_apb !== undefined && m.porcentaje_cobertura_apb !== null ? Number(m.porcentaje_cobertura_apb) : 0,
     activa: m.activa,
   };
   isDialogVisible.value = true;
@@ -125,6 +177,7 @@ const handleSave = async () => {
         codigo_externo: form.value.codigo_externo?.trim() || null,
         dias_vencimiento: form.value.dias_vencimiento,
         copago_default: form.value.copago_default !== undefined && form.value.copago_default !== null ? Number(form.value.copago_default) : 0,
+        porcentaje_cobertura_apb: form.value.porcentaje_cobertura_apb !== undefined && form.value.porcentaje_cobertura_apb !== null ? Number(form.value.porcentaje_cobertura_apb) : 0,
         activa: form.value.activa,
       };
       await mutualesService.update(editingId.value, updatePayload);
@@ -142,6 +195,7 @@ const handleSave = async () => {
         codigo_externo: form.value.codigo_externo?.trim() || null,
         dias_vencimiento: form.value.dias_vencimiento,
         copago_default: form.value.copago_default !== undefined && form.value.copago_default !== null ? Number(form.value.copago_default) : 0,
+        porcentaje_cobertura_apb: form.value.porcentaje_cobertura_apb !== undefined && form.value.porcentaje_cobertura_apb !== null ? Number(form.value.porcentaje_cobertura_apb) : 0,
         activa: form.value.activa,
       };
       await mutualesService.create(createPayload);
@@ -197,6 +251,43 @@ const handleToggleActive = async (m: ObraSocial) => {
       </div>
 
       <Button label="Nueva Obra Social" icon="pi pi-plus" severity="primary" size="small" @click="openNewDialog" />
+    </div>
+
+    <!-- Banner / Tarjeta de Valor Base de APB -->
+    <div
+      class="bg-gradient-to-r from-blue-50 via-indigo-50/70 to-slate-50 border border-blue-200/90 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center space-x-3.5">
+        <div class="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl shadow-sm shrink-0">
+          🧪
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-900">Acto Profesional Bioquímico (APB)</span>
+            <Tag value="Parámetro General Fijo" severity="info" class="text-[10px]" />
+          </div>
+          <div class="flex flex-wrap items-baseline gap-x-2 mt-0.5">
+            <span class="text-xs text-slate-600">Valor Base de Referencia:</span>
+            <span class="font-bold text-blue-900 font-mono text-lg">
+              ${{ Number(valorApbVigente).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+            </span>
+            <span v-if="apbUpdatedAt" class="text-[11px] text-slate-500">
+              &bull; Actualizado: {{ formatDateTime(apbUpdatedAt) }}
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-0.5">
+            Monto de referencia al marcar "Abona APB" en órdenes nuevas. Se descuenta el % de cobertura que posea cada mutual.
+          </p>
+        </div>
+      </div>
+      <Button
+        label="Modificar Valor APB"
+        icon="pi pi-pencil"
+        severity="primary"
+        size="small"
+        outlined
+        class="shrink-0 font-medium"
+        @click="openApbDialog"
+      />
     </div>
 
     <!-- Filter Bar -->
@@ -267,6 +358,19 @@ const handleToggleActive = async (m: ObraSocial) => {
           </template>
         </Column>
 
+        <Column field="porcentaje_cobertura_apb" header="% Cobertura APB" sortable>
+          <template #body="{ data }">
+            <span
+              v-if="Number(data.porcentaje_cobertura_apb || 0) > 0"
+              class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <i class="pi pi-check text-[10px]"></i> {{ Number(data.porcentaje_cobertura_apb) }}% cubre
+            </span>
+            <span v-else class="text-xs text-slate-400 font-medium">
+              0% (No cubre)
+            </span>
+          </template>
+        </Column>
+
         <Column field="activa" header="Estado" sortable>
           <template #body="{ data }">
             <Tag :value="data.activa ? 'ACTIVA' : 'INACTIVA'" :severity="data.activa ? 'success' : 'secondary'"
@@ -294,9 +398,9 @@ const handleToggleActive = async (m: ObraSocial) => {
 
     <!-- Modal: Crear / Editar Obra Social -->
     <Dialog v-model:visible="isDialogVisible" modal
-      :header="isEditing ? 'Editar Obra Social' : 'Registrar Nueva Obra Social'" :style="{ width: '520px' }">
+      :header="isEditing ? 'Editar Obra Social' : 'Registrar Nueva Obra Social'" :style="{ width: '560px' }">
       <div class="space-y-4">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Código Único <span class="text-red-500">*</span>
@@ -320,7 +424,7 @@ const handleToggleActive = async (m: ObraSocial) => {
             class="w-full text-xs" />
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Días de Vencimiento <span class="text-red-500">*</span>
@@ -330,18 +434,42 @@ const handleToggleActive = async (m: ObraSocial) => {
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Copago Predeterminado ($)
+              Código Externo (Opcional)
             </label>
-            <InputNumber v-model="form.copago_default as any" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" placeholder="$ 0,00" />
-            <p class="text-[10px] text-slate-400 mt-0.5">Valor sugerido al cargar orden</p>
+            <InputText v-model="form.codigo_externo as any" placeholder="Ej: 1040" class="w-full text-xs" />
+            <p class="text-[10px] text-slate-400 mt-0.5">Identificador de facturación / sistema externo</p>
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-            Código Externo (Opcional)
-          </label>
-          <InputText v-model="form.codigo_externo as any" placeholder="Ej: 1040" class="w-full text-xs" />
+        <div class="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-3">
+          <p class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="pi pi-dollar text-emerald-600"></i> Parámetros Económicos y Cobertura
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                Copago Predeterminado ($)
+              </label>
+              <InputNumber v-model="form.copago_default as any" mode="currency" currency="ARS" locale="es-AR" class="w-full text-xs" placeholder="$ 0,00" />
+              <p class="text-[10px] text-slate-400 mt-0.5">Valor sugerido al cargar orden</p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                % Cobertura de APB
+              </label>
+              <InputNumber
+                v-model="form.porcentaje_cobertura_apb as any"
+                suffix=" %"
+                :min="0"
+                :max="100"
+                :minFractionDigits="0"
+                :maxFractionDigits="2"
+                class="w-full text-xs"
+                placeholder="0 %"
+              />
+              <p class="text-[10px] text-slate-400 mt-0.5">100% = cubre todo; 0% = abona paciente</p>
+            </div>
+          </div>
         </div>
 
         <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">
@@ -356,6 +484,53 @@ const handleToggleActive = async (m: ObraSocial) => {
         <Button label="Cancelar" text severity="secondary" @click="isDialogVisible = false" />
         <Button :label="isEditing ? 'Guardar Cambios' : 'Registrar Obra Social'" icon="pi pi-check" severity="primary"
           :loading="isSaving" @click="handleSave" />
+      </template>
+    </Dialog>
+
+    <!-- Modal: Modificar Valor Fijo de APB General -->
+    <Dialog
+      v-model:visible="isApbDialogVisible"
+      modal
+      header="Modificar Valor Base de APB"
+      :style="{ width: '450px' }">
+      <div class="space-y-4">
+        <div class="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 text-xs text-blue-900 leading-relaxed">
+          <p class="font-bold mb-1 flex items-center gap-1.5">
+            <span>🧪</span> Acto Profesional Bioquímico (APB)
+          </p>
+          <p>
+            Este valor de referencia rige de manera general para el laboratorio y se modifica periódicamente. Al emitir una orden médica marcando <strong>"Abona APB"</strong>, el sistema cargará automáticamente lo que corresponda según el porcentaje cubierto por la mutual.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+            Nuevo Valor Base de Referencia ($) <span class="text-red-500">*</span>
+          </label>
+          <InputNumber
+            v-model="apbFormValue"
+            mode="currency"
+            currency="ARS"
+            locale="es-AR"
+            class="w-full"
+            inputClass="w-full font-bold text-base text-blue-900"
+            :min="0"
+          />
+          <p class="text-[11px] text-slate-500 mt-1">
+            Valor actual en vigencia: ${{ Number(valorApbVigente).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+          </p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text severity="secondary" @click="isApbDialogVisible = false" />
+        <Button
+          label="Guardar Nuevo Valor"
+          icon="pi pi-check"
+          severity="primary"
+          :loading="isSavingApb"
+          @click="handleSaveApb"
+        />
       </template>
     </Dialog>
   </div>

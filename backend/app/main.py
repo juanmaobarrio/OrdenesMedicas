@@ -39,16 +39,33 @@ def sync_database_columns(connection):
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN debe_orden_medica BOOLEAN DEFAULT 0"))
             if cols and "abona_apb" not in cols:
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
+            if cols and "valor_apb" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_apb NUMERIC(12, 2) DEFAULT 0.00"))
 
             res_mut = connection.execute(text("PRAGMA table_info(obras_sociales)")).fetchall()
             cols_mut = [r[1] for r in res_mut]
             if cols_mut and "copago_default" not in cols_mut:
                 connection.execute(text("ALTER TABLE obras_sociales ADD COLUMN copago_default NUMERIC(12, 2) DEFAULT 0.00"))
+            if cols_mut and "porcentaje_cobertura_apb" not in cols_mut:
+                connection.execute(text("ALTER TABLE obras_sociales ADD COLUMN porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00"))
 
             res_roles = connection.execute(text("PRAGMA table_info(roles)")).fetchall()
             cols_roles = [r[1] for r in res_roles]
             if cols_roles and "hierarchy_level" not in cols_roles:
                 connection.execute(text("ALTER TABLE roles ADD COLUMN hierarchy_level INTEGER DEFAULT 10"))
+
+            # Tabla de configuración general del sistema
+            connection.execute(text("""
+                CREATE TABLE IF NOT EXISTS configuracion_sistema (
+                    clave VARCHAR(100) PRIMARY KEY,
+                    valor VARCHAR(255) NOT NULL,
+                    descripcion VARCHAR(255),
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            row_apb = connection.execute(text("SELECT clave FROM configuracion_sistema WHERE clave = 'VALOR_APB'")).fetchone()
+            if not row_apb:
+                connection.execute(text("INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')"))
         except Exception as err:
             logger.warning(f"Error comprobando columnas SQLite: {err}")
 
@@ -60,7 +77,22 @@ def sync_database_columns(connection):
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS observacion_resultado_auditoria TEXT",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00",
             "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00",
+            "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00",
+            """
+            CREATE TABLE IF NOT EXISTS configuracion_sistema (
+                clave VARCHAR(100) PRIMARY KEY,
+                valor VARCHAR(255) NOT NULL,
+                descripcion VARCHAR(255),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')
+            ON CONFLICT (clave) DO NOTHING
+            """,
         ]
         for stmt in postgres_statements:
             try:

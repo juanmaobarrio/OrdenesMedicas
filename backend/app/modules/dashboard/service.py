@@ -149,6 +149,9 @@ class DashboardService:
             "Mutual / Cobertura",
             "Copago",
             "Estudios No Autorizados",
+            "Abona APB",
+            "Valor APB",
+            "Total a Abonar",
             "Cant Recetas Fisicas",
 
             "Fecha Prescripcion",
@@ -162,14 +165,21 @@ class DashboardService:
         ])
 
         for o in orders:
+            cop = o.valor_copago or Decimal("0.00")
+            no_aut = getattr(o, "valor_estudios_no_autorizados", Decimal("0.00")) or Decimal("0.00")
+            apb = getattr(o, "valor_apb", Decimal("0.00")) or Decimal("0.00")
+            total = cop + no_aut + apb
             writer.writerow([
                 o.nro_orden,
                 o.estado.value,
                 o.paciente.documento if o.paciente else "",
                 o.paciente.nombre_completo if o.paciente else "",
                 o.mutual,
-                str(o.valor_copago),
-                str(getattr(o, "valor_estudios_no_autorizados", "0.00")),
+                str(cop),
+                str(no_aut),
+                "SI" if getattr(o, "abona_apb", False) else "NO",
+                str(apb),
+                str(total),
                 o.cantidad_ordenes_fisicas,
 
                 o.fecha_prescripcion.strftime("%Y-%m-%d"),

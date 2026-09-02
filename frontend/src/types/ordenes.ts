@@ -140,6 +140,7 @@ export interface OrdenMedicaListItem {
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
+  valor_apb?: number;
   cantidad_ordenes_fisicas: number;
 
   numeros_auditoria: string[];
@@ -167,6 +168,7 @@ export interface OrdenMedicaDetail {
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
+  valor_apb?: number;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
@@ -207,6 +209,7 @@ export interface OrdenMedicaCreate {
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
+  valor_apb?: number;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
@@ -241,4 +244,10 @@ export interface OrdenLlamadaPendienteItem {
   debe_orden_medica?: boolean;
   cant_intentos_previos: number;
   solicitudes_pendientes?: AuditoriaSolicitud[];
+}
+
+export interface ConfiguracionAPB {
+  valor_apb: number;
+  descripcion?: string;
+  updated_at?: string;
 }

@@ -15,6 +15,9 @@ class ObraSocialBase(BaseModel):
     codigo_externo: Optional[str] = Field(None, max_length=50)
     dias_vencimiento: int = Field(default=30, ge=1, le=365, description="Dias de validez de la orden")
     copago_default: Decimal = Field(default=Decimal("0.00"), ge=0, description="Valor de copago por defecto")
+    porcentaje_cobertura_apb: Decimal = Field(
+        default=Decimal("0.00"), ge=0, le=100, description="Porcentaje de APB cubierto por la mutual (0 a 100%)"
+    )
     activa: bool = Field(default=True, description="Estado de operacion")
 
 
@@ -28,6 +31,7 @@ class ObraSocialUpdate(BaseModel):
     codigo_externo: Optional[str] = None
     dias_vencimiento: Optional[int] = Field(None, ge=1, le=365)
     copago_default: Optional[Decimal] = Field(None, ge=0)
+    porcentaje_cobertura_apb: Optional[Decimal] = Field(None, ge=0, le=100)
     activa: Optional[bool] = None
 
 

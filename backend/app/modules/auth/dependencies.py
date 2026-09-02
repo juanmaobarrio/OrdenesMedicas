@@ -79,3 +79,22 @@ def require_permission(permission_code: str) -> Callable:
         return current_user
 
     return permission_checker
+
+
+def require_any_permission(*permission_codes: str) -> Callable:
+    """Verifica si el usuario cuenta con al menos uno de los permisos indicados (o es superuser)."""
+    async def permission_checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.is_superuser:
+            return current_user
+
+        user_permissions = (
+            [p.code for p in current_user.role.permissions] if current_user.role else []
+        )
+        if not any(code in user_permissions for code in permission_codes):
+            raise ForbiddenActionException(
+                f"Permiso requerido no otorgado: al menos uno de {list(permission_codes)}"
+            )
+        return current_user
+
+    return permission_checker
+

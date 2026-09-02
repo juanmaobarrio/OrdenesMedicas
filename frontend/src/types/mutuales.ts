@@ -6,6 +6,7 @@ export interface ObraSocial {
   codigo_externo?: string | null;
   dias_vencimiento: number;
   copago_default?: number;
+  porcentaje_cobertura_apb?: number;
   activa: boolean;
   display_name: string;
   created_at?: string;
@@ -19,6 +20,7 @@ export interface ObraSocialCreate {
   codigo_externo?: string | null;
   dias_vencimiento: number;
   copago_default?: number;
+  porcentaje_cobertura_apb?: number;
   activa?: boolean;
 }
 
@@ -28,5 +30,6 @@ export interface ObraSocialUpdate {
   codigo_externo?: string | null;
   dias_vencimiento?: number;
   copago_default?: number;
+  porcentaje_cobertura_apb?: number;
   activa?: boolean;
 }

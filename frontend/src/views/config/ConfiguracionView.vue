@@ -26,6 +26,7 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
+import { formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 
 const toast = useToast();
@@ -34,6 +35,49 @@ const motivos = ref<MotivoCancelacion[]>([]);
 const estados = ref<EstadoOrdenConfig[]>([]);
 const isLoadingMotivos = ref(true);
 const isLoadingEstados = ref(true);
+
+// APB Configuration
+const valorApb = ref(0);
+const apbUpdatedAt = ref<string | null>(null);
+const isLoadingApb = ref(false);
+const isSavingApb = ref(false);
+
+const loadApb = async () => {
+  isLoadingApb.value = true;
+  try {
+    const res = await configService.getValorApb();
+    valorApb.value = Number(res.valor_apb) || 0;
+    apbUpdatedAt.value = res.updated_at || null;
+  } catch (err: any) {
+    console.warn('Error cargando APB:', err);
+  } finally {
+    isLoadingApb.value = false;
+  }
+};
+
+const handleSaveApb = async () => {
+  isSavingApb.value = true;
+  try {
+    const res = await configService.updateValorApb(valorApb.value);
+    valorApb.value = Number(res.valor_apb) || 0;
+    apbUpdatedAt.value = res.updated_at || null;
+    toast.add({
+      severity: 'success',
+      summary: 'Actualizado',
+      detail: `Valor base de APB fijado en $ ${valorApb.value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+      life: 3500,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err.response?.data?.detail || 'No se pudo actualizar el valor de APB',
+      life: 4000,
+    });
+  } finally {
+    isSavingApb.value = false;
+  }
+};
 
 // Modal Motivo
 const isDialogVisible = ref(false);
@@ -115,6 +159,7 @@ const loadEstados = async () => {
 onMounted(() => {
   loadMotivos();
   loadEstados();
+  loadApb();
 });
 
 const openNewDialog = () => {
@@ -324,6 +369,9 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           <Tab value="2">
             <i class="pi pi-sliders-h mr-1.5 text-indigo-500"></i> Ciclo de Vida y Reglas
           </Tab>
+          <Tab value="3">
+            <i class="pi pi-shield mr-1.5 text-emerald-600"></i> Acto Profesional Bioquímico (APB)
+          </Tab>
         </TabList>
 
         <TabPanels>
@@ -507,6 +555,56 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                       ejecución.
                     </li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Tab 3: Acto Profesional Bioquimico (APB) -->
+          <TabPanel value="3">
+            <div class="p-6 max-w-2xl space-y-6">
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50/80 p-5 rounded-2xl border border-blue-200 shadow-sm">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+                    🧪
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-blue-950">Acto Profesional Bioquímico (APB)</h3>
+                    <p class="text-xs text-blue-800/80 mt-1 leading-relaxed">
+                      Este monto es el valor de referencia fijo a nivel laboratorio. Al registrar una orden con <strong>"Abona APB"</strong>, el sistema calcula automáticamente lo que debe abonar el paciente deduciendo el porcentaje de cobertura configurado en su mutual.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                    Valor Base de Referencia Vigente ($)
+                  </label>
+                  <InputNumber
+                    v-model="valorApb"
+                    mode="currency"
+                    currency="ARS"
+                    locale="es-AR"
+                    class="w-full"
+                    inputClass="font-bold text-lg text-blue-900"
+                    :min="0"
+                  />
+                  <p v-if="apbUpdatedAt" class="text-xs text-slate-500 mt-1.5">
+                    Última actualización: <span class="font-medium text-slate-700">{{ formatDateTime(apbUpdatedAt) }}</span>
+                  </p>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span class="text-xs text-slate-500">Los cambios se aplican de inmediato para nuevas órdenes.</span>
+                  <Button
+                    label="Guardar Nuevo Valor APB"
+                    icon="pi pi-check"
+                    severity="primary"
+                    :loading="isSavingApb"
+                    @click="handleSaveApb"
+                  />
                 </div>
               </div>
             </div>

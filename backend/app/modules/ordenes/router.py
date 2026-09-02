@@ -22,13 +22,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.core.exceptions import AppException
-from backend.app.modules.auth.dependencies import get_current_user, require_permission, require_roles
+from backend.app.modules.auth.dependencies import (
+    get_current_user,
+    require_any_permission,
+    require_permission,
+    require_roles,
+)
 from backend.app.modules.ordenes.models import EstadoOrden
 from backend.app.modules.ordenes.schemas import (
     AdjuntoOrdenRead,
     AuditoriaSolicitudCreate,
     AuditoriaSolicitudRead,
     AuditoriaSolicitudResponder,
+    ConfiguracionAPBRead,
+    ConfiguracionAPBUpdate,
     EstadoOrdenConfigCreate,
     EstadoOrdenConfigRead,
     EstadoOrdenConfigUpdate,
@@ -47,6 +54,7 @@ from backend.app.modules.ordenes.schemas import (
 )
 
 from backend.app.modules.ordenes.service import (
+    ConfiguracionSistemaService,
     EstadoOrdenConfigService,
     MotivoCancelacionService,
     OrdenMedicaService,
@@ -154,6 +162,7 @@ async def list_ordenes(
                 "valor_copago": o.valor_copago or Decimal("0.00"),
                 "valor_estudios_no_autorizados": o.valor_estudios_no_autorizados or Decimal("0.00"),
                 "abona_apb": getattr(o, "abona_apb", False) or False,
+                "valor_apb": getattr(o, "valor_apb", Decimal("0.00")) or Decimal("0.00"),
                 "cantidad_ordenes_fisicas": o.cantidad_ordenes_fisicas or 1,
                 "numeros_auditoria": o.numeros_auditoria or [],
                 "debe_orden_medica": getattr(o, "debe_orden_medica", False) or False,
@@ -595,4 +604,35 @@ async def delete_estado_orden(
 ):
     service = EstadoOrdenConfigService(db)
     await service.delete_estado(estado_id)
+
+
+# ==========================================
+# CONFIGURACION GENERAL / VALOR APB
+# ==========================================
+@config_router.get(
+    "/apb",
+    response_model=ConfiguracionAPBRead,
+    summary="Obtener valor vigente del Acto Profesional Bioquímico (APB)",
+)
+async def get_configuracion_apb(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.get_config_apb()
+
+
+@config_router.put(
+    "/apb",
+    response_model=ConfiguracionAPBRead,
+    summary="Actualizar valor vigente del Acto Profesional Bioquímico (APB)",
+)
+async def update_configuracion_apb(
+    dto: ConfiguracionAPBUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("config:manage", "mutuales:manage")),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.update_valor_apb(dto)
+
 

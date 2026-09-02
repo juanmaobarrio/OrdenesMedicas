@@ -232,6 +232,19 @@ async def seed_initial_data():
                 db.add(est_obj)
                 await db.flush()
 
+        # 8. Configuración General del Sistema (APB)
+        from backend.app.modules.ordenes.models import ConfiguracionSistema
+        stmt_apb = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "VALOR_APB")
+        apb_cfg = (await db.execute(stmt_apb)).scalar_one_or_none()
+        if not apb_cfg:
+            apb_cfg = ConfiguracionSistema(
+                clave="VALOR_APB",
+                valor="0.00",
+                descripcion="Valor vigente de referencia del Acto Profesional Bioquímico (APB)",
+            )
+            db.add(apb_cfg)
+            await db.flush()
+
         await db.commit()
         logger.info("Siembra de datos finalizada con exito.")
 

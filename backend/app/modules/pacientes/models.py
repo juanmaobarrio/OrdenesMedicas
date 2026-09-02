@@ -57,6 +57,9 @@ class ObraSocial(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     copago_default: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Valor de copago predeterminado"
     )
+    porcentaje_cobertura_apb: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), default=Decimal("0.00"), nullable=False, comment="Porcentaje de cobertura de APB (0 a 100%)"
+    )
     activa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     @property

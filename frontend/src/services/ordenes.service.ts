@@ -60,7 +60,8 @@ export const ordenesService = {
     motivo_cancelacion_id?: string | null,
     observacion_resultado?: string | null,
     valor_copago?: number | null,
-    valor_estudios_no_autorizados?: number | null
+    valor_estudios_no_autorizados?: number | null,
+    valor_apb?: number | null
   ): Promise<OrdenMedicaDetail> {
     const response = await api.post<OrdenMedicaDetail>(`/ordenes/${id}/estado`, {
       nuevo_estado,
@@ -69,6 +70,7 @@ export const ordenesService = {
       observacion_resultado,
       valor_copago,
       valor_estudios_no_autorizados,
+      valor_apb,
     });
     return response.data;
   },

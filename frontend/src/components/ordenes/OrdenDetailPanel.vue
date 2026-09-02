@@ -67,11 +67,13 @@ const motivoEstadoDetalle = ref('');
 const observacionResultadoAuditoria = ref('');
 const finalCopago = ref(0);
 const finalEstudiosNoAutorizados = ref(0);
+const finalValorApb = ref(0);
 
 const openCambiarEstadoModal = () => {
   if (orden.value) {
     finalCopago.value = Number(orden.value.valor_copago || 0);
     finalEstudiosNoAutorizados.value = Number(orden.value.valor_estudios_no_autorizados || 0);
+    finalValorApb.value = Number(orden.value.valor_apb || 0);
     observacionResultadoAuditoria.value = orden.value.observacion_resultado_auditoria || '';
   }
   isCambioEstadoVisible.value = true;
@@ -159,6 +161,7 @@ const editForm = ref({
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   abona_apb: false,
+  valor_apb: 0,
   mutual: '',
   nro_afiliado: '',
   observaciones_ingreso: '',
@@ -178,6 +181,7 @@ const handleOpenEditOrden = () => {
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
     abona_apb: Boolean(orden.value.abona_apb),
+    valor_apb: Number(orden.value.valor_apb) || 0,
     mutual: orden.value.mutual || '',
     nro_afiliado: orden.value.nro_afiliado || orden.value.paciente?.nro_afiliado || '',
     observaciones_ingreso: orden.value.observaciones_ingreso || '',
@@ -199,6 +203,7 @@ const handleSaveEditOrden = async () => {
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
       abona_apb: editForm.value.abona_apb,
+      valor_apb: editForm.value.abona_apb ? editForm.value.valor_apb : 0,
       mutual: editForm.value.mutual.trim().toUpperCase() || undefined,
       nro_afiliado: editForm.value.nro_afiliado.trim() || null,
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
@@ -313,7 +318,8 @@ const handleCambiarEstado = async () => {
       null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? observacionResultadoAuditoria.value.trim() : null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalCopago.value : null,
-      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizados.value : null
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizados.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalValorApb.value : null
     );
     toast.add({
       severity: 'success',
@@ -700,12 +706,15 @@ const loadPreviousOrders = async (pacienteId: string) => {
             </div>
             <div class="mt-0.5 space-y-0.5">
               <p class="text-slate-900 font-bold text-xs">
-                Total a abonar: ${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                Total a abonar: ${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
               </p>
-              <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                 <span class="text-blue-700 font-medium">${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} copago</span>
                 <span v-if="Number(orden.valor_estudios_no_autorizados) > 0" class="text-red-600 font-medium">
                   &bull; ${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} no aut.
+                </span>
+                <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0" class="text-emerald-700 font-medium">
+                  &bull; ${{ Number(orden.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} APB
                 </span>
               </div>
             </div>
@@ -787,10 +796,11 @@ const loadPreviousOrders = async (pacienteId: string) => {
                     <p class="text-slate-800 bg-white p-2.5 rounded-lg border border-emerald-200 leading-relaxed font-medium">
                       {{ orden.observacion_resultado_auditoria }}
                     </p>
-                    <div class="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 pt-1 border-t border-emerald-200/60">
+                    <div class="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 pt-1 border-t border-emerald-200/60 gap-2">
                       <span>Copago: <strong>${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
                       <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">No Autorizados: <strong>${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
-                      <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                      <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0">APB: <strong>${{ Number(orden.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                      <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
                     </div>
                   </div>
 
@@ -1129,7 +1139,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
             />
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-200/60">
             <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
               <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
@@ -1137,6 +1147,10 @@ const loadPreviousOrders = async (pacienteId: string) => {
             <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
               <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
+            </div>
+            <div class="min-w-0">
+              <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Valor APB ($)</label>
+              <InputNumber v-model="finalValorApb" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
           </div>
         </div>
