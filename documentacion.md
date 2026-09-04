@@ -718,3 +718,31 @@ Se diseñó un sistema desacoplado de conmutación de funcionalidades (Feature F
 - **Store Central:** `frontend/src/stores/features.store.ts` consulta el estado de las flags al iniciar la app o autenticarse y expone getters computados (`isMailEnabled`, `isCalculadoraEnabled`, `isEstudiosAutorizacionEnabled`, `isIndicacionesEnabled`, `isAsignarAuditorEnabled`).
 - **Panel Administrativo:** Pestaña *"Funcionalidades (Feature Flags)"* en `ConfiguracionView.vue` con componentes `ToggleSwitch` de PrimeVue para activar o desactivar cada módulo con un clic y feedback inmediato vía Toast.
 - **Estado Inicial por Defecto:** Todas las flags mencionadas inician en estado **Inactivo (`false`)** para mantener el sistema limpio y permitir su habilitación progresiva cuando se decida el pase a producción.
+
+
+---
+
+## 18. PROCEDIMIENTO DE BACKUP Y RESTAURACIÓN DE BASE DE DATOS
+
+### 18.1 Respaldo en Entorno Docker (PostgreSQL 16)
+Antes de actualizar contenedores o ejecutar migraciones:
+```bash
+# Crear directorio de backups si no existe
+mkdir -p backups
+
+# Generar dump binario comprimido con fecha y hora
+docker compose exec postgres pg_dump -U postgres -d ordenes_medicas_db -F c -b -v -f /tmp/backup_ordenes_$(date +%Y%m%d_%H%M%S).dump
+
+# Copiar el archivo desde el contenedor al host
+docker cp ordenes_medicas_postgres:/tmp/$(docker compose exec postgres ls -t /tmp | grep backup_ordenes | head -n 1) ./backups/
+```
+
+### 18.2 Restauración en caso de contingencia (Rollback)
+```bash
+docker compose exec -T postgres pg_restore -U postgres -d ordenes_medicas_db --clean --if-exists -v < ./backups/archivo_backup.dump
+```
+
+### 18.3 Respaldo en Entorno Local de Desarrollo (SQLite)
+```powershell
+Copy-Item "ordenes_medicas.db" "backups/ordenes_medicas_backup_$((Get-Date).ToString('yyyyMMdd_HHmmss')).db"
+```

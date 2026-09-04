@@ -113,3 +113,25 @@ Cuando respondas o escribas código, sigue estrictamente estas reglas:
    - Cada vez que crees un archivo nuevo, agregues una función, modifiques la lógica existente o cambies dependencias, **debes generar o actualizar la documentación correspondiente**.
 5. **Auto-mejora de este archivo (`gemini.md`):**
    - Si durante el proyecto detectas patrones repetitivos, decisiones de arquitectura clave o preferencias mías, sugiere actualizaciones a esta sección para afinar futuras respuestas.
+
+---
+
+## 6. POLÍTICA ESTRICTA DE DESPLIEGUES Y BACKUPS EN PRODUCCIÓN
+En todas las actualizaciones a producción se deben cumplir rigurosamente las siguientes directivas:
+
+1. **Protocolo de Respaldo Obligatorio (Backup Previo):**
+   - Siempre generar un dump o copia completa de la base de datos antes de aplicar cualquier migración, build o despliegue.
+   - En entornos Docker: `docker compose exec postgres pg_dump -U postgres -d ordenes_medicas_db -F c -b -v -f /tmp/backup.dump` y copiarlo al host.
+   - En entornos nativos PostgreSQL: `pg_dump -U postgres -d ordenes_medicas_db -F c -b -v -f backup.dump`.
+   - En entornos locales SQLite: copiar el archivo `.db` con timestamp.
+
+2. **Inmutabilidad y Preservación de Datos:**
+   - Queda terminantemente prohibido ejecutar acciones destructivas como `DROP TABLE` o scripts de limpieza masiva que afecten tablas operativas de pacientes, usuarios u órdenes.
+   - Toda migración o script de base de datos debe ser aditivo con cláusulas seguras (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
+
+3. **Política de Feature Flags:**
+   - Toda nueva funcionalidad avanzada debe nacer con su correspondiente flag en estado `false` por defecto, permitiendo al usuario activarla desde la interfaz web (`/configuracion`) cuando decida ponerla en producción.
+
+4. **Estado de Catálogos al Desplegar:**
+   - La tabla `indicaciones_estudios` se entrega vacía para que el usuario ingrese sus propias directivas clínicas.
+   - La tabla `plantillas_email` debe incluir la plantilla oficial por defecto (`DEFAULT`) con el HTML corporativo probado.
