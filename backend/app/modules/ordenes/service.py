@@ -266,14 +266,33 @@ class OrdenMedicaService:
                 f"No se puede modificar una orden en estado final '{_enum_str(orden.estado)}'"
             )
 
+        # Validar nivel jerárquico para modificar cantidad de recetas o sede de ingreso (requiere jerarquía > 30)
+        user_hierarchy = 100 if current_user.is_superuser else (current_user.role.hierarchy_level if current_user.role else 10)
+        if user_hierarchy <= 30:
+            if dto.cantidad_ordenes_fisicas is not None and dto.cantidad_ordenes_fisicas != orden.cantidad_ordenes_fisicas:
+                raise ForbiddenActionException(
+                    "Se requiere un nivel jerárquico superior a 30 (Auditor o Administrador) para modificar la cantidad de recetas de la orden."
+                )
+            if dto.sucursal_id is not None and dto.sucursal_id != orden.sucursal_id:
+                raise ForbiddenActionException(
+                    "Se requiere un nivel jerárquico superior a 30 (Auditor o Administrador) para modificar la sede de ingreso de la orden."
+                )
+
         diff = {}
         if dto.fecha_prescripcion is not None:
             diff["fecha_prescripcion"] = str(dto.fecha_prescripcion)
             orden.fecha_prescripcion = dto.fecha_prescripcion
 
-        if dto.cantidad_ordenes_fisicas is not None:
+        if dto.cantidad_ordenes_fisicas is not None and dto.cantidad_ordenes_fisicas != orden.cantidad_ordenes_fisicas:
             diff["cantidad_ordenes_fisicas"] = dto.cantidad_ordenes_fisicas
             orden.cantidad_ordenes_fisicas = dto.cantidad_ordenes_fisicas
+
+        if dto.sucursal_id is not None and dto.sucursal_id != orden.sucursal_id:
+            sucursal = await self.sucursal_repo.get_by_id(dto.sucursal_id)
+            if not sucursal:
+                raise EntityNotFoundException("Sucursal", dto.sucursal_id)
+            diff["sucursal"] = sucursal.nombre
+            orden.sucursal_id = dto.sucursal_id
 
         if dto.mutual is not None:
             diff["mutual"] = dto.mutual.strip().upper()

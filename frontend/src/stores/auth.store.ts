@@ -14,6 +14,18 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuditor = computed(() => user.value?.role_code === 'AUDITOR');
   const isUsuario = computed(() => user.value?.role_code === 'USUARIO');
 
+  const hierarchyLevel = computed(() => {
+    if (user.value?.is_superuser) return 100;
+    if (user.value?.hierarchy_level !== undefined && user.value?.hierarchy_level !== null) {
+      return user.value.hierarchy_level;
+    }
+    if (user.value?.role_code === 'ADMIN') return 100;
+    if (user.value?.role_code === 'AUDITOR') return 50;
+    return 10;
+  });
+
+  const canEditSedeYCantidad = computed(() => hierarchyLevel.value > 30);
+
   const hasRole = (role: string) => {
     if (user.value?.is_superuser) return true;
     return user.value?.role_code === role;
@@ -69,6 +81,8 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isAuditor,
     isUsuario,
+    hierarchyLevel,
+    canEditSedeYCantidad,
     hasRole,
     hasPermission,
     login,

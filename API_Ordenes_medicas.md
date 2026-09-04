@@ -131,7 +131,23 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
 }
 ```
 
-#### D. Cambiar Estado del Ciclo de Vida (Por ID o por Nombre)
+#### D. Actualizar Datos de una Orden Médica
+- **Endpoint:** `PUT /api/v1/ordenes/{id}`
+- **Permiso requerido:** `ordenes:update`
+- **Regla Especial de Jerarquía:** Los campos `cantidad_ordenes_fisicas` y `sucursal_id` únicamente pueden ser modificados por usuarios con un nivel jerárquico **superior a 30** (`hierarchy_level > 30`, como Auditores o Administradores). Si un usuario estándar intenta modificarlos, la API responderá con `HTTP 403 Forbidden`.
+- **Request Body (Campos opcionales):**
+```json
+{
+  "cantidad_ordenes_fisicas": 2,
+  "sucursal_id": "e67e3a9c-0c3a-4467-bc18-eb34d168346f",
+  "mutual": "OSDE",
+  "valor_copago": 3000.00,
+  "contacto_telefono": "1144556677",
+  "debe_orden_medica": false
+}
+```
+
+#### E. Cambiar Estado del Ciclo de Vida (Por ID o por Nombre)
 - **Endpoint:** `POST /api/v1/ordenes/{id}/estado`
 - **Casos de Uso Principales (Soporta `estado_id` numérico o `nuevo_estado` en texto):**
 

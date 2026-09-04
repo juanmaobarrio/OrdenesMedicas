@@ -746,3 +746,27 @@ docker compose exec -T postgres pg_restore -U postgres -d ordenes_medicas_db --c
 ```powershell
 Copy-Item "ordenes_medicas.db" "backups/ordenes_medicas_backup_$((Get-Date).ToString('yyyyMMdd_HHmmss')).db"
 ```
+
+
+---
+
+## 19. REGLA DE PERMISOS: EDICIÓN DE CANTIDAD DE ÓRDENES Y SEDE DE INGRESO (JERARQUÍA > 30)
+
+### 19.1 Regla de Negocio
+Una vez ingresada una orden médica en el sistema:
+- La **Sede de Ingreso (`sucursal_id`)** y la **Cantidad de Recetas / Órdenes Físicas (`cantidad_ordenes_fisicas`)** únicamente pueden ser modificadas por usuarios con un nivel jerárquico **estrictamente superior a 30** (`hierarchy_level > 30`).
+- Roles autorizados:
+  - `ADMIN` (nivel 100)
+  - `AUDITOR` (nivel 50)
+  - Cualquier rol personalizado con nivel jerárquico asignado > 30.
+- Roles no autorizados:
+  - `USUARIO` / Operador de sucursal estándar (nivel 10).
+
+### 19.2 Implementación Backend y Frontend
+1. **Backend (`backend/app/modules/ordenes/service.py`):**
+   - El método `update_orden` valida el nivel jerárquico del usuario activo (`current_user.role.hierarchy_level` o `100` si es superuser).
+   - Si un usuario con nivel $\le 30$ intenta cambiar `cantidad_ordenes_fisicas` o `sucursal_id`, la petición es rechazada con código `HTTP 403 (ForbiddenActionException)`.
+   - Si se autoriza la modificación, el cambio de sucursal o cantidad se registra en el log inmutable de trazabilidad (`AuditoriaLog`).
+2. **Frontend (`frontend/src/views/ordenes/OrdenDetailView.vue` y `OrdenDetailPanel.vue`):**
+   - En el modal **"Editar Datos de la Orden"**, los campos de *Sede de Ingreso* y *Cantidad de Recetas* se muestran deshabilitados con un ícono de candado 🔒 y una leyenda informativa cuando el usuario no cuenta con nivel jerárquico suficiente.
+   - Si el usuario cuenta con nivel > 30, los campos son completamente editables.

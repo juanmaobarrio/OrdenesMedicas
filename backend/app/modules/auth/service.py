@@ -81,6 +81,7 @@ class AuthService:
             full_name=user.full_name,
             role_code=user.role.code if user.role else "",
             role_name=user.role.name if user.role else "",
+            hierarchy_level=100 if user.is_superuser else (user.role.hierarchy_level if user.role else 10),
             permissions=permissions,
             sucursal_id=user.sucursal.id if user.sucursal else None,
             sucursal_nombre=user.sucursal.nombre if user.sucursal else None,

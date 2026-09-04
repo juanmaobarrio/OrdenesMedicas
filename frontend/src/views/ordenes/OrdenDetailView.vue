@@ -42,6 +42,7 @@ const orden = ref<OrdenMedicaDetail | null>(null);
 const isLoading = ref(true);
 const auditors = ref<UserDetail[]>([]);
 const mutuales = ref<ObraSocial[]>([]);
+const sucursales = ref<any[]>([]);
 const motivosCancelacion = ref<MotivoCancelacion[]>([]);
 const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
 const isEmailModalVisible = ref(false);
@@ -152,6 +153,8 @@ const prevOrders = ref<OrdenMedicaListItem[]>([]);
 const isLoadingPrevOrders = ref(false);
 
 const editForm = ref({
+  cantidad_ordenes_fisicas: 1,
+  sucursal_id: null as string | null,
   contacto_nombre: '',
   contacto_horario: '',
   contacto_telefono: '',
@@ -173,6 +176,8 @@ const editForm = ref({
 const handleOpenEditOrden = () => {
   if (!orden.value) return;
   editForm.value = {
+    cantidad_ordenes_fisicas: orden.value.cantidad_ordenes_fisicas || 1,
+    sucursal_id: orden.value.sucursal_id || orden.value.sucursal?.id || null,
     contacto_nombre: orden.value.contacto_nombre || '',
     contacto_horario: orden.value.contacto_horario || '',
     contacto_telefono: orden.value.contacto_telefono || '',
@@ -196,7 +201,7 @@ const handleOpenEditOrden = () => {
 const handleSaveEditOrden = async () => {
   isActionLoading.value = true;
   try {
-    const payload = {
+    const payload: Record<string, any> = {
       contacto_nombre: editForm.value.contacto_nombre.trim() || null,
       contacto_horario: editForm.value.contacto_horario.trim() || null,
       contacto_telefono: editForm.value.contacto_telefono.trim() || null,
@@ -214,6 +219,13 @@ const handleSaveEditOrden = async () => {
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
       debe_orden_medica: editForm.value.debe_orden_medica,
     };
+
+    if (authStore.canEditSedeYCantidad) {
+      payload.cantidad_ordenes_fisicas = editForm.value.cantidad_ordenes_fisicas;
+      if (editForm.value.sucursal_id) {
+        payload.sucursal_id = editForm.value.sucursal_id;
+      }
+    }
 
     await ordenesService.update(ordenId, payload as any);
     toast.add({
@@ -325,14 +337,16 @@ const handlePreviewAdjunto = async (adj: AdjuntoOrden) => {
 };
 
 onMounted(async () => {
-  const [mutRes, motRes, indRes] = await Promise.all([
+  const [mutRes, motRes, indRes, sucRes] = await Promise.all([
     mutualesService.list(),
     configService.listMotivosCancelacion(true),
     configService.listIndicaciones(true),
+    usersService.listSucursales(),
   ]);
   mutuales.value = mutRes;
   motivosCancelacion.value = motRes;
   catalogoIndicaciones.value = indRes;
+  sucursales.value = sucRes;
   loadOrden();
 });
 
@@ -1165,6 +1179,45 @@ const handleCancelarEnvioAuto = async () => {
     <!-- Modal: Editar Datos de la Orden -->
     <Dialog v-model:visible="isEditOrdenVisible" modal header="Editar Datos de la Orden Médica" :style="{ width: '580px', maxWidth: '95vw' }">
       <div class="space-y-4">
+        <!-- Sede de Ingreso y Cantidad de Recetas (Restringido por nivel jerárquico > 30) -->
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200/90 space-y-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Sede de Ingreso</span>
+                <i v-if="!authStore.canEditSedeYCantidad" class="pi pi-lock text-[10px] text-amber-600" title="Requiere nivel > 30"></i>
+              </label>
+              <Dropdown
+                v-model="editForm.sucursal_id"
+                :options="sucursales"
+                optionLabel="nombre"
+                optionValue="id"
+                placeholder="Seleccione sede..."
+                class="w-full text-xs"
+                :disabled="!authStore.canEditSedeYCantidad"
+              />
+            </div>
+            <div class="min-w-0">
+              <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Cantidad de Recetas / Órdenes</span>
+                <i v-if="!authStore.canEditSedeYCantidad" class="pi pi-lock text-[10px] text-amber-600" title="Requiere nivel > 30"></i>
+              </label>
+              <InputNumber
+                v-model="editForm.cantidad_ordenes_fisicas"
+                :min="1"
+                :max="100"
+                class="w-full"
+                inputClass="w-full text-xs font-bold"
+                :disabled="!authStore.canEditSedeYCantidad"
+              />
+            </div>
+          </div>
+          <span v-if="!authStore.canEditSedeYCantidad" class="text-[10px] text-amber-700 font-medium flex items-center gap-1">
+            <i class="pi pi-info-circle text-[10px]"></i>
+            La sede y cantidad de recetas solo pueden ser modificadas por usuarios con jerarquía superior a 30 (Auditores o Administradores).
+          </span>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Mutual / Obra Social</label>

@@ -289,6 +289,7 @@ class OrdenMedicaCreate(OrdenMedicaBase):
 class OrdenMedicaUpdate(BaseModel):
     fecha_prescripcion: Optional[date] = None
     cantidad_ordenes_fisicas: Optional[int] = Field(None, ge=1, le=100)
+    sucursal_id: Optional[uuid.UUID] = Field(None, description="ID de la sucursal o sede de ingreso")
     mutual: Optional[str] = Field(None, min_length=2, max_length=100)
     nro_afiliado: Optional[str] = Field(None, max_length=50)
     valor_copago: Optional[Decimal] = Field(None, ge=0)

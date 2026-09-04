@@ -30,6 +30,7 @@ class CurrentUserSession(BaseModel):
     full_name: str
     role_code: str
     role_name: str
+    hierarchy_level: int = 10
     permissions: List[str]
     sucursal_id: Optional[uuid.UUID] = None
     sucursal_nombre: Optional[str] = None

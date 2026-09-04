@@ -175,6 +175,7 @@ export interface OrdenMedicaDetail {
   estado: EstadoOrden;
   fecha_prescripcion: string;
   cantidad_ordenes_fisicas: number;
+  sucursal_id?: string;
   mutual: string;
   nro_afiliado?: string | null;
   valor_copago: number;
