@@ -2,11 +2,14 @@ import api from './api';
 import {
   AdjuntoOrden,
   AuditoriaSolicitud,
+  EnviarEmailResolucionPayload,
   EstadoOrden,
+  EstudioDetalleItem,
   OrdenLlamadaPendienteItem,
   OrdenMedicaCreate,
   OrdenMedicaDetail,
   OrdenMedicaListItem,
+  PreviewEmailResolucion,
   RegistroLlamada,
   ResultadoLlamada,
   TipoLlamada,
@@ -61,7 +64,9 @@ export const ordenesService = {
     observacion_resultado?: string | null,
     valor_copago?: number | null,
     valor_estudios_no_autorizados?: number | null,
-    valor_apb?: number | null
+    valor_apb?: number | null,
+    estudios_autorizados?: string[] | null,
+    estudios_no_autorizados?: string[] | null
   ): Promise<OrdenMedicaDetail> {
     const response = await api.post<OrdenMedicaDetail>(`/ordenes/${id}/estado`, {
       nuevo_estado,
@@ -71,6 +76,8 @@ export const ordenesService = {
       valor_copago,
       valor_estudios_no_autorizados,
       valor_apb,
+      estudios_autorizados,
+      estudios_no_autorizados,
     });
     return response.data;
   },
@@ -157,5 +164,57 @@ export const ordenesService = {
     });
     return response.data;
   },
-};
 
+  // Indicaciones Clínicas de la Orden
+  async actualizarIndicaciones(
+    ordenId: string,
+    indicacionesIds: string[],
+    indicacionesTexto?: string | null
+  ): Promise<OrdenMedicaDetail> {
+    const response = await api.put<OrdenMedicaDetail>(`/ordenes/${ordenId}/indicaciones`, {
+      indicaciones_ids: indicacionesIds,
+      indicaciones_texto: indicacionesTexto,
+    });
+    return response.data;
+  },
+
+  // Previsualización y Envío de Email de Resolución
+  async previewEmail(ordenId: string): Promise<PreviewEmailResolucion> {
+    const response = await api.get<PreviewEmailResolucion>(`/ordenes/${ordenId}/preview-email`);
+    return response.data;
+  },
+
+  async enviarEmail(ordenId: string, payload: EnviarEmailResolucionPayload): Promise<OrdenMedicaDetail> {
+    const response = await api.post<OrdenMedicaDetail>(`/ordenes/${ordenId}/enviar-email`, payload);
+    return response.data;
+  },
+
+  async cancelarEnvioAutomatico(ordenId: string): Promise<OrdenMedicaDetail> {
+    const response = await api.post<OrdenMedicaDetail>(`/ordenes/${ordenId}/cancelar-envio-automatico`);
+    return response.data;
+  },
+
+  // Actualizar estudios autorizados y no autorizados de auditoría
+  async actualizarEstudiosAuditoria(
+    ordenId: string,
+    estudiosAutorizados: string[],
+    estudiosNoAutorizados: string[]
+  ): Promise<OrdenMedicaDetail> {
+    const response = await api.put<OrdenMedicaDetail>(`/ordenes/${ordenId}/estudios-auditoria`, {
+      estudios_autorizados: estudiosAutorizados,
+      estudios_no_autorizados: estudiosNoAutorizados,
+    });
+    return response.data;
+  },
+
+  // Actualizar desglose detallado de estudios con precios y estado de autorización
+  async actualizarEstudiosDetalle(
+    ordenId: string,
+    estudiosDetalle: EstudioDetalleItem[]
+  ): Promise<OrdenMedicaDetail> {
+    const response = await api.put<OrdenMedicaDetail>(`/ordenes/${ordenId}/estudios-detalle`, {
+      estudios_detalle: estudiosDetalle,
+    });
+    return response.data;
+  },
+};

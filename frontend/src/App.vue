@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
+import { useAuthStore } from './stores/auth.store';
+import { useFeaturesStore } from './stores/features.store';
+
+const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
+
+onMounted(async () => {
+  if (authStore.isAuthenticated) {
+    await featuresStore.fetchFeatures();
+  }
+});
 </script>
 
 <template>

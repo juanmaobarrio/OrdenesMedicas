@@ -41,6 +41,34 @@ def sync_database_columns(connection):
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
             if cols and "valor_apb" not in cols:
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_apb NUMERIC(12, 2) DEFAULT 0.00"))
+            if cols and "estudios_autorizados" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN estudios_autorizados JSON DEFAULT '[]'"))
+            if cols and "estudios_no_autorizados" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN estudios_no_autorizados JSON DEFAULT '[]'"))
+            if cols and "estudios_detalle" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN estudios_detalle JSON DEFAULT '[]'"))
+            if cols and "indicaciones_ids" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN indicaciones_ids JSON DEFAULT '[]'"))
+            if cols and "indicaciones_texto" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN indicaciones_texto TEXT"))
+            if cols and "mail_enviado" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_enviado BOOLEAN DEFAULT 0"))
+            if cols and "mail_enviado_fecha" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_enviado_fecha TIMESTAMP"))
+            if cols and "mail_enviado_por_id" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_enviado_por_id VARCHAR(36)"))
+            if cols and "mail_destinatario" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_destinatario VARCHAR(255)"))
+            if cols and "mail_asunto" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_asunto VARCHAR(255)"))
+            if cols and "mail_cuerpo_html" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_cuerpo_html TEXT"))
+            if cols and "mail_message_id" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_message_id VARCHAR(150)"))
+            if cols and "mail_programado_para" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_programado_para TIMESTAMP"))
+            if cols and "mail_auto_cancelado" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN mail_auto_cancelado BOOLEAN DEFAULT 0"))
 
             res_mut = connection.execute(text("PRAGMA table_info(obras_sociales)")).fetchall()
             cols_mut = [r[1] for r in res_mut]
@@ -66,6 +94,18 @@ def sync_database_columns(connection):
             row_apb = connection.execute(text("SELECT clave FROM configuracion_sistema WHERE clave = 'VALOR_APB'")).fetchone()
             if not row_apb:
                 connection.execute(text("INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')"))
+
+            feature_defaults = [
+                ("FEATURE_MODULO_MAIL", "false", "Activa el módulo y despacho de correos electrónicos de resolución médica"),
+                ("FEATURE_CALCULADORA_ESTUDIOS", "false", "Activa el botón y modal de calculadora interactiva de presupuestos"),
+                ("FEATURE_ESTUDIOS_AUTORIZACION", "false", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
+                ("FEATURE_INDICACIONES_ESTUDIOS", "false", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
+                ("FEATURE_ASIGNAR_AUDITOR", "false", "Activa la asignación de auditor médico a la orden médica"),
+            ]
+            for f_key, f_val, f_desc in feature_defaults:
+                r_feat = connection.execute(text(f"SELECT clave FROM configuracion_sistema WHERE clave = '{f_key}'")).fetchone()
+                if not r_feat:
+                    connection.execute(text(f"INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES ('{f_key}', '{f_val}', '{f_desc}')"))
         except Exception as err:
             logger.warning(f"Error comprobando columnas SQLite: {err}")
 
@@ -78,6 +118,20 @@ def sync_database_columns(connection):
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_autorizados JSONB DEFAULT '[]'",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_no_autorizados JSONB DEFAULT '[]'",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_detalle JSONB DEFAULT '[]'",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS indicaciones_ids JSONB DEFAULT '[]'",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS indicaciones_texto TEXT",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado_fecha TIMESTAMP WITH TIME ZONE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado_por_id UUID REFERENCES users(id) ON DELETE SET NULL",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_destinatario VARCHAR(255)",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_asunto VARCHAR(255)",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_cuerpo_html TEXT",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_message_id VARCHAR(150)",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_programado_para TIMESTAMP WITH TIME ZONE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_auto_cancelado BOOLEAN DEFAULT FALSE",
             "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00",
             "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00",
             """
@@ -91,6 +145,41 @@ def sync_database_columns(connection):
             """
             INSERT INTO configuracion_sistema (clave, valor, descripcion)
             VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('ENVIO_MAIL_AUTOMATICO', 'false', 'Indica si el envio de correos por auditoria finalizada es automatico (true) o manual (false)')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('MINUTOS_GRACIA_ENVIO_MAIL', '120', 'Minutos de espera programada antes del envio automatico del mail (permite cancelacion manual)')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_MODULO_MAIL', 'false', 'Activa el módulo y despacho de correos electrónicos de resolución médica')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_CALCULADORA_ESTUDIOS', 'false', 'Activa el botón y modal de calculadora interactiva de presupuestos')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_ESTUDIOS_AUTORIZACION', 'false', 'Activa los campos clínicos de prácticas autorizadas y no autorizadas')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_INDICACIONES_ESTUDIOS', 'false', 'Activa la asignación y catálogo de indicaciones clínicas de preparación')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_ASIGNAR_AUDITOR', 'false', 'Activa la asignación de auditor médico a la orden médica')
             ON CONFLICT (clave) DO NOTHING
             """,
         ]

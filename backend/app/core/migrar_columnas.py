@@ -20,8 +20,22 @@ async def fix_and_inspect():
                 ("ordenes_medicas", "debe_orden_medica", "BOOLEAN DEFAULT 0"),
                 ("ordenes_medicas", "abona_apb", "BOOLEAN DEFAULT 0"),
                 ("ordenes_medicas", "valor_apb", "NUMERIC(12, 2) DEFAULT 0.00"),
+                ("ordenes_medicas", "estudios_autorizados", "JSON DEFAULT '[]'"),
+                ("ordenes_medicas", "estudios_no_autorizados", "JSON DEFAULT '[]'"),
+                ("ordenes_medicas", "estudios_detalle", "JSON DEFAULT '[]'"),
                 ("obras_sociales", "copago_default", "NUMERIC(12, 2) DEFAULT 0.00"),
                 ("obras_sociales", "porcentaje_cobertura_apb", "NUMERIC(5, 2) DEFAULT 0.00"),
+                ("ordenes_medicas", "indicaciones_ids", "JSON DEFAULT '[]'"),
+                ("ordenes_medicas", "indicaciones_texto", "TEXT"),
+                ("ordenes_medicas", "mail_enviado", "BOOLEAN DEFAULT 0"),
+                ("ordenes_medicas", "mail_enviado_fecha", "TIMESTAMP"),
+                ("ordenes_medicas", "mail_enviado_por_id", "VARCHAR(36)"),
+                ("ordenes_medicas", "mail_destinatario", "VARCHAR(255)"),
+                ("ordenes_medicas", "mail_asunto", "VARCHAR(255)"),
+                ("ordenes_medicas", "mail_cuerpo_html", "TEXT"),
+                ("ordenes_medicas", "mail_message_id", "VARCHAR(150)"),
+                ("ordenes_medicas", "mail_programado_para", "TIMESTAMP"),
+                ("ordenes_medicas", "mail_auto_cancelado", "BOOLEAN DEFAULT 0"),
             ]
             for table, col, col_type in columns_to_add:
                 try:
@@ -52,6 +66,20 @@ async def fix_and_inspect():
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_autorizados JSONB DEFAULT '[]';",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_no_autorizados JSONB DEFAULT '[]';",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_detalle JSONB DEFAULT '[]';",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS indicaciones_ids JSONB DEFAULT '[]';",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS indicaciones_texto TEXT;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado_fecha TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_enviado_por_id UUID REFERENCES users(id) ON DELETE SET NULL;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_destinatario VARCHAR(255);",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_asunto VARCHAR(255);",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_cuerpo_html TEXT;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_message_id VARCHAR(150);",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_programado_para TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS mail_auto_cancelado BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS copago_default NUMERIC(12, 2) DEFAULT 0.00;",
                 "ALTER TABLE obras_sociales ADD COLUMN IF NOT EXISTS porcentaje_cobertura_apb NUMERIC(5, 2) DEFAULT 0.00;",
                 """
@@ -65,6 +93,16 @@ async def fix_and_inspect():
                 """
                 INSERT INTO configuracion_sistema (clave, valor, descripcion)
                 VALUES ('VALOR_APB', '0.00', 'Valor vigente de referencia del Acto Profesional Bioquímico (APB)')
+                ON CONFLICT (clave) DO NOTHING;
+                """,
+                """
+                INSERT INTO configuracion_sistema (clave, valor, descripcion)
+                VALUES ('ENVIO_MAIL_AUTOMATICO', 'false', 'Indica si el envio de correos por auditoria finalizada es automatico (true) o manual (false)')
+                ON CONFLICT (clave) DO NOTHING;
+                """,
+                """
+                INSERT INTO configuracion_sistema (clave, valor, descripcion)
+                VALUES ('MINUTOS_GRACIA_ENVIO_MAIL', '120', 'Minutos de espera programada antes del envio automatico del mail (permite cancelacion manual)')
                 ON CONFLICT (clave) DO NOTHING;
                 """,
             ]

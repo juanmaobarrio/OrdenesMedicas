@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 10
 
+    # Configuración de ZeptoMail / Envío de Correos
+    ZEPTOMAIL_API_URL: str = "https://api.zeptomail.com/v1.1/email"
+    ZEPTOMAIL_API_TOKEN: Optional[str] = None
+    ZEPTOMAIL_FROM_EMAIL: str = "notificaciones@auditoriasmedicas.local"
+    ZEPTOMAIL_FROM_NAME: str = "Laboratorio de Análisis Clínicos"
+    ZEPTOMAIL_BOUNCE_ADDRESS: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

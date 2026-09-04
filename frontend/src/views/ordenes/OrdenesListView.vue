@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useOrdenesStore } from '../../stores/ordenes.store';
 import { useAuthStore } from '../../stores/auth.store';
+import { useFeaturesStore } from '../../stores/features.store';
 import { usersService } from '../../services/users.service';
 import { EstadoOrden, OrdenMedicaListItem, Sucursal } from '../../types';
 import DataTable from 'primevue/datatable';
@@ -20,6 +21,7 @@ const route = useRoute();
 const router = useRouter();
 const ordenesStore = useOrdenesStore();
 const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
 
 const sucursales = ref<Sucursal[]>([]);
 const searchInput = ref('');
@@ -212,7 +214,7 @@ const handlePageChange = (event: any) => {
                   <div class="flex items-center justify-between text-[11px] text-slate-500 mt-0.5">
                     <span>DNI: {{ data.paciente?.documento }}</span>
                     <span class="font-bold text-blue-700" title="Total a abonar: Copago + No autorizados + APB">
-                      Total: ${{ (Number(data.valor_copago || 0) + Number(data.valor_estudios_no_autorizados || 0) + Number(data.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                      Total: ${{ (Number(data.valor_copago || 0) + (featuresStore.isEstudiosAutorizacionEnabled ? Number(data.valor_estudios_no_autorizados || 0) : 0) + Number(data.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                     </span>
                   </div>
                 </div>
@@ -233,11 +235,11 @@ const handlePageChange = (event: any) => {
               <template #body="{ data }">
                 <div class="text-xs space-y-0.5">
                   <p class="font-bold text-slate-800">
-                    Total: ${{ (Number(data.valor_copago || 0) + Number(data.valor_estudios_no_autorizados || 0) + Number(data.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                    Total: ${{ (Number(data.valor_copago || 0) + (featuresStore.isEstudiosAutorizacionEnabled ? Number(data.valor_estudios_no_autorizados || 0) : 0) + Number(data.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                   </p>
                   <p class="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5">
                     <span>Copago: ${{ Number(data.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</span>
-                    <span v-if="Number(data.valor_estudios_no_autorizados || 0) > 0" class="text-amber-700 font-medium">
+                    <span v-if="featuresStore.isEstudiosAutorizacionEnabled && Number(data.valor_estudios_no_autorizados || 0) > 0" class="text-amber-700 font-medium">
                       | No aut: ${{ Number(data.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
                     </span>
                     <span v-if="data.abona_apb || Number(data.valor_apb || 0) > 0" class="text-blue-700 font-medium">
@@ -253,7 +255,7 @@ const handlePageChange = (event: any) => {
               </template>
             </Column>
             <Column v-if="!selectedOrdenId" field="sucursal.nombre" header="Sucursal" sortable class="text-xs" />
-            <Column v-if="!selectedOrdenId" header="Auditor">
+            <Column v-if="featuresStore.isAsignarAuditorEnabled && !selectedOrdenId" header="Auditor">
               <template #body="{ data }">
                 <span class="text-xs text-slate-600">{{ data.assigned_auditor?.full_name || 'Sin asignar' }}</span>
               </template>

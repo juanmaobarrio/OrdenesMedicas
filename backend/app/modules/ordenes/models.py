@@ -133,6 +133,17 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         JSON_TYPE, default=list, nullable=False, comment="Lista de codigos / numeros de auditoria autorizados"
     )
 
+    # Prácticas / Estudios autorizados y no autorizados de la auditoría
+    estudios_autorizados: Mapped[List[str]] = mapped_column(
+        JSON_TYPE, default=list, nullable=False, comment="Lista de nombres de estudios autorizados por auditoria"
+    )
+    estudios_no_autorizados: Mapped[List[str]] = mapped_column(
+        JSON_TYPE, default=list, nullable=False, comment="Lista de nombres de estudios rechazados / no autorizados"
+    )
+    estudios_detalle: Mapped[List[dict]] = mapped_column(
+        JSON_TYPE, default=list, nullable=False, comment="Desglose detallado de estudios con codigo, nombre, precio y autorizado"
+    )
+
     # Control de orden fisica adeudada (recibida por mail/digital)
     debe_orden_medica: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, comment="Indica si el paciente debe la orden fisica original"
@@ -160,6 +171,44 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Text, nullable=True, comment="Observacion o resolucion comunicada al paciente al finalizar auditoria"
     )
     motivo_cancelacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Indicaciones clínicas seleccionadas para la orden
+    indicaciones_ids: Mapped[List[str]] = mapped_column(
+        JSON_TYPE, default=list, nullable=False, comment="IDs o codigos de indicaciones clinicas asociadas"
+    )
+    indicaciones_texto: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Texto consolidado de indicaciones para preparacion de estudios"
+    )
+
+    # Control de Notificación por Correo (ZeptoMail / Automático)
+    mail_enviado: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True, comment="Indica si ya se envio el correo de resolucion al paciente"
+    )
+    mail_enviado_fecha: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="Fecha y hora del despacho del correo"
+    )
+    mail_enviado_por_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="Usuario que despacho o confirmo el correo"
+    )
+    mail_destinatario: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, comment="Direccion de correo efectiva a la que se envio"
+    )
+    mail_asunto: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, comment="Asunto del correo despachado"
+    )
+    mail_cuerpo_html: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Cuerpo HTML o texto enviado o preparado para el paciente"
+    )
+    mail_message_id: Mapped[Optional[str]] = mapped_column(
+        String(150), nullable=True, comment="ID devuelto por ZeptoMail para trazabilidad de entrega"
+    )
+    # Control de automatización / programación de envío
+    mail_programado_para: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="Timestamp para despacho automatico tras ventana de gracia"
+    )
+    mail_auto_cancelado: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="Indica si un operador cancelo/freno el envio automatico"
+    )
 
     # Control de llamadas y aviso a pacientes en hitos clave
     # Hito 1: Cuando pasa a 'Solicitudes de auditoria'
@@ -234,6 +283,19 @@ class MotivoCancelacion(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     nombre: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class IndicacionEstudio(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Catálogo administrable de indicaciones preescritas de preparación para estudios."""
+    __tablename__ = "indicaciones_estudios"
+
+    codigo: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False, comment="Identificador corto (ej: AYUNO_8HS)")
+    titulo: Mapped[str] = mapped_column(String(150), nullable=False, comment="Nombre legible para el chip (ej: Ayuno de 8 a 12 hs)")
+    instrucciones: Mapped[str] = mapped_column(Text, nullable=False, comment="Texto explicativo para el paciente")
+    categoria: Mapped[Optional[str]] = mapped_column(String(80), nullable=True, comment="Categoria opcional: Sangre, Orina, Medicacion, etc.")
+    color: Mapped[str] = mapped_column(String(30), default="info", nullable=False, comment="Color visual para el chip PrimeVue (info, success, warn, contrast, secondary)")
+    orden_secuencia: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    activa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
 class EstadoOrdenConfig(Base, TimestampMixin):
@@ -368,3 +430,16 @@ class ConfiguracionSistema(Base):
 
 
 
+
+
+
+class PlantillaEmail(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Catálogo administrable de plantillas de correo para notificaciones de auditoría."""
+    __tablename__ = "plantillas_email"
+
+    codigo: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False, comment="Identificador corto (ej: DEFAULT, NO_AUTORIZADOS, ETC)")
+    nombre: Mapped[str] = mapped_column(String(150), nullable=False, comment="Nombre visible de la plantilla")
+    asunto: Mapped[str] = mapped_column(String(255), nullable=False, comment="Asunto por defecto para el correo")
+    cuerpo_html: Mapped[str] = mapped_column(Text, nullable=False, comment="Contenido HTML con soporte de placeholders")
+    es_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    activa: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

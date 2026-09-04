@@ -5,9 +5,14 @@ import {
   EstadoOrdenConfig,
   EstadoOrdenConfigCreate,
   EstadoOrdenConfigUpdate,
+  IndicacionEstudio,
+  IndicacionEstudioCreate,
   MotivoCancelacion,
   MotivoCancelacionCreate,
   MotivoCancelacionUpdate,
+  PlantillaEmail,
+  PlantillaEmailCreate,
+  SystemFeaturesConfig,
   TipoEstadoOrden,
 } from '../../types/ordenes';
 import DataTable from 'primevue/datatable';
@@ -20,6 +25,7 @@ import Dropdown from 'primevue/dropdown';
 import Dialog from 'primevue/dialog';
 import Tag from 'primevue/tag';
 import Checkbox from 'primevue/checkbox';
+import ToggleSwitch from 'primevue/toggleswitch';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -28,13 +34,343 @@ import TabPanel from 'primevue/tabpanel';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import { formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
+import { useFeaturesStore } from '../../stores/features.store';
 
 const toast = useToast();
+const featuresStore = useFeaturesStore();
+const isUpdatingFeature = ref<string | null>(null);
+
+const handleToggleFeature = async (featureKey: keyof SystemFeaturesConfig, newValue: boolean) => {
+  isUpdatingFeature.value = featureKey;
+  try {
+    await featuresStore.updateFeatures({ [featureKey]: newValue });
+    toast.add({
+      severity: newValue ? 'success' : 'warn',
+      summary: newValue ? 'Funcionalidad Activada' : 'Funcionalidad Desactivada',
+      detail: `El parámetro se actualizó en el sistema.`,
+      life: 3000,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err.response?.data?.detail || 'No se pudo actualizar la funcionalidad',
+      life: 4000,
+    });
+  } finally {
+    isUpdatingFeature.value = null;
+  }
+};
 
 const motivos = ref<MotivoCancelacion[]>([]);
 const estados = ref<EstadoOrdenConfig[]>([]);
+const indicaciones = ref<IndicacionEstudio[]>([]);
 const isLoadingMotivos = ref(true);
 const isLoadingEstados = ref(true);
+const isLoadingIndicaciones = ref(true);
+
+// Automatización y Plantillas de Mail
+const envioAutoMail = ref(false);
+const minutosGraciaMail = ref(120);
+const zeptomailConfigurado = ref(false);
+const remitenteEmail = ref('');
+const remitenteNombre = ref('');
+const isLoadingMailConfig = ref(false);
+const isSavingMailConfig = ref(false);
+
+const plantillas = ref<PlantillaEmail[]>([]);
+const isLoadingPlantillas = ref(false);
+const isPlantillaDialogVisible = ref(false);
+const isEditingPlantilla = ref(false);
+const isSavingPlantilla = ref(false);
+const editingPlantillaId = ref<string | null>(null);
+
+const plantillaForm = ref<PlantillaEmailCreate>({
+  codigo: '',
+  nombre: '',
+  asunto: '',
+  cuerpo_html: '',
+  es_default: false,
+  activa: true,
+});
+
+const loadPlantillas = async () => {
+  isLoadingPlantillas.value = true;
+  try {
+    plantillas.value = await configService.listPlantillasEmail(false);
+  } catch (err: any) {
+    console.warn('Error cargando plantillas:', err);
+  } finally {
+    isLoadingPlantillas.value = false;
+  }
+};
+
+const openNewPlantillaDialog = () => {
+  isEditingPlantilla.value = false;
+  editingPlantillaId.value = null;
+  plantillaForm.value = {
+    codigo: '',
+    nombre: '',
+    asunto: 'Resolución de Auditoría Médica - Orden N° {{nro_orden}}',
+    cuerpo_html: '',
+    es_default: plantillas.value.length === 0,
+    activa: true,
+  };
+  isPlantillaDialogVisible.value = true;
+};
+
+const isHelpVariablesVisible = ref(false);
+const isLoadingBaseHtml = ref(false);
+
+const handleCargarHtmlBase = async () => {
+  isLoadingBaseHtml.value = true;
+  try {
+    const baseHtml = await configService.getCodigoBasePlantilla();
+    plantillaForm.value.cuerpo_html = baseHtml;
+    toast.add({ severity: 'info', summary: 'Código Cargado', detail: 'Se cargó la estructura HTML base predeterminada', life: 2500 });
+  } catch (err) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cargar el código base', life: 3000 });
+  } finally {
+    isLoadingBaseHtml.value = false;
+  }
+};
+
+const openEditPlantillaDialog = async (tpl: PlantillaEmail) => {
+  isEditingPlantilla.value = true;
+  editingPlantillaId.value = tpl.id;
+
+  let htmlContent = tpl.cuerpo_html || '';
+  if (!htmlContent.trim()) {
+    try {
+      htmlContent = await configService.getCodigoBasePlantilla();
+    } catch {
+      htmlContent = '';
+    }
+  }
+
+  plantillaForm.value = {
+    codigo: tpl.codigo,
+    nombre: tpl.nombre,
+    asunto: tpl.asunto,
+    cuerpo_html: htmlContent,
+    es_default: tpl.es_default,
+    activa: tpl.activa,
+  };
+  isPlantillaDialogVisible.value = true;
+};
+
+const handleSavePlantilla = async () => {
+  if (!plantillaForm.value.nombre.trim() || !plantillaForm.value.asunto.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Nombre y Asunto son obligatorios', life: 3000 });
+    return;
+  }
+  if (!isEditingPlantilla.value && !plantillaForm.value.codigo.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'El código único es obligatorio', life: 3000 });
+    return;
+  }
+
+  isSavingPlantilla.value = true;
+  try {
+    if (isEditingPlantilla.value && editingPlantillaId.value) {
+      await configService.updatePlantillaEmail(editingPlantillaId.value, {
+        nombre: plantillaForm.value.nombre.trim(),
+        asunto: plantillaForm.value.asunto.trim(),
+        cuerpo_html: plantillaForm.value.cuerpo_html,
+        es_default: plantillaForm.value.es_default,
+        activa: plantillaForm.value.activa,
+      });
+      toast.add({ severity: 'success', summary: 'Plantilla Actualizada', detail: 'Cambios guardados con éxito', life: 3000 });
+    } else {
+      await configService.createPlantillaEmail({
+        codigo: plantillaForm.value.codigo.trim().toUpperCase(),
+        nombre: plantillaForm.value.nombre.trim(),
+        asunto: plantillaForm.value.asunto.trim(),
+        cuerpo_html: plantillaForm.value.cuerpo_html,
+        es_default: plantillaForm.value.es_default,
+        activa: plantillaForm.value.activa,
+      });
+      toast.add({ severity: 'success', summary: 'Plantilla Creada', detail: 'Nueva plantilla registrada', life: 3000 });
+    }
+    isPlantillaDialogVisible.value = false;
+    await loadPlantillas();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al guardar plantilla', life: 4000 });
+  } finally {
+    isSavingPlantilla.value = false;
+  }
+};
+
+const handleDeletePlantilla = async (tpl: PlantillaEmail) => {
+  if (tpl.es_default) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'No se puede eliminar la plantilla predeterminada', life: 3000 });
+    return;
+  }
+  try {
+    await configService.deletePlantillaEmail(tpl.id);
+    toast.add({ severity: 'info', summary: 'Eliminada', detail: `Plantilla '${tpl.nombre}' eliminada.`, life: 2500 });
+    await loadPlantillas();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo eliminar la plantilla', life: 3500 });
+  }
+};
+
+const loadMailConfig = async () => {
+  isLoadingMailConfig.value = true;
+  try {
+    const res = await configService.getMailAutomatizacion();
+    envioAutoMail.value = res.envio_automatico;
+    minutosGraciaMail.value = res.minutos_gracia;
+    zeptomailConfigurado.value = res.zeptomail_configurado;
+    remitenteEmail.value = res.remitente_email;
+    remitenteNombre.value = res.remitente_nombre;
+  } catch (err: any) {
+    console.warn('Error cargando config de correo:', err);
+  } finally {
+    isLoadingMailConfig.value = false;
+  }
+};
+
+const handleSaveMailConfig = async () => {
+  isSavingMailConfig.value = true;
+  try {
+    const res = await configService.updateMailAutomatizacion({
+      envio_automatico: envioAutoMail.value,
+      minutos_gracia: minutosGraciaMail.value,
+    });
+    envioAutoMail.value = res.envio_automatico;
+    minutosGraciaMail.value = res.minutos_gracia;
+    toast.add({
+      severity: 'success',
+      summary: 'Parámetros Actualizados',
+      detail: `Envío automático: ${envioAutoMail.value ? 'ACTIVADO' : 'DESACTIVADO (Manual)'} con ${minutosGraciaMail.value} min de gracia.`,
+      life: 3500,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err.response?.data?.detail || 'No se pudo guardar la configuración de correo',
+      life: 4000,
+    });
+  } finally {
+    isSavingMailConfig.value = false;
+  }
+};
+
+// Indicaciones
+const loadIndicaciones = async () => {
+  isLoadingIndicaciones.value = true;
+  try {
+    indicaciones.value = await configService.listIndicaciones(false);
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar las indicaciones', life: 3000 });
+  } finally {
+    isLoadingIndicaciones.value = false;
+  }
+};
+
+const isIndicacionDialogVisible = ref(false);
+const isEditingIndicacion = ref(false);
+const isSavingIndicacion = ref(false);
+const editingIndicacionId = ref<string | null>(null);
+
+const indicacionForm = ref<IndicacionEstudioCreate>({
+  codigo: '',
+  titulo: '',
+  instrucciones: '',
+  categoria: 'Sangre',
+  color: 'info',
+  orden_secuencia: 1,
+  activa: true,
+});
+
+const openNewIndicacionDialog = () => {
+  isEditingIndicacion.value = false;
+  editingIndicacionId.value = null;
+  indicacionForm.value = {
+    codigo: '',
+    titulo: '',
+    instrucciones: '',
+    categoria: 'Sangre',
+    color: 'info',
+    orden_secuencia: indicaciones.value.length + 1,
+    activa: true,
+  };
+  isIndicacionDialogVisible.value = true;
+};
+
+const openEditIndicacionDialog = (ind: IndicacionEstudio) => {
+  isEditingIndicacion.value = true;
+  editingIndicacionId.value = ind.id;
+  indicacionForm.value = {
+    codigo: ind.codigo,
+    titulo: ind.titulo,
+    instrucciones: ind.instrucciones,
+    categoria: ind.categoria || '',
+    color: ind.color,
+    orden_secuencia: ind.orden_secuencia,
+    activa: ind.activa,
+  };
+  isIndicacionDialogVisible.value = true;
+};
+
+const handleSaveIndicacion = async () => {
+  if (!indicacionForm.value.titulo.trim() || !indicacionForm.value.instrucciones.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'Título e Instrucciones son obligatorios', life: 3000 });
+    return;
+  }
+  if (!isEditingIndicacion.value && !indicacionForm.value.codigo.trim()) {
+    toast.add({ severity: 'warn', summary: 'Atención', detail: 'El código único es obligatorio', life: 3000 });
+    return;
+  }
+
+  isSavingIndicacion.value = true;
+  try {
+    if (isEditingIndicacion.value && editingIndicacionId.value) {
+      await configService.updateIndicacion(editingIndicacionId.value, {
+        titulo: indicacionForm.value.titulo.trim(),
+        instrucciones: indicacionForm.value.instrucciones.trim(),
+        categoria: indicacionForm.value.categoria?.trim() || null,
+        color: indicacionForm.value.color,
+        orden_secuencia: indicacionForm.value.orden_secuencia,
+        activa: indicacionForm.value.activa,
+      });
+      toast.add({ severity: 'success', summary: 'Actualizada', detail: 'Indicación clínica modificada con éxito', life: 3000 });
+    } else {
+      await configService.createIndicacion({
+        codigo: indicacionForm.value.codigo.trim().toUpperCase(),
+        titulo: indicacionForm.value.titulo.trim(),
+        instrucciones: indicacionForm.value.instrucciones.trim(),
+        categoria: indicacionForm.value.categoria?.trim() || null,
+        color: indicacionForm.value.color,
+        orden_secuencia: indicacionForm.value.orden_secuencia,
+        activa: indicacionForm.value.activa,
+      });
+      toast.add({ severity: 'success', summary: 'Creada', detail: 'Nueva indicación de preparación registrada', life: 3000 });
+    }
+    isIndicacionDialogVisible.value = false;
+    await loadIndicaciones();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'Error al guardar indicación', life: 4000 });
+  } finally {
+    isSavingIndicacion.value = false;
+  }
+};
+
+const handleToggleActiveIndicacion = async (ind: IndicacionEstudio) => {
+  try {
+    await configService.updateIndicacion(ind.id, { activa: !ind.activa });
+    toast.add({
+      severity: 'info',
+      summary: ind.activa ? 'Desactivada' : 'Activada',
+      detail: `Indicación '${ind.titulo}' ahora está ${ind.activa ? 'inactiva' : 'activa'}.`,
+      life: 2500,
+    });
+    await loadIndicaciones();
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cambiar estado de indicación', life: 3000 });
+  }
+};
 
 // APB Configuration
 const valorApb = ref(0);
@@ -157,9 +493,13 @@ const loadEstados = async () => {
 };
 
 onMounted(() => {
+  featuresStore.fetchFeatures(true);
   loadMotivos();
   loadEstados();
   loadApb();
+  loadIndicaciones();
+  loadMailConfig();
+  loadPlantillas();
 });
 
 const openNewDialog = () => {
@@ -371,6 +711,15 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           </Tab>
           <Tab value="3">
             <i class="pi pi-shield mr-1.5 text-emerald-600"></i> Acto Profesional Bioquímico (APB)
+          </Tab>
+          <Tab value="4">
+            <i class="pi pi-book mr-1.5 text-amber-600"></i> Indicaciones de Estudios
+          </Tab>
+          <Tab value="5">
+            <i class="pi pi-envelope mr-1.5 text-cyan-600"></i> Automatización y Correos
+          </Tab>
+          <Tab value="6">
+            <i class="pi pi-sliders-h mr-1.5 text-violet-600"></i> Funcionalidades (Feature Flags)
           </Tab>
         </TabList>
 
@@ -609,6 +958,398 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
               </div>
             </div>
           </TabPanel>
+
+          <!-- Tab 4: Indicaciones de Estudios -->
+          <TabPanel value="4">
+            <div class="p-4 space-y-4">
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div>
+                  <h4 class="text-sm font-bold text-slate-800">Catálogo de Indicaciones Preescritas para Estudios</h4>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Configure las indicaciones y preparaciones que los operadores y auditores podrán seleccionar en forma de <strong>chips</strong> en cualquier orden médica y enviar por correo al paciente.
+                  </p>
+                </div>
+                <Button label="Nueva Indicación" icon="pi pi-plus" severity="primary" size="small" class="text-xs" @click="openNewIndicacionDialog" />
+              </div>
+
+              <LoadingSpinner v-if="isLoadingIndicaciones" message="Cargando catálogo de indicaciones..." />
+
+              <DataTable v-else :value="indicaciones" stripedRows responsiveLayout="scroll" class="p-datatable-sm" rowHover>
+                <Column field="titulo" header="Indicación (Nombre en Chip)" sortable style="width: 240px">
+                  <template #body="{ data }">
+                    <div class="flex items-center space-x-2">
+                      <Tag :value="data.titulo" :severity="(data.color as any) || 'info'" class="text-xs font-bold" />
+                      <span v-if="data.categoria" class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">
+                        {{ data.categoria }}
+                      </span>
+                    </div>
+                  </template>
+                </Column>
+
+                <Column field="codigo" header="Código" sortable style="width: 170px">
+                  <template #body="{ data }">
+                    <span class="font-mono text-xs text-slate-500 font-semibold">{{ data.codigo }}</span>
+                  </template>
+                </Column>
+
+                <Column field="instrucciones" header="Instrucciones al Paciente">
+                  <template #body="{ data }">
+                    <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed">{{ data.instrucciones }}</p>
+                  </template>
+                </Column>
+
+                <Column field="activa" header="Estado" sortable style="width: 110px">
+                  <template #body="{ data }">
+                    <Tag :value="data.activa ? 'ACTIVA' : 'INACTIVA'" :severity="data.activa ? 'success' : 'secondary'" class="text-[10px]" />
+                  </template>
+                </Column>
+
+                <Column header="Acciones" style="width: 110px">
+                  <template #body="{ data }">
+                    <div class="flex items-center space-x-1">
+                      <Button icon="pi pi-pencil" text rounded size="small" severity="info" title="Editar indicación" @click="openEditIndicacionDialog(data)" />
+                      <Button
+                        :icon="data.activa ? 'pi pi-ban' : 'pi pi-check'"
+                        text
+                        rounded
+                        size="small"
+                        :severity="data.activa ? 'danger' : 'success'"
+                        :title="data.activa ? 'Desactivar' : 'Activar'"
+                        @click="handleToggleActiveIndicacion(data)"
+                      />
+                    </div>
+                  </template>
+                </Column>
+              </DataTable>
+            </div>
+          </TabPanel>
+
+          <!-- Tab 5: Automatización y Correos ZeptoMail -->
+          <TabPanel value="5">
+            <div class="p-6 max-w-2xl space-y-6">
+              <div class="bg-gradient-to-r from-cyan-50 to-blue-50/80 p-5 rounded-2xl border border-cyan-200 shadow-sm">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-xl bg-cyan-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+                    ✉
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-cyan-950">Despacho de Correos de Resolución Médica (ZeptoMail)</h3>
+                    <p class="text-xs text-cyan-900/80 mt-1 leading-relaxed">
+                      Al finalizar una auditoría, se genera el correo con el desglose económico y las indicaciones de preparación.
+                      Usted puede mantener el <strong>modo manual</strong> (el usuario revisa, edita y hace clic en Enviar) o <strong>activar el modo automático</strong> para que el sistema lo despache tras una ventana de espera programada con opción a frenado.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                <!-- Chip de Estado de Automatización -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border" :class="envioAutoMail ? 'bg-emerald-50/70 border-emerald-300' : 'bg-slate-50 border-slate-200'">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-bold text-slate-800">Modo de Envío de Correos:</span>
+                      <Tag :value="envioAutoMail ? 'AUTOMÁTICO ACTIVADO' : 'MANUAL (Revisión antes de enviar)'" :severity="envioAutoMail ? 'success' : 'warn'" class="text-xs font-bold" />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                      {{ envioAutoMail ? 'Las órdenes finalizadas se programarán para enviarse automáticamente tras el tiempo de gracia indicado.' : 'El envío queda 100% bajo control del operador. Cada correo se revisa y envía manualmente con el botón en el expediente.' }}
+                    </p>
+                  </div>
+                  <Button
+                    :label="envioAutoMail ? 'Cambiar a Modo Manual' : 'Activar Envío Automático'"
+                    :icon="envioAutoMail ? 'pi pi-pause' : 'pi pi-bolt'"
+                    :severity="envioAutoMail ? 'warn' : 'primary'"
+                    size="small"
+                    class="text-xs shrink-0"
+                    @click="envioAutoMail = !envioAutoMail"
+                  />
+                </div>
+
+                <!-- Tiempo de Gracia -->
+                <div v-if="envioAutoMail" class="p-4 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2 animate-fadeIn">
+                  <label class="block text-xs font-bold text-blue-950 uppercase">
+                    Ventana de Espera / Gracia antes del Envío Automático (Minutos)
+                  </label>
+                  <div class="flex items-center gap-3">
+                    <InputNumber v-model="minutosGraciaMail" :min="1" :max="1440" class="w-36" inputClass="font-bold text-sm text-center" />
+                    <span class="text-xs text-blue-800">
+                      (Equivale a <strong>{{ (minutosGraciaMail / 60).toFixed(1) }} horas</strong> para revisar o cancelar el envío antes de que salga).
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Estado del Conector ZeptoMail -->
+                <div class="p-3.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-700">Estado de API ZeptoMail:</span>
+                    <Tag :value="zeptomailConfigurado ? 'Conectado / Activo' : 'Modo Simulación (Sin Token .env)'" :severity="zeptomailConfigurado ? 'success' : 'secondary'" class="text-[10px]" />
+                  </div>
+                  <div class="text-[11px] text-slate-500">
+                    Remitente: <strong>{{ remitenteNombre }}</strong> &lt;{{ remitenteEmail }}&gt;
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span class="text-xs text-slate-500">La configuración aplica de inmediato en el servidor FastAPI.</span>
+                  <Button
+                    label="Guardar Configuración de Correo"
+                    icon="pi pi-check"
+                    severity="primary"
+                    :loading="isSavingMailConfig"
+                    @click="handleSaveMailConfig"
+                  />
+                </div>
+              </div>
+
+              <!-- Sección Gestor de Plantillas de Correo HTML -->
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-800">Plantillas de Correo Disponibles</h4>
+                    <p class="text-xs text-slate-500">
+                      Cree o edite plantillas con variables como <code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono">&#123;&#123;paciente_nombre&#125;&#125;</code>, <code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono">&#123;&#123;estudios_autorizados&#125;&#125;</code>, <code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono">&#123;&#123;estudios_no_autorizados&#125;&#125;</code>, <code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono">&#123;&#123;total_abonar&#125;&#125;</code>, <code class="bg-slate-100 text-blue-700 px-1 py-0.5 rounded font-mono">&#123;&#123;indicaciones&#125;&#125;</code>.
+                    </p>
+                  </div>
+                  <Button label="Nueva Plantilla" icon="pi pi-plus" severity="primary" size="small" class="text-xs shrink-0" @click="openNewPlantillaDialog" />
+                </div>
+
+                <LoadingSpinner v-if="isLoadingPlantillas" message="Cargando plantillas..." />
+
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="tpl in plantillas"
+                    :key="tpl.id"
+                    class="p-3 rounded-lg border border-slate-200 bg-slate-50/60 flex items-center justify-between text-xs hover:border-slate-300 transition"
+                  >
+                    <div class="min-w-0 pr-3">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-900 text-xs">{{ tpl.nombre }}</span>
+                        <Tag v-if="tpl.es_default" value="PREDETERMINADA" severity="success" class="text-[9px]" />
+                        <span class="font-mono text-[10px] text-slate-400">({{ tpl.codigo }})</span>
+                      </div>
+                      <p class="text-slate-500 text-[11px] truncate mt-0.5">Asunto: {{ tpl.asunto }}</p>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                      <Button icon="pi pi-pencil" text rounded size="small" severity="info" title="Editar plantilla" @click="openEditPlantillaDialog(tpl)" />
+                      <Button
+                        v-if="!tpl.es_default"
+                        icon="pi pi-trash"
+                        text
+                        rounded
+                        size="small"
+                        severity="danger"
+                        title="Eliminar plantilla"
+                        @click="handleDeletePlantilla(tpl)"
+                      />
+                    </div>
+                  </div>
+
+                  <p v-if="plantillas.length === 0" class="text-center py-4 text-xs text-slate-400 italic">
+                    No hay plantillas personalizadas. Se utiliza el diseño corporativo estándar.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Tab 6: Funcionalidades (Feature Flags) -->
+          <TabPanel value="6">
+            <div class="p-4 space-y-5">
+              <div class="bg-gradient-to-r from-violet-50 to-indigo-50 p-4 rounded-xl border border-violet-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <i class="pi pi-sliders-h text-violet-600"></i>
+                    <span>Control de Funcionalidades del Sistema (Feature Flags)</span>
+                  </h4>
+                  <p class="text-xs text-slate-600 mt-1">
+                    Activa o desactiva módulos y campos operativos según las necesidades de tu laboratorio o etapa de despliegue.
+                    Los cambios tienen impacto inmediato en la interfaz y en los formularios.
+                  </p>
+                </div>
+                <Button
+                  icon="pi pi-refresh"
+                  label="Actualizar"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  :loading="featuresStore.isLoading"
+                  @click="featuresStore.fetchFeatures(true)"
+                />
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 1. Módulo de Correo Electrónico -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isMailEnabled ? 'border-cyan-300 ring-1 ring-cyan-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isMailEnabled ? 'bg-cyan-600' : 'bg-slate-400'">
+                          <i class="pi pi-envelope text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Notificaciones por Correo Electrónico</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isMailEnabled ? 'text-cyan-600' : 'text-slate-400'">
+                            modulo_mail
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.modulo_mail"
+                        :disabled="isUpdatingFeature === 'modulo_mail'"
+                        @update:modelValue="handleToggleFeature('modulo_mail', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Habilita el botón de notificación y envío de correos con ZeptoMail, previsualización de resoluciones de auditoría y despachos programados a los pacientes.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isMailEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isMailEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+
+                <!-- 2. Calculadora de Presupuesto de Estudios -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isCalculadoraEnabled ? 'border-violet-300 ring-1 ring-violet-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isCalculadoraEnabled ? 'bg-violet-600' : 'bg-slate-400'">
+                          <i class="pi pi-calculator text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Calculadora de Presupuestos</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isCalculadoraEnabled ? 'text-violet-600' : 'text-slate-400'">
+                            calculadora_estudios
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.calculadora_estudios"
+                        :disabled="isUpdatingFeature === 'calculadora_estudios'"
+                        @update:modelValue="handleToggleFeature('calculadora_estudios', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Muestra el botón con el ícono de calculadora en la orden médica para simular cotizaciones dinámicas (tildar/destildar estudios no autorizados) durante consultas telefónicas.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isCalculadoraEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isCalculadoraEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+
+                <!-- 3. Prácticas Autorizadas y No Autorizadas -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isEstudiosAutorizacionEnabled ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isEstudiosAutorizacionEnabled ? 'bg-emerald-600' : 'bg-slate-400'">
+                          <i class="pi pi-check-circle text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Prácticas Autorizadas / No Autorizadas</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isEstudiosAutorizacionEnabled ? 'text-emerald-600' : 'text-slate-400'">
+                            estudios_autorizacion
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.estudios_autorizacion"
+                        :disabled="isUpdatingFeature === 'estudios_autorizacion'"
+                        @update:modelValue="handleToggleFeature('estudios_autorizacion', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Habilita los campos de auditoría médica para listar qué análisis fueron autorizados por la obra social, cuáles fueron rechazados y el valor de estudios no autorizados.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isEstudiosAutorizacionEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isEstudiosAutorizacionEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+
+                <!-- 4. Indicaciones Clínicas de Preparación -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isIndicacionesEnabled ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isIndicacionesEnabled ? 'bg-amber-600' : 'bg-slate-400'">
+                          <i class="pi pi-book text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Indicaciones Clínicas de Preparación</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isIndicacionesEnabled ? 'text-amber-600' : 'text-slate-400'">
+                            indicaciones_estudios
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.indicaciones_estudios"
+                        :disabled="isUpdatingFeature === 'indicaciones_estudios'"
+                        @update:modelValue="handleToggleFeature('indicaciones_estudios', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Habilita el selector de chips con instrucciones previas para el paciente (horas de ayuno, recolección de orina, suspensión de medicación) en la orden médica.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isIndicacionesEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isIndicacionesEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+
+                <!-- 5. Asignación de Auditor Médico -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isAsignarAuditorEnabled ? 'border-blue-300 ring-1 ring-blue-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isAsignarAuditorEnabled ? 'bg-blue-600' : 'bg-slate-400'">
+                          <i class="pi pi-user-plus text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Asignación de Auditor a la Orden</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isAsignarAuditorEnabled ? 'text-blue-600' : 'text-slate-400'">
+                            asignar_auditor
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.asignar_auditor"
+                        :disabled="isUpdatingFeature === 'asignar_auditor'"
+                        @update:modelValue="handleToggleFeature('asignar_auditor', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Permite vincular y reasignar un usuario auditor médico responsable específico a cada orden médica, habilitando además los filtros por auditor asignado.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isAsignarAuditorEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isAsignarAuditorEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </div>
@@ -767,6 +1508,258 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           :loading="isSavingEstado"
           @click="handleSaveEstado"
         />
+      </template>
+    </Dialog>
+
+    <!-- Modal: Crear / Editar Indicación de Estudio -->
+    <Dialog
+      v-model:visible="isIndicacionDialogVisible"
+      modal
+      :header="isEditingIndicacion ? 'Editar Indicación de Estudio' : 'Nueva Indicación de Estudio'"
+      :style="{ width: '540px' }"
+    >
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Código Único <span class="text-red-500">*</span>
+            </label>
+            <InputText
+              v-model="indicacionForm.codigo"
+              placeholder="Ej: AYUNO_8HS, ORINA_24HS"
+              class="w-full text-xs uppercase font-mono"
+              :disabled="isEditingIndicacion"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Nombre en Chip <span class="text-red-500">*</span>
+            </label>
+            <InputText
+              v-model="indicacionForm.titulo"
+              placeholder="Ej: Ayuno de 8 a 12 hs"
+              class="w-full text-xs font-bold"
+            />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Categoría</label>
+            <InputText
+              v-model="indicacionForm.categoria as any"
+              placeholder="Ej: Sangre, Orina, Medicación"
+              class="w-full text-xs"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Color del Chip</label>
+            <Dropdown
+              v-model="indicacionForm.color"
+              :options="opcionesColores"
+              optionLabel="label"
+              optionValue="value"
+              class="w-full text-xs"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+            Instrucciones al Paciente <span class="text-red-500">*</span>
+          </label>
+          <Textarea
+            v-model="indicacionForm.instrucciones"
+            rows="4"
+            placeholder="Detalle claro de cómo debe prepararse el paciente (ayuno, recolección, frascos, etc.)..."
+            class="w-full text-xs leading-relaxed"
+          />
+        </div>
+
+        <div class="flex items-center space-x-2 pt-2 border-t border-slate-100">
+          <Checkbox v-model="indicacionForm.activa as any" binary inputId="isIndActiva" />
+          <label for="isIndActiva" class="text-xs font-semibold text-slate-700 cursor-pointer">
+            Indicación Activa y Visible en el Selector de Órdenes
+          </label>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text severity="secondary" @click="isIndicacionDialogVisible = false" />
+        <Button
+          :label="isEditingIndicacion ? 'Guardar Cambios' : 'Registrar Indicación'"
+          icon="pi pi-check"
+          severity="primary"
+          :loading="isSavingIndicacion"
+          @click="handleSaveIndicacion"
+        />
+      </template>
+    </Dialog>
+
+    <!-- Modal: Crear / Editar Plantilla de Correo -->
+    <Dialog
+      v-model:visible="isPlantillaDialogVisible"
+      modal
+      :header="isEditingPlantilla ? 'Editar Plantilla de Correo' : 'Nueva Plantilla de Correo'"
+      :style="{ width: '680px' }"
+    >
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Código Único <span class="text-red-500">*</span>
+            </label>
+            <InputText
+              v-model="plantillaForm.codigo"
+              placeholder="Ej: DEFAULT, NOTIFICACION_NO_AUTORIZADOS"
+              class="w-full text-xs uppercase font-mono"
+              :disabled="isEditingPlantilla"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Nombre Visible <span class="text-red-500">*</span>
+            </label>
+            <InputText
+              v-model="plantillaForm.nombre"
+              placeholder="Ej: Plantilla con No Autorizados"
+              class="w-full text-xs font-bold"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+            Asunto del Correo <span class="text-red-500">*</span>
+          </label>
+          <InputText
+            v-model="plantillaForm.asunto"
+            placeholder="Ej: Resolución de Auditoría Médica - Orden N° {{nro_orden}}"
+            class="w-full text-xs font-semibold"
+          />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-700 uppercase">
+              Cuerpo HTML / Mensaje Personalizado
+            </label>
+            <div class="flex items-center gap-1.5">
+              <Button
+                label="Variables Disponibles (Ayuda)"
+                icon="pi pi-question-circle"
+                text
+                size="small"
+                severity="info"
+                class="text-[11px] py-0.5 px-1.5 font-bold"
+                @click="isHelpVariablesVisible = true"
+              />
+              <Button
+                label="Cargar HTML Base"
+                icon="pi pi-download"
+                text
+                size="small"
+                severity="secondary"
+                :loading="isLoadingBaseHtml"
+                class="text-[11px] py-0.5 px-1.5"
+                @click="handleCargarHtmlBase"
+                title="Carga la plantilla HTML completa predeterminada"
+              />
+            </div>
+          </div>
+          <Textarea
+            v-model="plantillaForm.cuerpo_html"
+            rows="10"
+            placeholder="Ingrese el código HTML o texto con variables..."
+            class="w-full text-xs font-mono leading-relaxed bg-slate-900 text-slate-100 p-2.5 rounded-lg border border-slate-700"
+          />
+        </div>
+
+        <div class="flex items-center gap-4 pt-2 border-t border-slate-100">
+          <div class="flex items-center space-x-2">
+            <Checkbox v-model="plantillaForm.es_default" binary inputId="isTplDefault" />
+            <label for="isTplDefault" class="text-xs font-semibold text-slate-700 cursor-pointer">
+              Plantilla Predeterminada
+            </label>
+          </div>
+          <div class="flex items-center space-x-2">
+            <Checkbox v-model="plantillaForm.activa" binary inputId="isTplActiva" />
+            <label for="isTplActiva" class="text-xs font-semibold text-slate-700 cursor-pointer">
+              Plantilla Activa
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text severity="secondary" @click="isPlantillaDialogVisible = false" />
+        <Button
+          :label="isEditingPlantilla ? 'Guardar Cambios' : 'Registrar Plantilla'"
+          icon="pi pi-check"
+          severity="primary"
+          :loading="isSavingPlantilla"
+          @click="handleSavePlantilla"
+        />
+      </template>
+    </Dialog>
+
+    <!-- Modal: Popup Ayuda Memoria de Variables -->
+    <Dialog
+      v-model:visible="isHelpVariablesVisible"
+      modal
+      header="Ayuda Memoria: Variables Disponibles en Plantillas"
+      :style="{ width: '560px' }"
+    >
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-600">
+          Puede insertar cualquiera de estos marcadores en el asunto o en el cuerpo HTML de la plantilla. Al momento del envío, el sistema reemplazará automáticamente cada variable con los datos de la orden:
+        </p>
+
+        <div class="space-y-2 border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-[380px] overflow-y-auto">
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-blue-700 font-bold font-mono">&#123;&#123;paciente_nombre&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Nombre y apellido del paciente o persona de contacto.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-blue-700 font-bold font-mono">&#123;&#123;nro_orden&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Identificador de orden (ej: ORD-2026-000001).</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-blue-700 font-bold font-mono">&#123;&#123;mutual&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Nombre o sigla de la Obra Social / Prepaga aplicada.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-blue-700 font-bold font-mono">&#123;&#123;estudios_autorizados&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Listado de estudios autorizados por auditoría separados por coma.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-red-700 font-bold font-mono">&#123;&#123;estudios_no_autorizados&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Listado de estudios no autorizados / rechazados separados por coma.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-blue-700 font-bold font-mono">&#123;&#123;observacion_resultado&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Texto o dictamen médico comunicado al finalizar la auditoría.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-emerald-700 font-bold font-mono">&#123;&#123;total_abonar&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Monto total final a abonar (Copago + No autorizados + APB) formateado con moneda.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-slate-700 font-bold font-mono">&#123;&#123;copago&#125;&#125;</code>, <code class="text-slate-700 font-bold font-mono">&#123;&#123;estudios_no_autorizados_valor&#125;&#125;</code>, <code class="text-slate-700 font-bold font-mono">&#123;&#123;valor_apb&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Desglose monetario individual de cada concepto.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-amber-700 font-bold font-mono">&#123;&#123;indicaciones&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Texto consolidado de indicaciones de preparación clínica seleccionadas.</p>
+          </div>
+          <div class="p-2 bg-white rounded border border-slate-200">
+            <code class="text-slate-700 font-bold font-mono">&#123;&#123;sucursal_nombre&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">Nombre de la sede o sucursal donde se emitió la orden médica.</p>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Entendido" severity="primary" size="small" @click="isHelpVariablesVisible = false" />
       </template>
     </Dialog>
   </div>

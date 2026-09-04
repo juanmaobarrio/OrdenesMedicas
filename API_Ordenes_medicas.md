@@ -366,3 +366,102 @@ A continuación se detallan los 2 flujos más comunes para automatizar con n8n:
 | `404 Not Found` | No encontrado | ID de orden, paciente o adjunto inexistente. |
 | `409 Conflict` | Conflicto de unicidad | DNI o Código duplicado. |
 | `422 Unprocessable` | Error de esquema | Tipos de datos inválidos en el payload JSON. |
+
+
+---
+
+### 5.6 Desglose de Estudios y Calculadora de Presupuestos (Integración n8n / Externa)
+
+Las órdenes médicas soportan el desglose individual de prácticas con su código, nombre, precio y estado de autorización (`true` si fue cubierta por la mutual, `false` si es rechazada/a cargo del paciente).
+
+#### A. Actualizar Desglose de Estudios con un solo Request (Recomendado para n8n)
+- **Endpoint:** `PUT /api/v1/ordenes/{id}/estudios-detalle`
+- **Sincronización Automática Inteligente:** Al enviar este desglose, el backend:
+  1. Almacena la estructura completa para la **Calculadora de Estudios**.
+  2. Auto-deriva la lista `estudios_autorizados` (nombres donde `autorizado = true`).
+  3. Auto-deriva la lista `estudios_no_autorizados` (nombres donde `autorizado = false`).
+  4. Auto-calcula la suma de precios no autorizados en `valor_estudios_no_autorizados`.
+
+**Formato 1: Objeto JSON con clave `estudios_detalle`:**
+```json
+{
+  "estudios_detalle": [
+    {
+      "codigo": "660001",
+      "nombre": "Hemograma completo",
+      "precio": 0,
+      "autorizado": true
+    },
+    {
+      "codigo": "660450",
+      "nombre": "Vitamina D3 (25-OH)",
+      "precio": 15400.00,
+      "autorizado": false
+    },
+    {
+      "codigo": "660720",
+      "nombre": "Hepatograma",
+      "precio": 0,
+      "autorizado": true
+    },
+    {
+      "codigo": "660890",
+      "nombre": "Anticuerpos Anti-TPO",
+      "precio": 9800.00,
+      "autorizado": false
+    }
+  ]
+}
+```
+
+**Formato 2: Array directo JSON (también soportado):**
+```json
+[
+  { "codigo": "660001", "nombre": "Hemograma completo", "precio": 0, "autorizado": true },
+  { "codigo": "660450", "nombre": "Vitamina D3 (25-OH)", "precio": 15400.00, "autorizado": false }
+]
+```
+
+#### B. Enviar Desglose en la Creación de la Orden
+- **Endpoint:** `POST /api/v1/ordenes`
+- Puede incluir la clave `"estudios_detalle": [...]` en el payload principal.
+
+#### C. Enviar Desglose al Finalizar Auditoría o Cambiar Estado
+- **Endpoint:** `POST /api/v1/ordenes/{id}/estado`
+- Permite enviar conjuntamente `"estado_id": 5` (o `"nuevo_estado": "Auditoria Finalizada"`), `"observacion_resultado"` y `"estudios_detalle": [...]`.
+
+
+---
+
+### 5.7 Feature Flags y Control de Funcionalidades del Sistema
+
+El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistido en la base de datos y administrable vía API o desde la interfaz web.
+
+#### A. Consultar Estado de Funcionalidades Activas
+- **Endpoint:** `GET /api/v1/config/features`
+- **Response Body:**
+```json
+{
+  "modulo_mail": false,
+  "calculadora_estudios": false,
+  "estudios_autorizacion": false,
+  "indicaciones_estudios": false,
+  "asignar_auditor": false
+}
+```
+
+#### B. Actualizar Funcionalidades (Solo Administradores)
+- **Endpoint:** `PUT /api/v1/config/features`
+- **Request Body (Permite actualización parcial o total):**
+```json
+{
+  "modulo_mail": true,
+  "calculadora_estudios": true
+}
+```
+- **Campos Disponibles:**
+  - `modulo_mail` (boolean): Activa el módulo de despacho de emails ZeptoMail y plantillas.
+  - `calculadora_estudios` (boolean): Activa el botón y modal de la calculadora de presupuesto de estudios.
+  - `estudios_autorizacion` (boolean): Activa los campos de prácticas autorizadas, no autorizadas y aranceles particulares.
+  - `indicaciones_estudios` (boolean): Activa el selector y gestión de indicaciones clínicas de preparación.
+  - `asignar_auditor` (boolean): Activa la vinculación y filtros de auditor médico en las órdenes.

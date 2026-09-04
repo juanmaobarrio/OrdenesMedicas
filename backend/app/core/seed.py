@@ -49,6 +49,7 @@ async def seed_initial_data():
             ("ordenes:update", "ordenes", "Modificación de datos, cambio de estado y adjuntos"),
             ("ordenes:audit", "ordenes", "Auditoría médica, observaciones y resolución"),
             ("ordenes:calls", "ordenes", "Bandeja y registro de llamadas a pacientes"),
+            ("ordenes:mail", "ordenes", "Previsualización y envío de correos electrónicos a pacientes"),
             ("dashboard:view", "dashboard", "Visualización de reportes, KPIs y exportación"),
             ("config:manage", "config", "Configuración de motivos de cancelación y estados"),
         ]
@@ -80,6 +81,7 @@ async def seed_initial_data():
                     permission_map["ordenes:update"],
                     permission_map["ordenes:audit"],
                     permission_map["ordenes:calls"],
+                    permission_map["ordenes:mail"],
                     permission_map["pacientes:manage"],
                     permission_map["dashboard:view"],
                     permission_map["mutuales:manage"],
@@ -232,8 +234,8 @@ async def seed_initial_data():
                 db.add(est_obj)
                 await db.flush()
 
-        # 8. Configuración General del Sistema (APB)
-        from backend.app.modules.ordenes.models import ConfiguracionSistema
+        # 8. Configuración General del Sistema (APB y Mail)
+        from backend.app.modules.ordenes.models import ConfiguracionSistema, IndicacionEstudio, PlantillaEmail
         stmt_apb = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "VALOR_APB")
         apb_cfg = (await db.execute(stmt_apb)).scalar_one_or_none()
         if not apb_cfg:
@@ -244,6 +246,62 @@ async def seed_initial_data():
             )
             db.add(apb_cfg)
             await db.flush()
+
+        stmt_mail_auto = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
+        mail_auto_cfg = (await db.execute(stmt_mail_auto)).scalar_one_or_none()
+        if not mail_auto_cfg:
+            db.add(ConfiguracionSistema(
+                clave="ENVIO_MAIL_AUTOMATICO",
+                valor="false",
+                descripcion="Indica si el envio de correos por auditoria finalizada es automatico (true) o manual (false)"
+            ))
+
+        stmt_gracia = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "MINUTOS_GRACIA_ENVIO_MAIL")
+        gracia_cfg = (await db.execute(stmt_gracia)).scalar_one_or_none()
+        if not gracia_cfg:
+            db.add(ConfiguracionSistema(
+                clave="MINUTOS_GRACIA_ENVIO_MAIL",
+                valor="120",
+                descripcion="Minutos de espera programada antes del envio automatico del mail"
+            ))
+
+        # 9. Indicaciones de preparación clínicas
+        # Se inicia la tabla vacía para carga manual personalizada por el operador (sin precarga automática)
+
+        # 10. Plantilla de Correo por Defecto
+        from backend.app.core.templates_email import obtener_plantilla_base_html
+        codigo_html_base = obtener_plantilla_base_html()
+
+        stmt_tpl = select(PlantillaEmail).where(PlantillaEmail.codigo == "DEFAULT")
+        tpl_existente = (await db.execute(stmt_tpl)).scalar_one_or_none()
+        if not tpl_existente:
+            db.add(PlantillaEmail(
+                codigo="DEFAULT",
+                nombre="Plantilla Estándar de Resolución Médica",
+                asunto="Resolución de Auditoría Médica - Orden N° {{nro_orden}}",
+                cuerpo_html=codigo_html_base,
+                es_default=True,
+                activa=True,
+            ))
+            await db.flush()
+        else:
+            # Si existía pero estaba vacía, inyectamos el código HTML base para que sea visible y editable
+            if not tpl_existente.cuerpo_html or not tpl_existente.cuerpo_html.strip():
+                tpl_existente.cuerpo_html = codigo_html_base
+                await db.flush()
+
+        # 11. Feature Flags del Sistema: Todas inactivas por defecto
+        feature_defaults = [
+            ("FEATURE_MODULO_MAIL", "false", "Activa el módulo y despacho de correos electrónicos de resolución médica"),
+            ("FEATURE_CALCULADORA_ESTUDIOS", "false", "Activa el botón y modal de calculadora interactiva de presupuestos"),
+            ("FEATURE_ESTUDIOS_AUTORIZACION", "false", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
+            ("FEATURE_INDICACIONES_ESTUDIOS", "false", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
+            ("FEATURE_ASIGNAR_AUDITOR", "false", "Activa la asignación de auditor médico a la orden médica"),
+        ]
+        for f_key, f_val, f_desc in feature_defaults:
+            stmt_f = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == f_key)
+            if not (await db.execute(stmt_f)).scalar_one_or_none():
+                db.add(ConfiguracionSistema(clave=f_key, valor=f_val, descripcion=f_desc))
 
         await db.commit()
         logger.info("Siembra de datos finalizada con exito.")

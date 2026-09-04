@@ -6,7 +6,7 @@ import { usersService } from '../../services/users.service';
 import { mutualesService } from '../../services/mutuales.service';
 import { configService } from '../../services/config.service';
 import { useAuthStore } from '../../stores/auth.store';
-import { EstadoOrden, OrdenMedicaDetail, OrdenMedicaListItem, AdjuntoOrden, ObraSocial, UserDetail, MotivoCancelacion } from '../../types';
+import { EstadoOrden, OrdenMedicaDetail, OrdenMedicaListItem, AdjuntoOrden, ObraSocial, UserDetail, MotivoCancelacion, IndicacionEstudio } from '../../types';
 
 import Button from 'primevue/button';
 
@@ -28,8 +28,12 @@ import Timeline from 'primevue/timeline';
 import StatusTag from '../common/StatusTag.vue';
 import LoadingSpinner from '../common/LoadingSpinner.vue';
 import RegistrarLlamadaModal from './RegistrarLlamadaModal.vue';
+import IndicacionesChipsSelector from './IndicacionesChipsSelector.vue';
+import EmailResolucionModal from './EmailResolucionModal.vue';
+import CalculadoraEstudiosModal from './CalculadoraEstudiosModal.vue';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
+import { useFeaturesStore } from '../../stores/features.store';
 
 const props = defineProps<{
   ordenId: string;
@@ -42,6 +46,7 @@ const emit = defineEmits<{
 
 const toast = useToast();
 const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
 const router = useRouter();
 
 const orden = ref<OrdenMedicaDetail | null>(null);
@@ -49,6 +54,9 @@ const isLoading = ref(true);
 const auditors = ref<UserDetail[]>([]);
 const mutuales = ref<ObraSocial[]>([]);
 const motivosCancelacion = ref<MotivoCancelacion[]>([]);
+const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
+const isEmailModalVisible = ref(false);
+const isCalculadoraModalVisible = ref(false);
 
 const opcionesHorarios = [
   'Todo el día',
@@ -68,6 +76,8 @@ const observacionResultadoAuditoria = ref('');
 const finalCopago = ref(0);
 const finalEstudiosNoAutorizados = ref(0);
 const finalValorApb = ref(0);
+const finalEstudiosAutorizadosLista = ref<string[]>([]);
+const finalEstudiosNoAutorizadosLista = ref<string[]>([]);
 
 const openCambiarEstadoModal = () => {
   if (orden.value) {
@@ -75,6 +85,8 @@ const openCambiarEstadoModal = () => {
     finalEstudiosNoAutorizados.value = Number(orden.value.valor_estudios_no_autorizados || 0);
     finalValorApb.value = Number(orden.value.valor_apb || 0);
     observacionResultadoAuditoria.value = orden.value.observacion_resultado_auditoria || '';
+    finalEstudiosAutorizadosLista.value = [...(orden.value.estudios_autorizados || [])];
+    finalEstudiosNoAutorizadosLista.value = [...(orden.value.estudios_no_autorizados || [])];
   }
   isCambioEstadoVisible.value = true;
 };
@@ -158,6 +170,8 @@ const editForm = ref({
   contacto_celular: '',
   contacto_email: '',
   numeros_auditoria: [] as string[],
+  estudios_autorizados: [] as string[],
+  estudios_no_autorizados: [] as string[],
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   abona_apb: false,
@@ -178,6 +192,8 @@ const handleOpenEditOrden = () => {
     contacto_celular: orden.value.contacto_celular || '',
     contacto_email: orden.value.contacto_email || '',
     numeros_auditoria: [...(orden.value.numeros_auditoria || [])],
+    estudios_autorizados: [...(orden.value.estudios_autorizados || [])],
+    estudios_no_autorizados: [...(orden.value.estudios_no_autorizados || [])],
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
     abona_apb: Boolean(orden.value.abona_apb),
@@ -200,6 +216,8 @@ const handleSaveEditOrden = async () => {
       contacto_celular: editForm.value.contacto_celular.trim() || null,
       contacto_email: editForm.value.contacto_email.trim() || null,
       numeros_auditoria: editForm.value.numeros_auditoria,
+      estudios_autorizados: editForm.value.estudios_autorizados,
+      estudios_no_autorizados: editForm.value.estudios_no_autorizados,
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
       abona_apb: editForm.value.abona_apb,
@@ -269,12 +287,14 @@ watch(
 );
 
 onMounted(async () => {
-  const [mutRes, motRes] = await Promise.all([
+  const [mutRes, motRes, indRes] = await Promise.all([
     mutualesService.list(),
     configService.listMotivosCancelacion(true),
+    configService.listIndicaciones(true),
   ]);
   mutuales.value = mutRes;
   motivosCancelacion.value = motRes;
+  catalogoIndicaciones.value = indRes;
   loadOrden();
 });
 
@@ -319,7 +339,9 @@ const handleCambiarEstado = async () => {
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? observacionResultadoAuditoria.value.trim() : null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalCopago.value : null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizados.value : null,
-      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalValorApb.value : null
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalValorApb.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosAutorizadosLista.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizadosLista.value : null
     );
     toast.add({
       severity: 'success',
@@ -575,6 +597,34 @@ const loadPreviousOrders = async (pacienteId: string) => {
   }
 };
 
+const handleChangeIndicaciones = async (payload: { ids: string[]; texto: string }) => {
+  if (!orden.value) return;
+  try {
+    await ordenesService.actualizarIndicaciones(props.ordenId, payload.ids, payload.texto);
+    orden.value.indicaciones_ids = payload.ids;
+    orden.value.indicaciones_texto = payload.texto;
+    toast.add({ severity: 'success', summary: 'Indicaciones Guardadas', detail: 'Se actualizaron las preparaciones de la orden', life: 2500 });
+    emit('updated');
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron guardar las indicaciones', life: 3000 });
+  }
+};
+
+const handleEmailSent = (updated: OrdenMedicaDetail) => {
+  orden.value = updated;
+  emit('updated');
+};
+
+const handleCancelarEnvioAuto = async () => {
+  try {
+    const updated = await ordenesService.cancelarEnvioAutomatico(props.ordenId);
+    orden.value = updated;
+    toast.add({ severity: 'info', summary: 'Envío Cancelado', detail: 'Se canceló el despacho automático del correo.', life: 3000 });
+    emit('updated');
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cancelar el envío automático', life: 3000 });
+  }
+};
 </script>
 
 <template>
@@ -655,10 +705,32 @@ const loadPreviousOrders = async (pacienteId: string) => {
           @click="handleOpenEditOrden"
         />
 
+        <!-- Calculadora de Presupuesto de Estudios -->
+        <Button
+          v-if="featuresStore.isCalculadoraEnabled"
+          icon="pi pi-calculator"
+          severity="secondary"
+          outlined
+          size="small"
+          title="Calculadora de Estudios"
+          aria-label="Calculadora de Estudios"
+          @click="isCalculadoraModalVisible = true"
+        />
+
+        <!-- Ver / Despachar Correo ZeptoMail (Protegido por Rol o Permiso ordenes:mail) -->
+        <Button
+          v-if="featuresStore.isMailEnabled && (authStore.isAdmin || authStore.isAuditor || authStore.hasPermission('ordenes:mail'))"
+          :label="orden.mail_enviado ? 'Mail Enviado' : 'Notificar / Enviar Mail'"
+          :icon="orden.mail_enviado ? 'pi pi-check-circle' : 'pi pi-envelope'"
+          :severity="orden.mail_enviado ? 'success' : 'help'"
+          :outlined="!orden.mail_enviado"
+          size="small"
+          @click="isEmailModalVisible = true"
+        />
 
         <!-- Asignar Auditor (Admin o con permiso) -->
         <Button
-          v-if="authStore.isAdmin || authStore.hasPermission('ordenes:audit')"
+          v-if="featuresStore.isAsignarAuditorEnabled && (authStore.isAdmin || authStore.hasPermission('ordenes:audit'))"
           icon="pi pi-user-plus"
           label="Auditor"
           text
@@ -706,11 +778,11 @@ const loadPreviousOrders = async (pacienteId: string) => {
             </div>
             <div class="mt-0.5 space-y-0.5">
               <p class="text-slate-900 font-bold text-xs">
-                Total a abonar: ${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                Total a abonar: ${{ (Number(orden.valor_copago || 0) + (featuresStore.isEstudiosAutorizacionEnabled ? Number(orden.valor_estudios_no_autorizados || 0) : 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
               </p>
               <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                 <span class="text-blue-700 font-medium">${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} copago</span>
-                <span v-if="Number(orden.valor_estudios_no_autorizados) > 0" class="text-red-600 font-medium">
+                <span v-if="featuresStore.isEstudiosAutorizacionEnabled && Number(orden.valor_estudios_no_autorizados) > 0" class="text-red-600 font-medium">
                   &bull; ${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} no aut.
                 </span>
                 <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0" class="text-emerald-700 font-medium">
@@ -727,7 +799,7 @@ const loadPreviousOrders = async (pacienteId: string) => {
           </div>
           <div class="border-t border-slate-200 pt-2">
             <p class="text-slate-500"><span class="font-semibold">Sucursal:</span> {{ orden.sucursal?.nombre }}</p>
-            <p class="text-slate-500"><span class="font-semibold">Auditor:</span> {{ orden.assigned_auditor?.full_name || 'Sin asignar' }}</p>
+            <p v-if="featuresStore.isAsignarAuditorEnabled" class="text-slate-500"><span class="font-semibold">Auditor:</span> {{ orden.assigned_auditor?.full_name || 'Sin asignar' }}</p>
           </div>
         </div>
 
@@ -745,6 +817,81 @@ const loadPreviousOrders = async (pacienteId: string) => {
           </span>
         </div>
 
+        <!-- Banner de Programación Automática de Mail (si está programado) -->
+        <div
+          v-if="featuresStore.isMailEnabled && orden.mail_programado_para && !orden.mail_enviado && !orden.mail_auto_cancelado"
+          class="p-2.5 bg-blue-50/90 rounded-lg border border-blue-300 flex items-center justify-between text-xs animate-fadeIn"
+        >
+          <div class="flex items-center gap-2 text-blue-900">
+            <i class="pi pi-clock text-blue-600 animate-pulse"></i>
+            <div>
+              <span class="font-bold">Envío Automático de Correo Programado</span>
+              <p class="text-[11px] text-blue-700">Se despachará a las {{ formatDateTime(orden.mail_programado_para) }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <Button
+              label="Enviar Ahora"
+              icon="pi pi-send"
+              size="small"
+              severity="primary"
+              class="text-[11px] py-1 px-2"
+              @click="isEmailModalVisible = true"
+            />
+            <Button
+              label="Frenar Automático"
+              icon="pi pi-ban"
+              size="small"
+              severity="danger"
+              outlined
+              class="text-[11px] py-1 px-2"
+              @click="handleCancelarEnvioAuto"
+            />
+          </div>
+        </div>
+
+        <!-- Sección de Indicaciones Clínicas de Preparación (Chips) -->
+        <div v-if="featuresStore.isIndicacionesEnabled" class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-700 uppercase flex items-center gap-1.5">
+              <i class="pi pi-book text-amber-600"></i> Indicaciones Clínicas para el Estudio
+            </span>
+            <span class="text-[10px] text-slate-400">Seleccionables en cualquier etapa</span>
+          </div>
+          <IndicacionesChipsSelector
+            :model-value="orden.indicaciones_ids || []"
+            :texto-consolidado="orden.indicaciones_texto"
+            :indicaciones-disponibles="catalogoIndicaciones"
+            @change="handleChangeIndicaciones"
+          />
+        </div>
+
+        <!-- Prácticas Autorizadas y No Autorizadas (si existen) -->
+        <div v-if="featuresStore.isEstudiosAutorizacionEnabled && ((orden.estudios_autorizados && orden.estudios_autorizados.length > 0) || (orden.estudios_no_autorizados && orden.estudios_no_autorizados.length > 0))" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div class="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+            <span class="text-[10px] font-bold text-emerald-900 uppercase block mb-1">
+              ✓ Autorizados ({{ (orden.estudios_autorizados || []).length }})
+            </span>
+            <div v-if="orden.estudios_autorizados && orden.estudios_autorizados.length > 0" class="flex flex-wrap gap-1">
+              <span v-for="ea in orden.estudios_autorizados" :key="ea" class="px-1.5 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 font-semibold text-[11px]">
+                {{ ea }}
+              </span>
+            </div>
+            <span v-else class="text-[11px] text-emerald-700 italic">Todos autorizados</span>
+          </div>
+
+          <div class="p-2.5 rounded-lg bg-red-50 border border-red-200">
+            <span class="text-[10px] font-bold text-red-900 uppercase block mb-1">
+              ✕ No Autorizados ({{ (orden.estudios_no_autorizados || []).length }})
+            </span>
+            <div v-if="orden.estudios_no_autorizados && orden.estudios_no_autorizados.length > 0" class="flex flex-wrap gap-1">
+              <span v-for="ena in orden.estudios_no_autorizados" :key="ena" class="px-1.5 py-0.5 rounded bg-white text-red-800 border border-red-200 font-semibold text-[11px]">
+                {{ ena }}
+              </span>
+            </div>
+            <span v-else class="text-[11px] text-slate-400 italic">Ninguno</span>
+          </div>
+        </div>
 
         <!-- Observaciones de Ingreso / Notas Iniciales -->
         <div v-if="orden.observaciones_ingreso" class="p-2.5 bg-amber-50/70 rounded-lg border border-amber-200 text-xs space-y-1">
@@ -1133,18 +1280,46 @@ const loadPreviousOrders = async (pacienteId: string) => {
             </label>
             <Textarea
               v-model="observacionResultadoAuditoria"
-              rows="3"
+              rows="2"
               class="w-full text-xs"
-              placeholder="Ej: Aprobada 100%. Se autorizan todas las prácticas solicitadas..."
+              placeholder="Ej: Aprobada 100%. Se autorizan las prácticas solicitadas..."
             />
           </div>
+
+          <!-- Estudios Autorizados y No Autorizados con Chips -->
+          <template v-if="featuresStore.isEstudiosAutorizacionEnabled">
+            <div class="space-y-2 pt-1 border-t border-blue-200/60">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center gap-1">
+                  <i class="pi pi-check text-emerald-600"></i> Estudios Autorizados (Separados por coma o Enter)
+                </label>
+                <Chips
+                  v-model="finalEstudiosAutorizadosLista"
+                  separator=","
+                  placeholder="Escriba un estudio y presione Enter o coma..."
+                  class="w-full text-xs"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-red-900 uppercase mb-1 flex items-center gap-1">
+                  <i class="pi pi-times text-red-600"></i> Estudios NO Autorizados (Separados por coma o Enter)
+                </label>
+                <Chips
+                  v-model="finalEstudiosNoAutorizadosLista"
+                  separator=","
+                  placeholder="Ej: Vitamina D, Hepatograma (presione Enter)..."
+                  class="w-full text-xs"
+                />
+              </div>
+            </div>
+          </template>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-200/60">
             <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
               <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
-            <div class="min-w-0">
+            <div v-if="featuresStore.isEstudiosAutorizacionEnabled" class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
               <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
@@ -1270,12 +1445,39 @@ const loadPreviousOrders = async (pacienteId: string) => {
           </p>
         </div>
 
+        <template v-if="featuresStore.isEstudiosAutorizacionEnabled">
+          <div class="space-y-2">
+            <div>
+              <label class="block text-xs font-semibold text-emerald-900 uppercase mb-1">
+                ✓ Estudios Autorizados (Separados por Enter o coma)
+              </label>
+              <Chips
+                v-model="editForm.estudios_autorizados"
+                separator=","
+                placeholder="Escriba el nombre del estudio autorizado..."
+                class="w-full text-xs"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-red-900 uppercase mb-1">
+                ✕ Estudios NO Autorizados (Separados por Enter o coma)
+              </label>
+              <Chips
+                v-model="editForm.estudios_no_autorizados"
+                separator=","
+                placeholder="Escriba el nombre del estudio rechazado..."
+                class="w-full text-xs"
+              />
+            </div>
+          </div>
+        </template>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Copago a Abonar ($)</label>
             <InputNumber v-model="editForm.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
-          <div class="min-w-0">
+          <div v-if="featuresStore.isEstudiosAutorizacionEnabled" class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Estudios No Autorizados ($)</label>
             <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
@@ -1478,6 +1680,21 @@ const loadPreviousOrders = async (pacienteId: string) => {
       :telefono="orden.contacto_telefono || orden.contacto_celular || orden.paciente.telefono"
       :tipoLlamada="orden.estado === 'Solicitudes de auditoria' ? 'SOLICITUD_AUDITORIA' : 'AUDITORIA_FINALIZADA'"
       @success="handleLlamadaSuccess"
+    />
+
+    <!-- Modal Despacho de Correo ZeptoMail -->
+    <EmailResolucionModal
+      v-if="orden"
+      v-model:visible="isEmailModalVisible"
+      :orden="orden"
+      @sent="handleEmailSent"
+    />
+
+    <!-- Modal Calculadora de Presupuesto de Estudios -->
+    <CalculadoraEstudiosModal
+      v-if="orden"
+      v-model:visible="isCalculadoraModalVisible"
+      :orden="orden"
     />
   </div>
 </template>

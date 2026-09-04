@@ -6,7 +6,7 @@ import { usersService } from '../../services/users.service';
 import { mutualesService } from '../../services/mutuales.service';
 import { configService } from '../../services/config.service';
 import { useAuthStore } from '../../stores/auth.store';
-import { EstadoOrden, OrdenMedicaDetail, OrdenMedicaListItem, AdjuntoOrden, ObraSocial, UserDetail, MotivoCancelacion } from '../../types';
+import { EstadoOrden, OrdenMedicaDetail, OrdenMedicaListItem, AdjuntoOrden, ObraSocial, UserDetail, MotivoCancelacion, IndicacionEstudio } from '../../types';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
@@ -24,13 +24,18 @@ import Timeline from 'primevue/timeline';
 import StatusTag from '../../components/common/StatusTag.vue';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModal.vue';
+import IndicacionesChipsSelector from '../../components/ordenes/IndicacionesChipsSelector.vue';
+import EmailResolucionModal from '../../components/ordenes/EmailResolucionModal.vue';
+import CalculadoraEstudiosModal from '../../components/ordenes/CalculadoraEstudiosModal.vue';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
+import { useFeaturesStore } from '../../stores/features.store';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
 
 const ordenId = route.params.id as string;
 const orden = ref<OrdenMedicaDetail | null>(null);
@@ -38,6 +43,9 @@ const isLoading = ref(true);
 const auditors = ref<UserDetail[]>([]);
 const mutuales = ref<ObraSocial[]>([]);
 const motivosCancelacion = ref<MotivoCancelacion[]>([]);
+const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
+const isEmailModalVisible = ref(false);
+const isCalculadoraModalVisible = ref(false);
 
 const opcionesHorarios = [
   'Todo el día',
@@ -57,6 +65,8 @@ const observacionResultadoAuditoria = ref('');
 const finalCopago = ref(0);
 const finalEstudiosNoAutorizados = ref(0);
 const finalValorApb = ref(0);
+const finalEstudiosAutorizadosLista = ref<string[]>([]);
+const finalEstudiosNoAutorizadosLista = ref<string[]>([]);
 
 const openCambiarEstadoModal = () => {
   if (orden.value) {
@@ -64,6 +74,8 @@ const openCambiarEstadoModal = () => {
     finalEstudiosNoAutorizados.value = Number(orden.value.valor_estudios_no_autorizados || 0);
     finalValorApb.value = Number(orden.value.valor_apb || 0);
     observacionResultadoAuditoria.value = orden.value.observacion_resultado_auditoria || '';
+    finalEstudiosAutorizadosLista.value = [...(orden.value.estudios_autorizados || [])];
+    finalEstudiosNoAutorizadosLista.value = [...(orden.value.estudios_no_autorizados || [])];
   }
   isCambioEstadoVisible.value = true;
 };
@@ -146,6 +158,8 @@ const editForm = ref({
   contacto_celular: '',
   contacto_email: '',
   numeros_auditoria: [] as string[],
+  estudios_autorizados: [] as string[],
+  estudios_no_autorizados: [] as string[],
   valor_copago: 0,
   valor_estudios_no_autorizados: 0,
   abona_apb: false,
@@ -165,6 +179,8 @@ const handleOpenEditOrden = () => {
     contacto_celular: orden.value.contacto_celular || '',
     contacto_email: orden.value.contacto_email || '',
     numeros_auditoria: [...(orden.value.numeros_auditoria || [])],
+    estudios_autorizados: [...(orden.value.estudios_autorizados || [])],
+    estudios_no_autorizados: [...(orden.value.estudios_no_autorizados || [])],
     valor_copago: Number(orden.value.valor_copago) || 0,
     valor_estudios_no_autorizados: Number(orden.value.valor_estudios_no_autorizados) || 0,
     abona_apb: Boolean(orden.value.abona_apb),
@@ -187,6 +203,8 @@ const handleSaveEditOrden = async () => {
       contacto_celular: editForm.value.contacto_celular.trim() || null,
       contacto_email: editForm.value.contacto_email.trim() || null,
       numeros_auditoria: editForm.value.numeros_auditoria,
+      estudios_autorizados: editForm.value.estudios_autorizados,
+      estudios_no_autorizados: editForm.value.estudios_no_autorizados,
       valor_copago: editForm.value.valor_copago,
       valor_estudios_no_autorizados: editForm.value.valor_estudios_no_autorizados,
       abona_apb: editForm.value.abona_apb,
@@ -307,12 +325,14 @@ const handlePreviewAdjunto = async (adj: AdjuntoOrden) => {
 };
 
 onMounted(async () => {
-  const [mutRes, motRes] = await Promise.all([
+  const [mutRes, motRes, indRes] = await Promise.all([
     mutualesService.list(),
     configService.listMotivosCancelacion(true),
+    configService.listIndicaciones(true),
   ]);
   mutuales.value = mutRes;
   motivosCancelacion.value = motRes;
+  catalogoIndicaciones.value = indRes;
   loadOrden();
 });
 
@@ -356,7 +376,9 @@ const handleCambiarEstado = async () => {
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? observacionResultadoAuditoria.value.trim() : null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalCopago.value : null,
       selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizados.value : null,
-      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalValorApb.value : null
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalValorApb.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosAutorizadosLista.value : null,
+      selectedNuevoEstado.value === 'Auditoria Finalizada' ? finalEstudiosNoAutorizadosLista.value : null
     );
     toast.add({
       severity: 'success',
@@ -522,6 +544,31 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
     toast.add({ severity: 'error', summary: 'Error', detail: err.response?.data?.detail || 'No se pudo eliminar el archivo', life: 4000 });
   }
 };
+const handleChangeIndicaciones = async (payload: { ids: string[]; texto: string }) => {
+  if (!orden.value) return;
+  try {
+    await ordenesService.actualizarIndicaciones(ordenId, payload.ids, payload.texto);
+    orden.value.indicaciones_ids = payload.ids;
+    orden.value.indicaciones_texto = payload.texto;
+    toast.add({ severity: 'success', summary: 'Indicaciones Guardadas', detail: 'Se actualizaron las preparaciones de la orden', life: 2500 });
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron guardar las indicaciones', life: 3000 });
+  }
+};
+
+const handleEmailSent = (updated: OrdenMedicaDetail) => {
+  orden.value = updated;
+};
+
+const handleCancelarEnvioAuto = async () => {
+  try {
+    const updated = await ordenesService.cancelarEnvioAutomatico(ordenId);
+    orden.value = updated;
+    toast.add({ severity: 'info', summary: 'Envío Cancelado', detail: 'Se canceló el despacho automático del correo.', life: 3000 });
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo cancelar el envío automático', life: 3000 });
+  }
+};
 </script>
 
 <template>
@@ -611,9 +658,32 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
             @click="handleOpenEditOrden"
           />
 
+          <!-- Calculadora de Presupuesto de Estudios -->
+          <Button
+            v-if="featuresStore.isCalculadoraEnabled"
+            icon="pi pi-calculator"
+            severity="secondary"
+            outlined
+            size="small"
+            title="Calculadora de Estudios"
+            aria-label="Calculadora de Estudios"
+            @click="isCalculadoraModalVisible = true"
+          />
+
+          <!-- Ver / Despachar Correo ZeptoMail (Protegido por Rol o Permiso ordenes:mail) -->
+          <Button
+            v-if="featuresStore.isMailEnabled && (authStore.isAdmin || authStore.isAuditor || authStore.hasPermission('ordenes:mail'))"
+            :label="orden.mail_enviado ? 'Mail Enviado' : 'Notificar / Enviar Mail'"
+            :icon="orden.mail_enviado ? 'pi pi-check-circle' : 'pi pi-envelope'"
+            :severity="orden.mail_enviado ? 'success' : 'help'"
+            :outlined="!orden.mail_enviado"
+            size="small"
+            @click="isEmailModalVisible = true"
+          />
+
           <!-- Asignar Auditor -->
           <Button
-            v-if="authStore.isAdmin || authStore.hasPermission('ordenes:audit')"
+            v-if="featuresStore.isAsignarAuditorEnabled && (authStore.isAdmin || authStore.hasPermission('ordenes:audit'))"
             icon="pi pi-user-plus"
             label="Asignar Auditor"
             text
@@ -649,11 +719,11 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               </div>
               <div class="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                 <p class="font-bold text-slate-900">
-                  Total a abonar: ${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                  Total a abonar: ${{ (Number(orden.valor_copago || 0) + (featuresStore.isEstudiosAutorizacionEnabled ? Number(orden.valor_estudios_no_autorizados || 0) : 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                 </p>
                 <div class="text-[11px] text-slate-500 flex flex-wrap gap-x-2">
                   <span>Copago: <strong class="text-emerald-700">${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
-                  <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">
+                  <span v-if="featuresStore.isEstudiosAutorizacionEnabled && Number(orden.valor_estudios_no_autorizados || 0) > 0">
                     &bull; No Aut.: <strong class="text-amber-700">${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong>
                   </span>
                   <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0">
@@ -663,7 +733,7 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               </div>
               <p><span class="font-semibold">Prescripción:</span> {{ formatDate(orden.fecha_prescripcion) }}</p>
               <p><span class="font-semibold">Recetas Físicas:</span> {{ orden.cantidad_ordenes_fisicas }}</p>
-              <p v-if="orden.assigned_auditor"><span class="font-semibold">Auditor:</span> {{ orden.assigned_auditor.full_name }}</p>
+              <p v-if="featuresStore.isAsignarAuditorEnabled && orden.assigned_auditor"><span class="font-semibold">Auditor:</span> {{ orden.assigned_auditor.full_name }}</p>
             </div>
           </div>
 
@@ -676,6 +746,85 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
               <p><i class="pi pi-clock mr-1.5 text-slate-400"></i> {{ orden.contacto_horario || 'Sin horario preferido' }}</p>
               <p><i class="pi pi-envelope mr-1.5 text-slate-400"></i> {{ orden.contacto_email || orden.paciente?.email || 'Sin email' }}</p>
             </div>
+          </div>
+
+          <!-- Banner de Programación Automática de Mail (si está programado) -->
+          <div
+            v-if="featuresStore.isMailEnabled && orden.mail_programado_para && !orden.mail_enviado && !orden.mail_auto_cancelado"
+            class="bg-blue-50/95 p-4 rounded-xl border border-blue-300 shadow-sm space-y-2 text-xs"
+          >
+            <div class="flex items-center gap-2 text-blue-900 font-bold">
+              <i class="pi pi-clock text-blue-600 animate-pulse"></i>
+              <span>Envío Automático de Correo Programado</span>
+            </div>
+            <p class="text-blue-700 text-[11px]">
+              Se enviará automáticamente a las <strong>{{ formatDateTime(orden.mail_programado_para) }}</strong> a menos que lo desees frenar o enviar anticipadamente.
+            </p>
+            <div class="flex items-center gap-2 pt-1">
+              <Button
+                label="Enviar Ahora"
+                icon="pi pi-send"
+                size="small"
+                severity="primary"
+                class="text-xs py-1"
+                @click="isEmailModalVisible = true"
+              />
+              <Button
+                label="Frenar Automático"
+                icon="pi pi-ban"
+                size="small"
+                severity="danger"
+                outlined
+                class="text-xs py-1"
+                @click="handleCancelarEnvioAuto"
+              />
+            </div>
+          </div>
+
+          <!-- Prácticas Autorizadas y No Autorizadas -->
+          <div v-if="featuresStore.isEstudiosAutorizacionEnabled && ((orden.estudios_autorizados && orden.estudios_autorizados.length > 0) || (orden.estudios_no_autorizados && orden.estudios_no_autorizados.length > 0))" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Estudios Evaluados por Auditoría</h4>
+            <div class="space-y-2">
+              <div class="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                <span class="text-[10px] font-bold text-emerald-900 uppercase block mb-1">
+                  ✓ Autorizados ({{ (orden.estudios_autorizados || []).length }})
+                </span>
+                <div v-if="orden.estudios_autorizados && orden.estudios_autorizados.length > 0" class="flex flex-wrap gap-1">
+                  <span v-for="ea in orden.estudios_autorizados" :key="ea" class="px-2 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 font-semibold text-xs">
+                    {{ ea }}
+                  </span>
+                </div>
+                <span v-else class="text-xs text-emerald-700 italic">Todos los solicitados</span>
+              </div>
+
+              <div class="p-2.5 rounded-lg bg-red-50 border border-red-200">
+                <span class="text-[10px] font-bold text-red-900 uppercase block mb-1">
+                  ✕ No Autorizados ({{ (orden.estudios_no_autorizados || []).length }})
+                </span>
+                <div v-if="orden.estudios_no_autorizados && orden.estudios_no_autorizados.length > 0" class="flex flex-wrap gap-1">
+                  <span v-for="ena in orden.estudios_no_autorizados" :key="ena" class="px-2 py-0.5 rounded bg-white text-red-800 border border-red-200 font-semibold text-xs">
+                    {{ ena }}
+                  </span>
+                </div>
+                <span v-else class="text-xs text-slate-400 italic">Ninguno</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Indicaciones Clínicas de Preparación (Chips interactivos) -->
+          <div v-if="featuresStore.isIndicacionesEnabled" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="pi pi-book text-amber-600"></i> Indicaciones Clínicas
+              </h4>
+              <span class="text-[10px] text-slate-400">Preparación del paciente</span>
+            </div>
+            <IndicacionesChipsSelector
+              :model-value="orden.indicaciones_ids || []"
+              :texto-consolidado="orden.indicaciones_texto"
+              :indicaciones-disponibles="catalogoIndicaciones"
+              @change="handleChangeIndicaciones"
+            />
           </div>
 
           <!-- Códigos de Auditoría (Gestor interactivo) -->
@@ -1034,10 +1183,37 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
           </div>
         </div>
 
-        <div class="min-w-0">
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Estudios NO Autorizados ($)</label>
-          <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
-        </div>
+        <template v-if="featuresStore.isEstudiosAutorizacionEnabled">
+          <div class="space-y-2">
+            <div>
+              <label class="block text-xs font-semibold text-emerald-900 uppercase mb-1">
+                ✓ Estudios Autorizados (Separados por Enter o coma)
+              </label>
+              <Chips
+                v-model="editForm.estudios_autorizados"
+                separator=","
+                placeholder="Escriba el nombre del estudio autorizado..."
+                class="w-full text-xs"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-red-900 uppercase mb-1">
+                ✕ Estudios NO Autorizados (Separados por Enter o coma)
+              </label>
+              <Chips
+                v-model="editForm.estudios_no_autorizados"
+                separator=","
+                placeholder="Escriba el nombre del estudio rechazado..."
+                class="w-full text-xs"
+              />
+            </div>
+          </div>
+
+          <div class="min-w-0">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Valor Estudios NO Autorizados ($)</label>
+            <InputNumber v-model="editForm.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
+          </div>
+        </template>
 
         <div class="pt-2 border-t border-slate-200">
           <h5 class="text-xs font-bold text-slate-600 uppercase mb-2">Datos de Contacto</h5>
@@ -1186,18 +1362,46 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
             </label>
             <Textarea
               v-model="observacionResultadoAuditoria"
-              rows="3"
+              rows="2"
               class="w-full text-xs"
-              placeholder="Ej: Aprobada 100%. Se autorizan todas las prácticas solicitadas..."
+              placeholder="Ej: Aprobada 100%. Se autorizan las prácticas solicitadas..."
             />
           </div>
+
+          <!-- Estudios Autorizados y No Autorizados con Chips -->
+          <template v-if="featuresStore.isEstudiosAutorizacionEnabled">
+            <div class="space-y-2 pt-1 border-t border-blue-200/60">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center gap-1">
+                  <i class="pi pi-check text-emerald-600"></i> Estudios Autorizados (Separados por coma o Enter)
+                </label>
+                <Chips
+                  v-model="finalEstudiosAutorizadosLista"
+                  separator=","
+                  placeholder="Escriba un estudio y presione Enter o coma..."
+                  class="w-full text-xs"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-red-900 uppercase mb-1 flex items-center gap-1">
+                  <i class="pi pi-times text-red-600"></i> Estudios NO Autorizados (Separados por coma o Enter)
+                </label>
+                <Chips
+                  v-model="finalEstudiosNoAutorizadosLista"
+                  separator=","
+                  placeholder="Ej: Vitamina D, Hepatograma (presione Enter)..."
+                  class="w-full text-xs"
+                />
+              </div>
+            </div>
+          </template>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-blue-200/60">
             <div class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Copago Final ($)</label>
               <InputNumber v-model="finalCopago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
-            <div class="min-w-0">
+            <div v-if="featuresStore.isEstudiosAutorizacionEnabled" class="min-w-0">
               <label class="block text-[11px] font-bold text-blue-950 uppercase mb-1">Estudios No Aut. ($)</label>
               <InputNumber v-model="finalEstudiosNoAutorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
             </div>
@@ -1385,5 +1589,20 @@ const handleDeleteAdjunto = async (adjunto: AdjuntoOrden) => {
         <Button label="Guardar Llamada" icon="pi pi-check" severity="primary" :loading="isActionLoading" @click="handleSaveDirectLlamada" />
       </template>
     </Dialog>
+
+    <!-- Modal Despacho de Correo ZeptoMail -->
+    <EmailResolucionModal
+      v-if="orden"
+      v-model:visible="isEmailModalVisible"
+      :orden="orden"
+      @sent="handleEmailSent"
+    />
+
+    <!-- Modal Calculadora de Presupuesto de Estudios -->
+    <CalculadoraEstudiosModal
+      v-if="orden"
+      v-model:visible="isCalculadoraModalVisible"
+      :orden="orden"
+    />
   </div>
 </template>

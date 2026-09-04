@@ -207,6 +207,18 @@ class AuditoriaLogRead(BaseModel):
 
 
 # ==========================================
+# ESTUDIO DETALLE ITEM (CALCULADORA / AUDITORIA)
+# ==========================================
+class EstudioDetalleItem(BaseModel):
+    codigo: Optional[str] = Field(None, max_length=50, description="Código de la práctica (ej: 660001)")
+    nombre: str = Field(..., min_length=1, max_length=255, description="Nombre descriptivo de la práctica o estudio")
+    precio: Decimal = Field(default=Decimal("0.00"), ge=0, description="Precio particular si no está autorizado")
+    autorizado: bool = Field(default=True, description="Indica si la práctica está autorizada (true) o no autorizada (false)")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
 # ORDEN MEDICA SCHEMAS
 # ==========================================
 class OrdenMedicaBase(BaseModel):
@@ -237,6 +249,15 @@ class OrdenMedicaBase(BaseModel):
     )
     numeros_auditoria: List[str] = Field(
         default_factory=list, description="Lista de numeros/codigos de autorizacion de auditoria"
+    )
+    estudios_autorizados: List[str] = Field(
+        default_factory=list, description="Lista de estudios autorizados por la auditoría"
+    )
+    estudios_no_autorizados: List[str] = Field(
+        default_factory=list, description="Lista de estudios no autorizados / rechazados"
+    )
+    estudios_detalle: Optional[List[EstudioDetalleItem]] = Field(
+        default=None, description="Desglose detallado de estudios con código, nombre, precio y estado de autorización"
     )
     debe_orden_medica: bool = Field(
         default=False, description="Indica si el paciente debe la orden medica fisica (recibida digital/mail)"
@@ -277,6 +298,9 @@ class OrdenMedicaUpdate(BaseModel):
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: Optional[List[str]] = None
+    estudios_autorizados: Optional[List[str]] = None
+    estudios_no_autorizados: Optional[List[str]] = None
+    estudios_detalle: Optional[List[EstudioDetalleItem]] = None
     contacto_nombre: Optional[str] = None
     contacto_horario: Optional[str] = None
     contacto_telefono: Optional[str] = None
@@ -297,6 +321,15 @@ class OrdenMedicaCambioEstado(BaseModel):
     )
     observacion_resultado: Optional[str] = Field(
         None, description="Observacion o resultado comunicado al paciente al finalizar auditoria"
+    )
+    estudios_autorizados: Optional[List[str]] = Field(
+        None, description="Lista de estudios autorizados"
+    )
+    estudios_no_autorizados: Optional[List[str]] = Field(
+        None, description="Lista de estudios no autorizados"
+    )
+    estudios_detalle: Optional[List[EstudioDetalleItem]] = Field(
+        None, description="Desglose detallado de estudios con código, nombre, precio y autorización"
     )
     valor_copago: Optional[Decimal] = Field(
         None, ge=0, description="Monto actualizado del copago al finalizar auditoria"
@@ -327,7 +360,12 @@ class OrdenMedicaListItem(BaseModel):
     cantidad_ordenes_fisicas: int = 1
 
     numeros_auditoria: List[str] = Field(default_factory=list)
+    estudios_autorizados: List[str] = Field(default_factory=list)
+    estudios_no_autorizados: List[str] = Field(default_factory=list)
+    estudios_detalle: List[EstudioDetalleItem] = Field(default_factory=list)
     debe_orden_medica: bool = False
+    indicaciones_ids: List[str] = Field(default_factory=list)
+    mail_enviado: bool = False
     paciente: Optional[PacienteRead] = None
     sucursal: Optional[SucursalRead] = None
     created_by_user: Optional[UserReadSummary] = None
@@ -357,6 +395,9 @@ class OrdenMedicaDetail(BaseModel):
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: List[str] = Field(default_factory=list)
+    estudios_autorizados: List[str] = Field(default_factory=list)
+    estudios_no_autorizados: List[str] = Field(default_factory=list)
+    estudios_detalle: List[EstudioDetalleItem] = Field(default_factory=list)
     debe_orden_medica: bool = False
     contacto_nombre: Optional[str] = None
     contacto_horario: Optional[str] = None
@@ -366,6 +407,20 @@ class OrdenMedicaDetail(BaseModel):
     observaciones_ingreso: Optional[str] = None
     observacion_resultado_auditoria: Optional[str] = None
     motivo_cancelacion: Optional[str] = None
+
+    # Indicaciones clínicas y estado del correo
+    indicaciones_ids: List[str] = Field(default_factory=list)
+    indicaciones_texto: Optional[str] = None
+    mail_enviado: bool = False
+    mail_enviado_fecha: Optional[datetime] = None
+    mail_enviado_por_id: Optional[uuid.UUID] = None
+    mail_destinatario: Optional[str] = None
+    mail_asunto: Optional[str] = None
+    mail_cuerpo_html: Optional[str] = None
+    mail_message_id: Optional[str] = None
+    mail_programado_para: Optional[datetime] = None
+    mail_auto_cancelado: bool = False
+
     llamada_solicitud_completada: bool = False
     llamada_solicitud_fecha: Optional[datetime] = None
     llamada_solicitud_observacion: Optional[str] = None
@@ -402,3 +457,144 @@ class ConfiguracionAPBRead(BaseModel):
 
 class ConfiguracionAPBUpdate(BaseModel):
     valor_apb: Decimal = Field(..., ge=0, description="Nuevo valor de referencia del Acto Profesional Bioquímico (APB)")
+
+
+# ==========================================
+# FEATURE FLAGS / FUNCIONALIDADES DEL SISTEMA
+# ==========================================
+class SystemFeaturesConfig(BaseModel):
+    modulo_mail: bool = Field(default=False, description="Activa el módulo y despacho de correos electrónicos de resolución médica")
+    calculadora_estudios: bool = Field(default=False, description="Activa el botón y modal de calculadora interactiva de presupuestos")
+    estudios_autorizacion: bool = Field(default=False, description="Activa los campos clínicos de prácticas autorizadas y no autorizadas")
+    indicaciones_estudios: bool = Field(default=False, description="Activa la asignación y catálogo de indicaciones clínicas de preparación")
+    asignar_auditor: bool = Field(default=False, description="Activa la asignación de auditor médico a la orden médica")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SystemFeaturesConfigUpdate(BaseModel):
+    modulo_mail: Optional[bool] = None
+    calculadora_estudios: Optional[bool] = None
+    estudios_autorizacion: Optional[bool] = None
+    indicaciones_estudios: Optional[bool] = None
+    asignar_auditor: Optional[bool] = None
+
+
+# ==========================================
+# INDICACIONES DE ESTUDIOS SCHEMAS
+# ==========================================
+class IndicacionEstudioBase(BaseModel):
+    codigo: str = Field(..., min_length=2, max_length=50, description="Código único (ej: AYUNO_8HS)")
+    titulo: str = Field(..., min_length=2, max_length=150, description="Título visible en chip")
+    instrucciones: str = Field(..., min_length=5, description="Texto detallado de preparación clínica")
+    categoria: Optional[str] = Field(None, max_length=80, description="Categoría (Sangre, Orina, etc.)")
+    color: str = Field(default="info", max_length=30, description="Color de chip (info, warn, success, contrast, danger)")
+    orden_secuencia: int = Field(default=0, ge=0)
+    activa: bool = Field(default=True)
+
+
+class IndicacionEstudioCreate(IndicacionEstudioBase):
+    pass
+
+
+class IndicacionEstudioUpdate(BaseModel):
+    codigo: Optional[str] = Field(None, min_length=2, max_length=50)
+    titulo: Optional[str] = Field(None, min_length=2, max_length=150)
+    instrucciones: Optional[str] = None
+    categoria: Optional[str] = None
+    color: Optional[str] = None
+    orden_secuencia: Optional[int] = None
+    activa: Optional[bool] = None
+
+
+class IndicacionEstudioRead(IndicacionEstudioBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrdenActualizarIndicaciones(BaseModel):
+    indicaciones_ids: List[str] = Field(..., description="Lista de códigos o IDs de indicaciones asignadas")
+    indicaciones_texto: Optional[str] = Field(None, description="Texto consolidado y editable de indicaciones")
+
+
+# ==========================================
+# CONFIGURACIÓN Y DESPACHO DE EMAIL SCHEMAS
+# ==========================================
+class ConfiguracionMailAutomatizacionRead(BaseModel):
+    envio_automatico: bool = Field(..., description="Si el envío automático de mails está activo")
+    minutos_gracia: int = Field(..., description="Minutos de gracia programados antes del envío")
+    zeptomail_configurado: bool = Field(..., description="Indica si existe token válido de ZeptoMail")
+    remitente_email: str
+    remitente_nombre: str
+
+
+class ConfiguracionMailAutomatizacionUpdate(BaseModel):
+    envio_automatico: bool = Field(..., description="Habilitar o pausar envío automático")
+    minutos_gracia: int = Field(default=120, ge=1, le=1440, description="Minutos de gracia (1 a 1440)")
+
+
+class PreviewEmailResolucionRead(BaseModel):
+    destinatario_email: str
+    destinatario_nombre: str
+    asunto: str
+    cuerpo_html: str
+    tiene_email: bool
+    ya_enviado: bool
+    mail_enviado_fecha: Optional[datetime] = None
+    plantilla_id: Optional[uuid.UUID] = None
+    plantillas_disponibles: List["PlantillaEmailRead"] = []
+
+
+class EnviarEmailResolucionRequest(BaseModel):
+    destinatario_email: Optional[EmailStr] = None
+    asunto: Optional[str] = None
+    cuerpo_html: Optional[str] = None
+    plantilla_id: Optional[uuid.UUID] = None
+    observaciones_adicionales: Optional[str] = None
+
+
+
+# ==========================================
+# PLANTILLAS DE EMAIL SCHEMAS
+# ==========================================
+class PlantillaEmailBase(BaseModel):
+    codigo: str = Field(..., min_length=2, max_length=50)
+    nombre: str = Field(..., min_length=2, max_length=150)
+    asunto: str = Field(..., min_length=2, max_length=255)
+    cuerpo_html: str = Field(default="", description="Cuerpo HTML con soporte de placeholders")
+    es_default: bool = Field(default=False)
+    activa: bool = Field(default=True)
+
+
+class PlantillaEmailCreate(PlantillaEmailBase):
+    pass
+
+
+class PlantillaEmailUpdate(BaseModel):
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
+    asunto: Optional[str] = None
+    cuerpo_html: Optional[str] = None
+    es_default: Optional[bool] = None
+    activa: Optional[bool] = None
+
+
+class PlantillaEmailRead(PlantillaEmailBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrdenActualizarEstudiosAuditoria(BaseModel):
+    estudios_autorizados: Optional[List[str]] = Field(default=None)
+    estudios_no_autorizados: Optional[List[str]] = Field(default=None)
+    estudios_detalle: Optional[List[EstudioDetalleItem]] = Field(default=None)
+
+
+class OrdenActualizarEstudiosDetalle(BaseModel):
+    estudios_detalle: List[EstudioDetalleItem] = Field(..., description="Listado detallado de estudios")

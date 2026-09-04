@@ -2,11 +2,12 @@ import os
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy.orm import selectinload
 from backend.app.core.exceptions import (
     AppException,
     EntityAlreadyExistsException,
@@ -21,8 +22,10 @@ from backend.app.modules.ordenes.models import (
     EstadoOrden,
     EstadoOrdenConfig,
     EstadoSolicitudAuditoria,
+    IndicacionEstudio,
     MotivoCancelacion,
     OrdenMedica,
+    PlantillaEmail,
     RegistroLlamadaPaciente,
     ResultadoLlamada,
     TipoEstadoOrden,
@@ -38,8 +41,14 @@ from backend.app.modules.ordenes.schemas import (
     AuditoriaSolicitudResponder,
     ConfiguracionAPBRead,
     ConfiguracionAPBUpdate,
+    ConfiguracionMailAutomatizacionRead,
+    ConfiguracionMailAutomatizacionUpdate,
+    EnviarEmailResolucionRequest,
     EstadoOrdenConfigCreate,
     EstadoOrdenConfigUpdate,
+    IndicacionEstudioCreate,
+    IndicacionEstudioRead,
+    IndicacionEstudioUpdate,
     MotivoCancelacionCreate,
     MotivoCancelacionUpdate,
     OrdenLlamadaPendienteItem,
@@ -47,7 +56,13 @@ from backend.app.modules.ordenes.schemas import (
     OrdenMedicaCambioEstado,
     OrdenMedicaCreate,
     OrdenMedicaUpdate,
+    PlantillaEmailCreate,
+    PlantillaEmailRead,
+    PlantillaEmailUpdate,
+    PreviewEmailResolucionRead,
     RegistroLlamadaCreate,
+    SystemFeaturesConfig,
+    SystemFeaturesConfigUpdate,
 )
 
 from backend.app.modules.pacientes.repository import PacienteRepository
@@ -59,6 +74,53 @@ def _enum_str(v: Any) -> Optional[str]:
     if v is None:
         return None
     return v.value if hasattr(v, "value") else str(v)
+
+
+def _sincronizar_estudios_y_totales(
+    estudios_detalle: Optional[List[Any]],
+    estudios_autorizados: Optional[List[str]],
+    estudios_no_autorizados: Optional[List[str]],
+    valor_estudios_no_autorizados: Optional[Decimal],
+):
+    """
+    Sincroniza y autocalcula listas de nombres y monto de no autorizados
+    a partir del desglose JSON de estudios_detalle si se proporciona.
+    """
+    detalle_dicts = None
+    if estudios_detalle is not None:
+        detalle_dicts = []
+        for e in estudios_detalle:
+            if hasattr(e, "model_dump"):
+                d = e.model_dump(mode="json")
+            elif isinstance(e, dict):
+                d = dict(e)
+            else:
+                d = {"nombre": str(e), "precio": 0.0, "autorizado": True}
+            d["nombre"] = str(d.get("nombre") or "").strip()
+            d["codigo"] = str(d.get("codigo") or "").strip() if d.get("codigo") else None
+            try:
+                d["precio"] = float(d.get("precio") or 0.0)
+            except (ValueError, TypeError):
+                d["precio"] = 0.0
+            d["autorizado"] = bool(d.get("autorizado", True))
+            detalle_dicts.append(d)
+
+        # Si no se proveyeron listas explícitas de nombres, derivarlas automáticamente
+        if estudios_autorizados is None or len(estudios_autorizados) == 0:
+            estudios_autorizados = [
+                d["nombre"] for d in detalle_dicts if d["autorizado"] and d["nombre"]
+            ]
+        if estudios_no_autorizados is None or len(estudios_no_autorizados) == 0:
+            estudios_no_autorizados = [
+                d["nombre"] for d in detalle_dicts if not d["autorizado"] and d["nombre"]
+            ]
+        # Si no se pasó un valor específico o es 0, sumar precios de no autorizados
+        if valor_estudios_no_autorizados is None or valor_estudios_no_autorizados == Decimal("0.00"):
+            suma_no_aut = Decimal(str(sum(d["precio"] for d in detalle_dicts if not d["autorizado"])))
+            if suma_no_aut > Decimal("0.00") or valor_estudios_no_autorizados is None:
+                valor_estudios_no_autorizados = suma_no_aut
+
+    return detalle_dicts, estudios_autorizados, estudios_no_autorizados, valor_estudios_no_autorizados
 
 
 class OrdenMedicaService:
@@ -121,6 +183,18 @@ class OrdenMedicaService:
         # Generar numero correlativo unico
         nro_orden = await self.repo.generate_next_nro_orden()
 
+        (
+            detalle_dicts,
+            estudios_aut,
+            estudios_no_aut,
+            valor_no_aut,
+        ) = _sincronizar_estudios_y_totales(
+            estudios_detalle=dto.estudios_detalle,
+            estudios_autorizados=dto.estudios_autorizados,
+            estudios_no_autorizados=dto.estudios_no_autorizados,
+            valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+        )
+
         orden = OrdenMedica(
             nro_orden=nro_orden,
             paciente_id=dto.paciente_id,
@@ -132,11 +206,14 @@ class OrdenMedicaService:
             mutual=dto.mutual.strip().upper(),
             nro_afiliado=dto.nro_afiliado.strip() if dto.nro_afiliado else None,
             valor_copago=dto.valor_copago,
-            valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+            valor_estudios_no_autorizados=valor_no_aut or Decimal("0.00"),
             abona_apb=dto.abona_apb,
             valor_apb=dto.valor_apb if dto.abona_apb else Decimal("0.00"),
             fecha_vencimiento=dto.fecha_vencimiento,
             numeros_auditoria=dto.numeros_auditoria,
+            estudios_autorizados=estudios_aut or [],
+            estudios_no_autorizados=estudios_no_aut or [],
+            estudios_detalle=detalle_dicts or [],
             debe_orden_medica=dto.debe_orden_medica,
 
             contacto_nombre=dto.contacto_nombre.strip() if dto.contacto_nombre else None,
@@ -233,6 +310,37 @@ class OrdenMedicaService:
             if len(dto.numeros_auditoria) > 0 and orden.estado == EstadoOrden.INGRESO:
                 orden.estado = EstadoOrden.EN_AUDITORIA
                 diff["autotransicion_estado"] = EstadoOrden.EN_AUDITORIA.value
+
+        if dto.estudios_detalle is not None:
+            (
+                detalle_dicts,
+                estudios_aut,
+                estudios_no_aut,
+                valor_no_aut,
+            ) = _sincronizar_estudios_y_totales(
+                estudios_detalle=dto.estudios_detalle,
+                estudios_autorizados=dto.estudios_autorizados,
+                estudios_no_autorizados=dto.estudios_no_autorizados,
+                valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+            )
+            orden.estudios_detalle = detalle_dicts or []
+            diff["estudios_detalle"] = detalle_dicts or []
+            if estudios_aut is not None:
+                orden.estudios_autorizados = estudios_aut
+                diff["estudios_autorizados"] = estudios_aut
+            if estudios_no_aut is not None:
+                orden.estudios_no_autorizados = estudios_no_aut
+                diff["estudios_no_autorizados"] = estudios_no_aut
+            if valor_no_aut is not None:
+                orden.valor_estudios_no_autorizados = valor_no_aut
+                diff["valor_estudios_no_autorizados"] = str(valor_no_aut)
+        else:
+            if dto.estudios_autorizados is not None:
+                diff["estudios_autorizados"] = dto.estudios_autorizados
+                orden.estudios_autorizados = dto.estudios_autorizados
+            if dto.estudios_no_autorizados is not None:
+                diff["estudios_no_autorizados"] = dto.estudios_no_autorizados
+                orden.estudios_no_autorizados = dto.estudios_no_autorizados
 
 
         if dto.contacto_nombre is not None:
@@ -335,6 +443,24 @@ class OrdenMedicaService:
                 orden.observacion_resultado_auditoria = dto.motivo
             orden.llamada_finalizada_completada = False
 
+            # Programar envío automático de mail si está configurado
+            try:
+                stmt_mail_cfg = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
+                res_mail_cfg = await self.db.execute(stmt_mail_cfg)
+                cfg_obj = res_mail_cfg.scalar_one_or_none()
+                is_auto = cfg_obj and cfg_obj.valor.strip().lower() == "true"
+
+                if is_auto and not orden.mail_enviado:
+                    stmt_gracia = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "MINUTOS_GRACIA_ENVIO_MAIL")
+                    res_gracia = await self.db.execute(stmt_gracia)
+                    gracia_obj = res_gracia.scalar_one_or_none()
+                    minutos = int(gracia_obj.valor) if gracia_obj and gracia_obj.valor.isdigit() else 120
+                    from datetime import timezone, timedelta
+                    orden.mail_programado_para = datetime.now(timezone.utc) + timedelta(minutes=minutos)
+                    orden.mail_auto_cancelado = False
+            except Exception as e:
+                logger.warning(f"Error comprobando programacion automatica de mail: {e}")
+
         # Si se modificó copago o no autorizados al cambiar estado (ej: al finalizar auditoría)
         if dto.valor_copago is not None:
             orden.valor_copago = dto.valor_copago
@@ -342,6 +468,30 @@ class OrdenMedicaService:
             orden.valor_estudios_no_autorizados = dto.valor_estudios_no_autorizados
         if dto.valor_apb is not None:
             orden.valor_apb = dto.valor_apb
+        if getattr(dto, "estudios_detalle", None) is not None:
+            (
+                detalle_dicts,
+                estudios_aut,
+                estudios_no_aut,
+                valor_no_aut,
+            ) = _sincronizar_estudios_y_totales(
+                estudios_detalle=dto.estudios_detalle,
+                estudios_autorizados=dto.estudios_autorizados,
+                estudios_no_autorizados=dto.estudios_no_autorizados,
+                valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+            )
+            orden.estudios_detalle = detalle_dicts or []
+            if estudios_aut is not None:
+                orden.estudios_autorizados = estudios_aut
+            if estudios_no_aut is not None:
+                orden.estudios_no_autorizados = estudios_no_aut
+            if valor_no_aut is not None:
+                orden.valor_estudios_no_autorizados = valor_no_aut
+        else:
+            if dto.estudios_autorizados is not None:
+                orden.estudios_autorizados = dto.estudios_autorizados
+            if dto.estudios_no_autorizados is not None:
+                orden.estudios_no_autorizados = dto.estudios_no_autorizados
 
         # Si pasa a 'Solicitudes de auditoria', habilitar llamada
         if final_estado_enum == EstadoOrden.SOLICITUDES_AUDITORIA:
@@ -935,5 +1085,526 @@ class ConfiguracionSistemaService:
             updated_at=cfg.updated_at,
         )
 
+    FEATURE_KEYS = {
+        "modulo_mail": ("FEATURE_MODULO_MAIL", "Activa el módulo y despacho de correos electrónicos de resolución médica"),
+        "calculadora_estudios": ("FEATURE_CALCULADORA_ESTUDIOS", "Activa el botón y modal de calculadora interactiva de presupuestos"),
+        "estudios_autorizacion": ("FEATURE_ESTUDIOS_AUTORIZACION", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
+        "indicaciones_estudios": ("FEATURE_INDICACIONES_ESTUDIOS", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
+        "asignar_auditor": ("FEATURE_ASIGNAR_AUDITOR", "Activa la asignación de auditor médico a la orden médica"),
+    }
+
+    async def get_features(self) -> SystemFeaturesConfig:
+        stmt = select(ConfiguracionSistema).where(
+            ConfiguracionSistema.clave.in_([k[0] for k in self.FEATURE_KEYS.values()])
+        )
+        res = await self.db.execute(stmt)
+        rows = {r.clave: r.valor.lower() in ["true", "1", "yes", "si"] for r in res.scalars().all()}
+
+        return SystemFeaturesConfig(
+            modulo_mail=rows.get(self.FEATURE_KEYS["modulo_mail"][0], False),
+            calculadora_estudios=rows.get(self.FEATURE_KEYS["calculadora_estudios"][0], False),
+            estudios_autorizacion=rows.get(self.FEATURE_KEYS["estudios_autorizacion"][0], False),
+            indicaciones_estudios=rows.get(self.FEATURE_KEYS["indicaciones_estudios"][0], False),
+            asignar_auditor=rows.get(self.FEATURE_KEYS["asignar_auditor"][0], False),
+        )
+
+    async def update_features(self, dto: SystemFeaturesConfigUpdate) -> SystemFeaturesConfig:
+        for attr, (db_key, desc) in self.FEATURE_KEYS.items():
+            val = getattr(dto, attr, None)
+            if val is not None:
+                stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == db_key)
+                res = await self.db.execute(stmt)
+                cfg = res.scalar_one_or_none()
+                if not cfg:
+                    cfg = ConfiguracionSistema(
+                        clave=db_key,
+                        valor="true" if val else "false",
+                        descripcion=desc,
+                    )
+                    self.db.add(cfg)
+                else:
+                    cfg.valor = "true" if val else "false"
+        await self.db.commit()
+        return await self.get_features()
 
 
+
+
+
+
+class IndicacionEstudioService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def list_indicaciones(self, only_active: bool = False) -> List[IndicacionEstudio]:
+        stmt = select(IndicacionEstudio).order_by(IndicacionEstudio.orden_secuencia.asc(), IndicacionEstudio.titulo.asc())
+        if only_active:
+            stmt = stmt.where(IndicacionEstudio.activa == True)
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
+
+    async def get_by_id(self, indicacion_id: uuid.UUID) -> IndicacionEstudio:
+        stmt = select(IndicacionEstudio).where(IndicacionEstudio.id == indicacion_id)
+        res = await self.db.execute(stmt)
+        ind = res.scalar_one_or_none()
+        if not ind:
+            raise EntityNotFoundException("IndicacionEstudio", indicacion_id)
+        return ind
+
+    async def create_indicacion(self, dto: IndicacionEstudioCreate) -> IndicacionEstudio:
+        cod = dto.codigo.strip().upper()
+        stmt = select(IndicacionEstudio).where(IndicacionEstudio.codigo == cod)
+        res = await self.db.execute(stmt)
+        if res.scalar_one_or_none():
+            raise EntityAlreadyExistsException("IndicacionEstudio", "codigo", cod)
+
+        ind = IndicacionEstudio(
+            codigo=cod,
+            titulo=dto.titulo.strip(),
+            instrucciones=dto.instrucciones.strip(),
+            categoria=dto.categoria.strip() if dto.categoria else None,
+            color=dto.color.strip() if dto.color else "info",
+            orden_secuencia=dto.orden_secuencia,
+            activa=dto.activa,
+        )
+        self.db.add(ind)
+        await self.db.commit()
+        await self.db.refresh(ind)
+        return ind
+
+    async def update_indicacion(self, indicacion_id: uuid.UUID, dto: IndicacionEstudioUpdate) -> IndicacionEstudio:
+        ind = await self.get_by_id(indicacion_id)
+        if dto.codigo is not None:
+            cod = dto.codigo.strip().upper()
+            if cod != ind.codigo:
+                stmt = select(IndicacionEstudio).where(IndicacionEstudio.codigo == cod)
+                res = await self.db.execute(stmt)
+                if res.scalar_one_or_none():
+                    raise EntityAlreadyExistsException("IndicacionEstudio", "codigo", cod)
+                ind.codigo = cod
+        if dto.titulo is not None:
+            ind.titulo = dto.titulo.strip()
+        if dto.instrucciones is not None:
+            ind.instrucciones = dto.instrucciones.strip()
+        if dto.categoria is not None:
+            ind.categoria = dto.categoria.strip() if dto.categoria else None
+        if dto.color is not None:
+            ind.color = dto.color.strip()
+        if dto.orden_secuencia is not None:
+            ind.orden_secuencia = dto.orden_secuencia
+        if dto.activa is not None:
+            ind.activa = dto.activa
+
+        await self.db.commit()
+        await self.db.refresh(ind)
+        return ind
+
+    async def delete_indicacion(self, indicacion_id: uuid.UUID) -> None:
+        ind = await self.get_by_id(indicacion_id)
+        await self.db.delete(ind)
+        await self.db.commit()
+
+
+class EmailResolucionService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_config_automatizacion(self) -> ConfiguracionMailAutomatizacionRead:
+        stmt_auto = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
+        res_auto = await self.db.execute(stmt_auto)
+        cfg_auto = res_auto.scalar_one_or_none()
+        envio_auto = (cfg_auto.valor.strip().lower() == "true") if cfg_auto else False
+
+        stmt_gracia = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "MINUTOS_GRACIA_ENVIO_MAIL")
+        res_gracia = await self.db.execute(stmt_gracia)
+        cfg_gracia = res_gracia.scalar_one_or_none()
+        minutos = int(cfg_gracia.valor) if cfg_gracia and cfg_gracia.valor.isdigit() else 120
+
+        from backend.app.core.zeptomail import zepto_mail_service
+        return ConfiguracionMailAutomatizacionRead(
+            envio_automatico=envio_auto,
+            minutos_gracia=minutos,
+            zeptomail_configurado=zepto_mail_service.is_configured,
+            remitente_email=zepto_mail_service.from_email,
+            remitente_nombre=zepto_mail_service.from_name,
+        )
+
+    async def update_config_automatizacion(self, dto: ConfiguracionMailAutomatizacionUpdate) -> ConfiguracionMailAutomatizacionRead:
+        stmt_auto = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
+        res_auto = await self.db.execute(stmt_auto)
+        cfg_auto = res_auto.scalar_one_or_none()
+        val_auto_str = "true" if dto.envio_automatico else "false"
+        if not cfg_auto:
+            self.db.add(ConfiguracionSistema(clave="ENVIO_MAIL_AUTOMATICO", valor=val_auto_str, descripcion="Envio automatico de emails"))
+        else:
+            cfg_auto.valor = val_auto_str
+
+        stmt_gracia = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "MINUTOS_GRACIA_ENVIO_MAIL")
+        res_gracia = await self.db.execute(stmt_gracia)
+        cfg_gracia = res_gracia.scalar_one_or_none()
+        val_gracia_str = str(dto.minutos_gracia)
+        if not cfg_gracia:
+            self.db.add(ConfiguracionSistema(clave="MINUTOS_GRACIA_ENVIO_MAIL", valor=val_gracia_str, descripcion="Minutos de gracia"))
+        else:
+            cfg_gracia.valor = val_gracia_str
+
+        await self.db.commit()
+        return await self.get_config_automatizacion()
+
+    async def build_preview_email(self, orden_id: uuid.UUID) -> PreviewEmailResolucionRead:
+        stmt = (
+            select(OrdenMedica)
+            .where(OrdenMedica.id == orden_id)
+            .options(
+                selectinload(OrdenMedica.paciente),
+                selectinload(OrdenMedica.sucursal),
+            )
+        )
+        res = await self.db.execute(stmt)
+        orden = res.scalar_one_or_none()
+        if not orden:
+            raise EntityNotFoundException("OrdenMedica", orden_id)
+
+        destinatario_email = (orden.contacto_email or (orden.paciente.email if orden.paciente else None) or "").strip().lower()
+        paciente_nombre = orden.contacto_nombre or (f"{orden.paciente.nombres} {orden.paciente.apellidos}" if orden.paciente else "Paciente")
+        asunto = f"Resolución de Auditoría Médica - Orden N° {orden.nro_orden}"
+
+        copago = Decimal(str(orden.valor_copago or 0))
+        estudios_no = Decimal(str(orden.valor_estudios_no_autorizados or 0))
+        apb = Decimal(str(orden.valor_apb or 0))
+        total_abonar = copago + estudios_no + apb
+
+        resolucion_texto = orden.observacion_resultado_auditoria or "Auditoría médica aprobada. Se autorizan las prácticas solicitadas para su realización."
+
+        # Cargar plantillas disponibles
+        stmt_tpls = select(PlantillaEmail).where(PlantillaEmail.activa == True).order_by(PlantillaEmail.es_default.desc(), PlantillaEmail.nombre.asc())
+        res_tpls = await self.db.execute(stmt_tpls)
+        plantillas_list = list(res_tpls.scalars().all())
+
+        tpl_default = next((t for t in plantillas_list if t.es_default), None)
+        tpl_custom_html = tpl_default.cuerpo_html if (tpl_default and tpl_default.cuerpo_html and tpl_default.cuerpo_html.strip()) else None
+
+        from backend.app.core.templates_email import generar_plantilla_email_resolucion
+        cuerpo_html = generar_plantilla_email_resolucion(
+            paciente_nombre=paciente_nombre,
+            nro_orden=orden.nro_orden,
+            mutual_nombre=orden.mutual,
+            observacion_resolucion=resolucion_texto,
+            copago=copago,
+            estudios_no_autorizados_valor=estudios_no,
+            valor_apb=apb,
+            total_abonar=total_abonar,
+            indicaciones_texto=orden.indicaciones_texto,
+            sucursal_nombre=orden.sucursal.nombre if orden.sucursal else "Sede Central",
+            contacto_telefono=orden.contacto_telefono or orden.contacto_celular,
+            lista_estudios_autorizados=orden.estudios_autorizados or [],
+            lista_estudios_no_autorizados=orden.estudios_no_autorizados or [],
+            cuerpo_template_custom=tpl_custom_html,
+        )
+
+        from backend.app.modules.ordenes.schemas import PlantillaEmailRead
+        return PreviewEmailResolucionRead(
+            destinatario_email=destinatario_email,
+            destinatario_nombre=paciente_nombre,
+            asunto=asunto,
+            cuerpo_html=cuerpo_html,
+            tiene_email=bool(destinatario_email),
+            ya_enviado=orden.mail_enviado,
+            mail_enviado_fecha=orden.mail_enviado_fecha,
+            plantilla_id=tpl_default.id if tpl_default else None,
+            plantillas_disponibles=[PlantillaEmailRead.model_validate(t) for t in plantillas_list],
+        )
+
+    async def enviar_email_resolucion(
+        self,
+        orden_id: uuid.UUID,
+        dto: EnviarEmailResolucionRequest,
+        current_user: User,
+        client_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> OrdenMedica:
+        stmt = (
+            select(OrdenMedica)
+            .where(OrdenMedica.id == orden_id)
+            .options(
+                selectinload(OrdenMedica.paciente),
+                selectinload(OrdenMedica.sucursal),
+            )
+        )
+        res = await self.db.execute(stmt)
+        orden = res.scalar_one_or_none()
+        if not orden:
+            raise EntityNotFoundException("OrdenMedica", orden_id)
+
+        target_email = dto.destinatario_email or orden.contacto_email or (orden.paciente.email if orden.paciente else None)
+        if not target_email or not str(target_email).strip():
+            raise AppException(status_code=400, detail="La orden médica no cuenta con una dirección de correo válida para el envío.")
+
+        target_email = str(target_email).strip().lower()
+        paciente_nombre = orden.contacto_nombre or (f"{orden.paciente.nombres} {orden.paciente.apellidos}" if orden.paciente else "Paciente")
+        asunto = (dto.asunto or f"Resolución de Auditoría Médica - Orden N° {orden.nro_orden}").strip()
+
+        copago = Decimal(str(orden.valor_copago or 0))
+        estudios_no = Decimal(str(orden.valor_estudios_no_autorizados or 0))
+        apb = Decimal(str(orden.valor_apb or 0))
+        total_abonar = copago + estudios_no + apb
+
+        if dto.cuerpo_html and dto.cuerpo_html.strip():
+            cuerpo_html = dto.cuerpo_html.strip()
+        else:
+            resolucion_texto = orden.observacion_resultado_auditoria or "Auditoría médica aprobada."
+            tpl_custom_html = None
+            if dto.plantilla_id:
+                stmt_t = select(PlantillaEmail).where(PlantillaEmail.id == dto.plantilla_id)
+                res_t = await self.db.execute(stmt_t)
+                t_obj = res_t.scalar_one_or_none()
+                if t_obj and t_obj.cuerpo_html and t_obj.cuerpo_html.strip():
+                    tpl_custom_html = t_obj.cuerpo_html
+
+            from backend.app.core.templates_email import generar_plantilla_email_resolucion
+            cuerpo_html = generar_plantilla_email_resolucion(
+                paciente_nombre=paciente_nombre,
+                nro_orden=orden.nro_orden,
+                mutual_nombre=orden.mutual,
+                observacion_resolucion=resolucion_texto,
+                copago=copago,
+                estudios_no_autorizados_valor=estudios_no,
+                valor_apb=apb,
+                total_abonar=total_abonar,
+                indicaciones_texto=orden.indicaciones_texto,
+                sucursal_nombre=orden.sucursal.nombre if orden.sucursal else "Sede Central",
+                contacto_telefono=orden.contacto_telefono or orden.contacto_celular,
+                lista_estudios_autorizados=orden.estudios_autorizados or [],
+                lista_estudios_no_autorizados=orden.estudios_no_autorizados or [],
+                cuerpo_template_custom=tpl_custom_html,
+            )
+
+        from backend.app.core.zeptomail import zepto_mail_service
+        resultado = await zepto_mail_service.enviar_correo(
+            destinatario_email=target_email,
+            destinatario_nombre=paciente_nombre,
+            asunto=asunto,
+            cuerpo_html=cuerpo_html,
+        )
+
+        if not resultado.get("success"):
+            raise AppException(status_code=502, detail=f"No se pudo despachar el correo: {resultado.get('message')}")
+
+        from datetime import timezone
+        ahora = datetime.now(timezone.utc)
+        orden.mail_enviado = True
+        orden.mail_enviado_fecha = ahora
+        orden.mail_enviado_por_id = current_user.id
+        orden.mail_destinatario = target_email
+        orden.mail_asunto = asunto
+        orden.mail_cuerpo_html = cuerpo_html
+        orden.mail_message_id = resultado.get("message_id")
+        orden.mail_programado_para = None  # Ya no requiere despacho programado
+
+        # Bitácora inmutable
+        self.db.add(
+            AuditoriaLog(
+                orden_id=orden.id,
+                user_id=current_user.id,
+                accion="ENVIO_MAIL_RESOLUCION",
+                estado_anterior=orden.estado.value,
+                estado_nuevo=orden.estado.value,
+                detalles={
+                    "destinatario": target_email,
+                    "asunto": asunto,
+                    "message_id": resultado.get("message_id"),
+                    "mock": resultado.get("mock", False),
+                    "observaciones": dto.observaciones_adicionales,
+                },
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
+        )
+
+        await self.db.commit()
+        await self.db.refresh(orden)
+        logger.info(f"Correo de resolucion despachado y registrado para orden {orden.nro_orden}")
+        return orden
+
+    async def cancelar_envio_automatico(
+        self,
+        orden_id: uuid.UUID,
+        current_user: User,
+        client_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> OrdenMedica:
+        stmt = select(OrdenMedica).where(OrdenMedica.id == orden_id)
+        res = await self.db.execute(stmt)
+        orden = res.scalar_one_or_none()
+        if not orden:
+            raise EntityNotFoundException("OrdenMedica", orden_id)
+
+        orden.mail_auto_cancelado = True
+        orden.mail_programado_para = None
+
+        self.db.add(
+            AuditoriaLog(
+                orden_id=orden.id,
+                user_id=current_user.id,
+                accion="CANCELACION_ENVIO_AUTO_MAIL",
+                estado_anterior=orden.estado.value,
+                estado_nuevo=orden.estado.value,
+                detalles={"mensaje": "Operador frenó el despacho automático del correo"},
+                ip_address=client_ip,
+                user_agent=user_agent,
+            )
+        )
+        await self.db.commit()
+        await self.db.refresh(orden)
+        return orden
+
+    async def actualizar_indicaciones_orden(
+        self,
+        orden_id: uuid.UUID,
+        indicaciones_ids: List[str],
+        indicaciones_texto: Optional[str],
+        current_user: User,
+    ) -> OrdenMedica:
+        stmt = select(OrdenMedica).where(OrdenMedica.id == orden_id)
+        res = await self.db.execute(stmt)
+        orden = res.scalar_one_or_none()
+        if not orden:
+            raise EntityNotFoundException("OrdenMedica", orden_id)
+
+        orden.indicaciones_ids = indicaciones_ids
+        if indicaciones_texto is not None:
+            orden.indicaciones_texto = indicaciones_texto
+
+        await self.db.commit()
+        await self.db.refresh(orden)
+        return orden
+
+    async def actualizar_estudios_auditoria(
+        self,
+        orden_id: uuid.UUID,
+        estudios_autorizados: Optional[List[str]],
+        estudios_no_autorizados: Optional[List[str]],
+        current_user: User,
+        estudios_detalle: Optional[List[Any]] = None,
+    ) -> OrdenMedica:
+        stmt = select(OrdenMedica).where(OrdenMedica.id == orden_id)
+        res = await self.db.execute(stmt)
+        orden = res.scalar_one_or_none()
+        if not orden:
+            raise EntityNotFoundException("OrdenMedica", orden_id)
+
+        if estudios_detalle is not None:
+            (
+                detalle_dicts,
+                estudios_aut,
+                estudios_no_aut,
+                valor_no_aut,
+            ) = _sincronizar_estudios_y_totales(
+                estudios_detalle=estudios_detalle,
+                estudios_autorizados=estudios_autorizados,
+                estudios_no_autorizados=estudios_no_autorizados,
+                valor_estudios_no_autorizados=None,
+            )
+            orden.estudios_detalle = detalle_dicts or []
+            if estudios_aut is not None:
+                orden.estudios_autorizados = [s.strip() for s in estudios_aut if s.strip()]
+            if estudios_no_aut is not None:
+                orden.estudios_no_autorizados = [s.strip() for s in estudios_no_aut if s.strip()]
+            if valor_no_aut is not None:
+                orden.valor_estudios_no_autorizados = valor_no_aut
+        else:
+            if estudios_autorizados is not None:
+                orden.estudios_autorizados = [s.strip() for s in estudios_autorizados if s.strip()]
+            if estudios_no_autorizados is not None:
+                orden.estudios_no_autorizados = [s.strip() for s in estudios_no_autorizados if s.strip()]
+
+        await self.db.commit()
+        await self.db.refresh(orden)
+        return orden
+
+
+class PlantillaEmailService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def list_plantillas(self, only_active: bool = False) -> List[PlantillaEmail]:
+        stmt = select(PlantillaEmail).order_by(PlantillaEmail.es_default.desc(), PlantillaEmail.nombre.asc())
+        if only_active:
+            stmt = stmt.where(PlantillaEmail.activa == True)
+        res = await self.db.execute(stmt)
+        return list(res.scalars().all())
+
+    async def get_by_id(self, plantilla_id: uuid.UUID) -> PlantillaEmail:
+        stmt = select(PlantillaEmail).where(PlantillaEmail.id == plantilla_id)
+        res = await self.db.execute(stmt)
+        tpl = res.scalar_one_or_none()
+        if not tpl:
+            raise EntityNotFoundException("PlantillaEmail", plantilla_id)
+        return tpl
+
+    async def create_plantilla(self, dto: PlantillaEmailCreate) -> PlantillaEmail:
+        cod = dto.codigo.strip().upper()
+        stmt = select(PlantillaEmail).where(PlantillaEmail.codigo == cod)
+        res = await self.db.execute(stmt)
+        if res.scalar_one_or_none():
+            raise EntityAlreadyExistsException("PlantillaEmail", "codigo", cod)
+
+        if dto.es_default:
+            # Desmarcar default previo
+            await self.db.execute(
+                select(PlantillaEmail).where(PlantillaEmail.es_default == True)
+            )
+            # update
+            from sqlalchemy import update
+            await self.db.execute(update(PlantillaEmail).values(es_default=False))
+
+        tpl = PlantillaEmail(
+            codigo=cod,
+            nombre=dto.nombre.strip(),
+            asunto=dto.asunto.strip(),
+            cuerpo_html=dto.cuerpo_html or "",
+            es_default=dto.es_default,
+            activa=dto.activa,
+        )
+        self.db.add(tpl)
+        await self.db.commit()
+        await self.db.refresh(tpl)
+        return tpl
+
+    async def update_plantilla(self, plantilla_id: uuid.UUID, dto: PlantillaEmailUpdate) -> PlantillaEmail:
+        tpl = await self.get_by_id(plantilla_id)
+        if dto.codigo is not None:
+            cod = dto.codigo.strip().upper()
+            if cod != tpl.codigo:
+                stmt = select(PlantillaEmail).where(PlantillaEmail.codigo == cod)
+                res = await self.db.execute(stmt)
+                if res.scalar_one_or_none():
+                    raise EntityAlreadyExistsException("PlantillaEmail", "codigo", cod)
+                tpl.codigo = cod
+
+        if dto.es_default:
+            from sqlalchemy import update
+            await self.db.execute(update(PlantillaEmail).values(es_default=False))
+            tpl.es_default = True
+        elif dto.es_default is False:
+            tpl.es_default = False
+
+        if dto.nombre is not None:
+            tpl.nombre = dto.nombre.strip()
+        if dto.asunto is not None:
+            tpl.asunto = dto.asunto.strip()
+        if dto.cuerpo_html is not None:
+            tpl.cuerpo_html = dto.cuerpo_html
+        if dto.activa is not None:
+            tpl.activa = dto.activa
+
+        await self.db.commit()
+        await self.db.refresh(tpl)
+        return tpl
+
+    async def delete_plantilla(self, plantilla_id: uuid.UUID) -> None:
+        tpl = await self.get_by_id(plantilla_id)
+        if tpl.es_default:
+            raise ForbiddenActionException("No se puede eliminar la plantilla de correo predeterminada del sistema")
+        await self.db.delete(tpl)
+        await self.db.commit()

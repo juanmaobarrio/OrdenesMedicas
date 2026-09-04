@@ -595,3 +595,126 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - El monto total a abonar por el paciente se consolida de forma estricta y transparente en todas las vistas:
     $$\text{Total a Abonar} = \text{Copago/Bono} + \text{Estudios No Autorizados} + \text{APB}$$
   - Visible en el formulario de creación (tarjeta resumen en tiempo real), tabla de órdenes (columna de Valores), panel lateral de expediente, vista completa de orden, modal de edición, modal de finalización de auditoría y reportes exportados en CSV/Excel.
+
+
+### 14.9 Catálogo de Indicaciones Preescritas, Notificación por Correo (ZeptoMail) y Automatización Programable
+
+- **Catálogo Administrable de Indicaciones de Preparación (`indicaciones_estudios`):**
+  - Permite gestionar instrucciones clínicas normalizadas (ayuno, recolección de orina, curvas, suspensión de medicación previa).
+  - Cada indicación cuenta con `codigo`, `titulo` (para chip visual), `instrucciones` detalladas, `categoria` y `color` de distinción.
+  - Endpoints REST: `GET /api/v1/config/indicaciones`, `POST /api/v1/config/indicaciones`, `PUT /api/v1/config/indicaciones/{id}` y `DELETE /api/v1/config/indicaciones/{id}`.
+- **Selector Flexible de Indicaciones en el Expediente (Chips):**
+  - Componente reutilizable `IndicacionesChipsSelector.vue` integrado en el panel maestro-detalle (`OrdenDetailPanel.vue`) y en la vista completa (`OrdenDetailView.vue`).
+  - Los operadores y auditores pueden asociar o quitar indicaciones clínicas con chips rápidos en cualquier etapa del ciclo de vida, generando y editando un texto de instrucciones consolidado (`PUT /api/v1/ordenes/{id}/indicaciones`).
+- **Plantilla HTML Corporativa y Previsualización con Editor:**
+  - Generador de correo transaccional `backend/app/core/templates_email.py` con diseño responsive corporativo para Gmail, Outlook y móviles.
+  - Incluye: membrete del laboratorio, datos del paciente y N° de orden, observación médica de resolución, desglose estricto del **Total a Abonar** (Copago + No autorizados + APB), bloque destacado de **Indicaciones de Preparación**, y nota de contacto telefónico.
+  - Modal `EmailResolucionModal.vue` que permite previsualizar el correo renderizado, alternar a edición de código HTML/texto, validar o ingresar la dirección de correo y despachar el mensaje.
+- **Integración con ZeptoMail de Zoho (`backend/app/core/zeptomail.py`):**
+  - Cliente HTTP asíncrono con `httpx` que conecta con la API REST de ZeptoMail (`POST /api/v1/ordenes/{id}/enviar-email`).
+  - En entornos de desarrollo o sin API Token configurado, opera en **modo simulación / mock** registrando en log sin generar caídas.
+  - Al enviarse, marca `mail_enviado = true`, guarda fecha y usuario en `mail_enviado_fecha` y `mail_enviado_por_id`, almacena el `mail_message_id` para trazabilidad y asienta el evento en el Audit Trail (`AuditoriaLog`).
+- **Control de Automatización: Modo Manual vs Automático con Ventana de Gracia:**
+  - Parámetros persistidos en `configuracion_sistema`: `ENVIO_MAIL_AUTOMATICO` (default `false`) y `MINUTOS_GRACIA_ENVIO_MAIL` (default `120`).
+  - Pestaña de administración en **Configuración** (`/configuracion`) con switch de control y selector de minutos de gracia.
+  - En modo automático, al pasar una orden a `Auditoria Finalizada`, se calcula `mail_programado_para`. El expediente muestra un banner con cuenta regresiva, botón para **"Enviar Ahora"** y botón para **"Frenar / Cancelar Envío Automático"** (`POST /api/v1/ordenes/{id}/cancelar-envio-automatico`).
+- **Preservación Estricta de la Llamada Directa:**
+  - Enviar o despachar el correo no altera `llamada_finalizada_completada`. La orden se mantiene de forma inalterable en la bandeja de **Llamadas Pendientes**, garantizando la comunicación telefónica directa con el paciente según el protocolo de la clínica.
+
+
+### 14.10 Discriminación de Estudios Autorizados / No Autorizados y Gestor de Plantillas de Correo
+
+- **Campos de Estudios Autorizados y No Autorizados (`estudios_autorizados` y `estudios_no_autorizados`):**
+  - Incorporados como columnas `JSONB` en `ordenes_medicas`.
+  - Permiten registrar listas de nombres de estudios separados por coma o tecla Enter mediante componentes `Chips` de PrimeVue.
+  - Disponibles y sincronizados en:
+    - Modal de transición a **Auditoría Finalizada** (se cargan en el momento de dictaminar la resolución).
+    - Modal de **Editar Datos** de la orden.
+    - Ficha y panel del expediente (`OrdenDetailPanel.vue` y `OrdenDetailView.vue`) con tarjetas visuales verdes (Autorizados) y rojas (No Autorizados).
+    - Endpoint dedicado: `PUT /api/v1/ordenes/{id}/estudios-auditoria`.
+- **Inclusión en el Correo Electrónico:**
+  - El generador de correo HTML (`backend/app/core/templates_email.py`) renderiza dos bloques destacados:
+    1. **✓ Estudios Autorizados por la Mutual:** Listado separado por coma o indicación de 100% cubierto.
+    2. **✕ Estudios No Autorizados (a cargo del paciente):** Listado destacado en rojo claro de las prácticas que el paciente debe abonar de forma particular, enlazado directamente con el importe de *Estudios No Autorizados ($)* en la tabla de desglose.
+- **Catálogo Administrable de Plantillas de Correo (`plantillas_email`):**
+  - Módulo en la pestaña **Automatización y Correos** de **Configuración** (`/configuracion`).
+  - Permite crear múltiples plantillas con nombre descriptivo, código único, asunto por defecto y cuerpo HTML editable con variables dinámicas:
+    - `{{paciente_nombre}}`, `{{nro_orden}}`, `{{mutual}}`, `{{observacion_resultado}}`, `{{copago}}`, `{{estudios_no_autorizados_valor}}`, `{{valor_apb}}`, `{{total_abonar}}`, `{{estudios_autorizados}}`, `{{estudios_no_autorizados}}`, `{{indicaciones}}`, `{{sucursal_nombre}}`.
+  - Soporte de **Plantilla Predeterminada (`es_default`)** y fallback elegante al diseño corporativo responsivo.
+  - Selector desplegable de plantillas en el modal de despacho (`EmailResolucionModal.vue`), permitiendo al usuario cambiar de plantilla para un paciente específico al vuelo antes de despachar el correo.
+
+
+### 14.11 Permiso Atómico `ordenes:mail` y Editor Completo de Plantillas con Ayuda Memoria
+
+- **Nuevo Permiso Atómico `ordenes:mail`:**
+  - Código: `ordenes:mail` (Módulo: `ordenes`).
+  - Descripción: *Previsualización y envío de correos electrónicos a pacientes*.
+  - Asignado por defecto a los roles `ADMIN` y `AUDITOR`.
+  - Visible y configurable en el selector de permisos del módulo de **Roles y Permisos (RBAC)** en `/users`.
+  - Los endpoints `POST /api/v1/ordenes/{id}/enviar-email` y `POST /api/v1/ordenes/{id}/cancelar-envio-automatico` ahora exigen contar con `ordenes:mail` o `ordenes:audit`.
+  - En la interfaz web (`OrdenDetailPanel.vue` y `OrdenDetailView.vue`), el botón **"Notificar / Enviar Mail"** se oculta automáticamente para aquellos usuarios que no posean el permiso.
+- **Carga del Código HTML Completo en la Plantilla Predeterminada:**
+  - Se incorporó la función `obtener_plantilla_base_html()` y el endpoint `GET /api/v1/config/plantillas-email-codigo-base`.
+  - Al abrir a editar la plantilla predeterminada (`DEFAULT`), el editor muestra de forma completa e inmediata todo el código HTML base profesional.
+  - Botón **"Cargar HTML Base"** disponible en el modal para restaurar o inicializar cualquier plantilla con la estructura oficial del laboratorio.
+- **Popup de Ayuda Memoria de Variables Dinámicas:**
+  - Botón interactivo **"Variables Disponibles (Ayuda)"** en el modal de plantillas de correo.
+  - Despliega un modal con la lista de marcadores soportados:
+    - `{{paciente_nombre}}`, `{{nro_orden}}`, `{{mutual}}`, `{{estudios_autorizados}}`, `{{estudios_no_autorizados}}`, `{{observacion_resultado}}`, `{{copago}}`, `{{estudios_no_autorizados_valor}}`, `{{valor_apb}}`, `{{total_abonar}}`, `{{indicaciones}}`, `{{sucursal_nombre}}`.
+
+
+---
+
+## 15. RESOLUCIÓN DE ACCESO EN RED LOCAL (LAN / MULTI-MÁQUINA)
+
+### Diagnóstico de Acceso Remoto
+Al acceder desde otra PC en la misma red LAN a través de `http://192.168.0.212:5173`:
+1. **Problema con la URL del Backend (`VITE_API_BASE_URL`):**
+   - El archivo `frontend/.env` definía `VITE_API_BASE_URL=http://localhost:8000/api/v1`.
+   - Cuando un navegador cliente en otra máquina cargaba la página, intentaba enviar las peticiones a `localhost:8000` (su propia máquina física local), fallando la conexión y arrojando el mensaje de "Credenciales inválidas" en la vista de login.
+   - **Solución implementada:** Se actualizó `frontend/.env` a `VITE_API_BASE_URL=/api/v1`. Gracias al proxy inverso integrado de Vite (`vite.config.ts`), cualquier cliente que acceda por IP o dominio redirige automáticamente `/api` hacia el servidor backend local sin exponer URLs rígidas con `localhost`.
+
+2. **Binding de red del Backend (`0.0.0.0` vs `127.0.0.1`):**
+   - Se ajustaron `run_backend.py` e `iniciar_backend.ps1` para que Uvicorn escuche en `host="0.0.0.0"`, permitiendo que el proxy y solicitudes en red local puedan resolver y enlazar los sockets sin restricciones.
+
+
+---
+
+## 16. DESGLOSE DE ESTUDIOS Y CALCULADORA DINÁMICA DE PRESUPUESTOS
+
+### 16.1 Arquitectura de Datos (`estudios_detalle`)
+Se incorporó la columna `estudios_detalle` (`JSON` en SQLite / `JSONB` en PostgreSQL) en la tabla `ordenes_medicas`:
+- Cada elemento contiene:
+  - `codigo`: Identificador numérico o alfanumérico de la práctica (opcional).
+  - `nombre`: Nombre del estudio clínico (obligatorio).
+  - `precio`: Importe particular si no está cubierto (por defecto `0.00`).
+  - `autorizado`: Booleano que indica si la mutual cubrió el estudio (`true`) o quedó a cargo del paciente (`false`).
+- **Sincronización Transversal y Compatibilidad:**
+  - Si un sistema externo (ej. n8n) envía `estudios_detalle`, el backend sincroniza de forma transparente las columnas existentes `estudios_autorizados`, `estudios_no_autorizados` y calcula la sumatoria de aranceles en `valor_estudios_no_autorizados`.
+  - Si una orden legacy no posee `estudios_detalle`, la calculadora opera en modo fallback a partir de las listas preexistentes.
+
+### 16.2 Componente Frontend `CalculadoraEstudiosModal.vue`
+- Ubicado entre **Editar Datos** y **Notificar / Enviar Mail** con un botón de acceso directo con ícono `pi pi-calculator`.
+- **Naturaleza Efímera (En Memoria):** Cada apertura del modal restablece el estado a la orden original; desmarcar o marcar prácticas no persiste cambios en la base de datos ni altera montos de la prescripción.
+- **Lógica de Simulación:**
+  - Las prácticas autorizadas permanecen tildadas y deshabilitadas (cobertura 100% mutual, costo $0.00 para el paciente).
+  - Las prácticas no autorizadas inician tildadas pero habilitadas para ser excluidas si el paciente no desea realizarlas en ese momento.
+  - El panel inferior calcula en tiempo real: `Copago Obra Social + APB (si aplica) + Suma de Prácticas No Autorizadas seleccionadas`.
+
+
+---
+
+## 17. SISTEMA DE FEATURE FLAGS (CONTROL DE FUNCIONALIDADES)
+
+### 17.1 Arquitectura y Persistencia
+Se diseñó un sistema desacoplado de conmutación de funcionalidades (Feature Flags) persistido en la tabla `configuracion_sistema`:
+- `FEATURE_MODULO_MAIL`: Controla el módulo de despacho de emails ZeptoMail y plantillas.
+- `FEATURE_CALCULADORA_ESTUDIOS`: Controla el botón y modal de la calculadora interactiva de aranceles de estudios.
+- `FEATURE_ESTUDIOS_AUTORIZACION`: Controla los campos de prácticas autorizadas, no autorizadas y montos particulares en formularios y fichas.
+- `FEATURE_INDICACIONES_ESTUDIOS`: Controla el catálogo y chips de preparación clínica.
+- `FEATURE_ASIGNAR_AUDITOR`: Controla la asignación y visualización del auditor médico responsable.
+
+### 17.2 Integración Frontend (Pinia + Directivas Reactivas)
+- **Store Central:** `frontend/src/stores/features.store.ts` consulta el estado de las flags al iniciar la app o autenticarse y expone getters computados (`isMailEnabled`, `isCalculadoraEnabled`, `isEstudiosAutorizacionEnabled`, `isIndicacionesEnabled`, `isAsignarAuditorEnabled`).
+- **Panel Administrativo:** Pestaña *"Funcionalidades (Feature Flags)"* en `ConfiguracionView.vue` con componentes `ToggleSwitch` de PrimeVue para activar o desactivar cada módulo con un clic y feedback inmediato vía Toast.
+- **Estado Inicial por Defecto:** Todas las flags mencionadas inician en estado **Inactivo (`false`)** para mantener el sistema limpio y permitir su habilitación progresiva cuando se decida el pase a producción.

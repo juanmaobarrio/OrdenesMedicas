@@ -20,6 +20,13 @@ export type TipoLlamada =
   | 'OTRO';
 export type ResultadoLlamada = 'EXITOSA' | 'NO_CONTESTA' | 'NUMERO_ERRONEO' | 'REINTENTAR';
 
+export interface EstudioDetalleItem {
+  codigo?: string | null;
+  nombre: string;
+  precio: number;
+  autorizado: boolean;
+}
+
 export interface AdjuntoOrden {
   id: string;
   nombre_archivo_original: string;
@@ -144,7 +151,12 @@ export interface OrdenMedicaListItem {
   cantidad_ordenes_fisicas: number;
 
   numeros_auditoria: string[];
+  estudios_autorizados?: string[];
+  estudios_no_autorizados?: string[];
+  estudios_detalle?: EstudioDetalleItem[];
   debe_orden_medica?: boolean;
+  indicaciones_ids?: string[];
+  mail_enviado?: boolean;
   paciente: Paciente;
   sucursal: Sucursal;
   created_by_user: UserSummary;
@@ -172,7 +184,21 @@ export interface OrdenMedicaDetail {
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
+  estudios_autorizados?: string[];
+  estudios_no_autorizados?: string[];
+  estudios_detalle?: EstudioDetalleItem[];
   debe_orden_medica?: boolean;
+  indicaciones_ids?: string[];
+  indicaciones_texto?: string | null;
+  mail_enviado?: boolean;
+  mail_enviado_fecha?: string | null;
+  mail_enviado_por_id?: string | null;
+  mail_destinatario?: string | null;
+  mail_asunto?: string | null;
+  mail_cuerpo_html?: string | null;
+  mail_message_id?: string | null;
+  mail_programado_para?: string | null;
+  mail_auto_cancelado?: boolean;
   contacto_nombre?: string | null;
   contacto_horario?: string | null;
   contacto_telefono?: string | null;
@@ -213,6 +239,7 @@ export interface OrdenMedicaCreate {
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
+  estudios_detalle?: EstudioDetalleItem[];
   contacto_nombre?: string | null;
   contacto_horario?: string | null;
   contacto_telefono?: string | null;
@@ -250,4 +277,119 @@ export interface ConfiguracionAPB {
   valor_apb: number;
   descripcion?: string;
   updated_at?: string;
+}
+
+// ==========================================
+// FEATURE FLAGS / FUNCIONALIDADES
+// ==========================================
+export interface SystemFeaturesConfig {
+  modulo_mail: boolean;
+  calculadora_estudios: boolean;
+  estudios_autorizacion: boolean;
+  indicaciones_estudios: boolean;
+  asignar_auditor: boolean;
+}
+
+export interface SystemFeaturesConfigUpdate {
+  modulo_mail?: boolean;
+  calculadora_estudios?: boolean;
+  estudios_autorizacion?: boolean;
+  indicaciones_estudios?: boolean;
+  asignar_auditor?: boolean;
+}
+
+
+// ==========================================
+// INDICACIONES DE ESTUDIOS Y NOTIFICACIONES EMAIL
+// ==========================================
+export interface IndicacionEstudio {
+  id: string;
+  codigo: string;
+  titulo: string;
+  instrucciones: string;
+  categoria?: string | null;
+  color: string;
+  orden_secuencia: number;
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface IndicacionEstudioCreate {
+  codigo: string;
+  titulo: string;
+  instrucciones: string;
+  categoria?: string | null;
+  color?: string;
+  orden_secuencia?: number;
+  activa?: boolean;
+}
+
+export interface IndicacionEstudioUpdate {
+  codigo?: string;
+  titulo?: string;
+  instrucciones?: string;
+  categoria?: string | null;
+  color?: string;
+  orden_secuencia?: number;
+  activa?: boolean;
+}
+
+export interface ConfiguracionMailAutomatizacion {
+  envio_automatico: boolean;
+  minutos_gracia: number;
+  zeptomail_configurado: boolean;
+  remitente_email: string;
+  remitente_nombre: string;
+}
+
+export interface PreviewEmailResolucion {
+  destinatario_email: string;
+  destinatario_nombre: string;
+  asunto: string;
+  cuerpo_html: string;
+  tiene_email: boolean;
+  ya_enviado: boolean;
+  mail_enviado_fecha?: string | null;
+  plantilla_id?: string | null;
+  plantillas_disponibles?: PlantillaEmail[];
+}
+
+export interface EnviarEmailResolucionPayload {
+  destinatario_email?: string;
+  asunto?: string;
+  cuerpo_html?: string;
+  plantilla_id?: string | null;
+  observaciones_adicionales?: string;
+}
+
+
+export interface PlantillaEmail {
+  id: string;
+  codigo: string;
+  nombre: string;
+  asunto: string;
+  cuerpo_html: string;
+  es_default: boolean;
+  activa: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PlantillaEmailCreate {
+  codigo: string;
+  nombre: string;
+  asunto: string;
+  cuerpo_html?: string;
+  es_default?: boolean;
+  activa?: boolean;
+}
+
+export interface PlantillaEmailUpdate {
+  codigo?: string;
+  nombre?: string;
+  asunto?: string;
+  cuerpo_html?: string;
+  es_default?: boolean;
+  activa?: boolean;
 }

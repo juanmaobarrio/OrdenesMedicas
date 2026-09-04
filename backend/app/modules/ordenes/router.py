@@ -3,7 +3,7 @@ import shutil
 import uuid
 from datetime import date
 from decimal import Decimal
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 from loguru import logger
 from fastapi import (
     APIRouter,
@@ -36,12 +36,22 @@ from backend.app.modules.ordenes.schemas import (
     AuditoriaSolicitudResponder,
     ConfiguracionAPBRead,
     ConfiguracionAPBUpdate,
+    ConfiguracionMailAutomatizacionRead,
+    ConfiguracionMailAutomatizacionUpdate,
+    EnviarEmailResolucionRequest,
     EstadoOrdenConfigCreate,
     EstadoOrdenConfigRead,
     EstadoOrdenConfigUpdate,
+    EstudioDetalleItem,
+    IndicacionEstudioCreate,
+    IndicacionEstudioRead,
+    IndicacionEstudioUpdate,
     MotivoCancelacionCreate,
     MotivoCancelacionRead,
     MotivoCancelacionUpdate,
+    OrdenActualizarIndicaciones,
+    OrdenActualizarEstudiosAuditoria,
+    OrdenActualizarEstudiosDetalle,
     OrdenLlamadaPendienteItem,
     OrdenMedicaAsignarAuditor,
     OrdenMedicaCambioEstado,
@@ -49,15 +59,24 @@ from backend.app.modules.ordenes.schemas import (
     OrdenMedicaDetail,
     OrdenMedicaListItem,
     OrdenMedicaUpdate,
+    PlantillaEmailCreate,
+    PlantillaEmailRead,
+    PlantillaEmailUpdate,
+    PreviewEmailResolucionRead,
     RegistroLlamadaCreate,
     RegistroLlamadaRead,
+    SystemFeaturesConfig,
+    SystemFeaturesConfigUpdate,
 )
 
 from backend.app.modules.ordenes.service import (
     ConfiguracionSistemaService,
+    EmailResolucionService,
     EstadoOrdenConfigService,
+    IndicacionEstudioService,
     MotivoCancelacionService,
     OrdenMedicaService,
+    PlantillaEmailService,
 )
 from backend.app.modules.users.models import User
 
@@ -636,3 +655,322 @@ async def update_configuracion_apb(
     return await service.update_valor_apb(dto)
 
 
+# ==========================================
+# FEATURE FLAGS (SISTEMA DE FUNCIONALIDADES)
+# ==========================================
+@config_router.get(
+    "/features",
+    response_model=SystemFeaturesConfig,
+    summary="Obtener estado de Feature Flags del sistema",
+)
+async def get_system_features(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.get_features()
+
+
+@config_router.put(
+    "/features",
+    response_model=SystemFeaturesConfig,
+    summary="Actualizar estado de Feature Flags (solo administradores)",
+)
+async def update_system_features(
+    dto: SystemFeaturesConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.update_features(dto)
+
+
+
+
+# ==========================================
+# ENDPOINTS PARA INDICACIONES Y PREVISUALIZACION/ENVIO DE CORREO
+# ==========================================
+@router.put(
+    "/{id}/indicaciones",
+    response_model=OrdenMedicaDetail,
+    summary="Actualizar indicaciones de estudio asociadas a una orden",
+)
+async def actualizar_indicaciones_orden(
+    id: uuid.UUID,
+    dto: OrdenActualizarIndicaciones,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:update", "ordenes:audit")),
+):
+    service = EmailResolucionService(db)
+    return await service.actualizar_indicaciones_orden(
+        orden_id=id,
+        indicaciones_ids=dto.indicaciones_ids,
+        indicaciones_texto=dto.indicaciones_texto,
+        current_user=current_user,
+    )
+
+
+@router.get(
+    "/{id}/preview-email",
+    response_model=PreviewEmailResolucionRead,
+    summary="Previsualizar correo de resolución de auditoría para el paciente",
+)
+async def preview_email_resolucion(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:mail", "ordenes:audit", "ordenes:update")),
+):
+    service = EmailResolucionService(db)
+    return await service.build_preview_email(id)
+
+
+@router.post(
+    "/{id}/enviar-email",
+    response_model=OrdenMedicaDetail,
+    summary="Despachar correo de resolución de auditoría al paciente vía ZeptoMail",
+)
+async def enviar_email_resolucion(
+    id: uuid.UUID,
+    dto: EnviarEmailResolucionRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:mail", "ordenes:audit")),
+):
+    ip, agent = _get_client_info(request)
+    service = EmailResolucionService(db)
+    return await service.enviar_email_resolucion(
+        orden_id=id,
+        dto=dto,
+        current_user=current_user,
+        client_ip=ip,
+        user_agent=agent,
+    )
+
+
+@router.post(
+    "/{id}/cancelar-envio-automatico",
+    response_model=OrdenMedicaDetail,
+    summary="Frenar o cancelar el envío automático programado del correo",
+)
+async def cancelar_envio_automatico_email(
+    id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:mail", "ordenes:audit")),
+):
+    ip, agent = _get_client_info(request)
+    service = EmailResolucionService(db)
+    return await service.cancelar_envio_automatico(
+        orden_id=id,
+        current_user=current_user,
+        client_ip=ip,
+        user_agent=agent,
+    )
+
+
+# ==========================================
+# INDICACIONES DE ESTUDIOS (CATÁLOGO EN CONFIGURACIÓN)
+# ==========================================
+@config_router.get(
+    "/indicaciones",
+    response_model=List[IndicacionEstudioRead],
+    summary="Listar catálogo de indicaciones preescritas",
+)
+async def list_indicaciones(
+    only_active: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = IndicacionEstudioService(db)
+    return await service.list_indicaciones(only_active=only_active)
+
+
+@config_router.post(
+    "/indicaciones",
+    response_model=IndicacionEstudioRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear nueva indicación de estudio",
+)
+async def create_indicacion(
+    dto: IndicacionEstudioCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = IndicacionEstudioService(db)
+    return await service.create_indicacion(dto)
+
+
+@config_router.put(
+    "/indicaciones/{indicacion_id}",
+    response_model=IndicacionEstudioRead,
+    summary="Actualizar indicación de estudio",
+)
+async def update_indicacion(
+    indicacion_id: uuid.UUID,
+    dto: IndicacionEstudioUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = IndicacionEstudioService(db)
+    return await service.update_indicacion(indicacion_id, dto)
+
+
+@config_router.delete(
+    "/indicaciones/{indicacion_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar indicación de estudio",
+)
+async def delete_indicacion(
+    indicacion_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = IndicacionEstudioService(db)
+    await service.delete_indicacion(indicacion_id)
+
+
+# ==========================================
+# CONFIGURACIÓN AUTOMATIZACIÓN DE CORREOS
+# ==========================================
+@config_router.get(
+    "/mail-automatizacion",
+    response_model=ConfiguracionMailAutomatizacionRead,
+    summary="Consultar parámetros de automatización y estado de ZeptoMail",
+)
+async def get_config_mail_automatizacion(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = EmailResolucionService(db)
+    return await service.get_config_automatizacion()
+
+
+@config_router.put(
+    "/mail-automatizacion",
+    response_model=ConfiguracionMailAutomatizacionRead,
+    summary="Actualizar parámetros de automatización de correos",
+)
+async def update_config_mail_automatizacion(
+    dto: ConfiguracionMailAutomatizacionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = EmailResolucionService(db)
+    return await service.update_config_automatizacion(dto)
+
+
+@router.put(
+    "/{id}/estudios-auditoria",
+    response_model=OrdenMedicaDetail,
+    summary="Actualizar lista de estudios autorizados y no autorizados",
+)
+async def actualizar_estudios_auditoria(
+    id: uuid.UUID,
+    dto: OrdenActualizarEstudiosAuditoria,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:update", "ordenes:audit")),
+):
+    service = EmailResolucionService(db)
+    return await service.actualizar_estudios_auditoria(
+        orden_id=id,
+        estudios_autorizados=dto.estudios_autorizados,
+        estudios_no_autorizados=dto.estudios_no_autorizados,
+        estudios_detalle=dto.estudios_detalle,
+        current_user=current_user,
+    )
+
+
+@router.put(
+    "/{id}/estudios-detalle",
+    response_model=OrdenMedicaDetail,
+    summary="Actualizar desglose de estudios con precios y estado de autorización (integración simple n8n/APIs)",
+)
+async def actualizar_estudios_detalle(
+    id: uuid.UUID,
+    dto: Union[OrdenActualizarEstudiosDetalle, List[EstudioDetalleItem]],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_any_permission("ordenes:update", "ordenes:audit")),
+):
+    service = EmailResolucionService(db)
+    items = dto.estudios_detalle if isinstance(dto, OrdenActualizarEstudiosDetalle) else dto
+    return await service.actualizar_estudios_auditoria(
+        orden_id=id,
+        estudios_autorizados=None,
+        estudios_no_autorizados=None,
+        estudios_detalle=items,
+        current_user=current_user,
+    )
+
+
+# ==========================================
+# PLANTILLAS DE EMAIL (CATÁLOGO EN CONFIGURACIÓN)
+# ==========================================
+@config_router.get(
+    "/plantillas-email",
+    response_model=List[PlantillaEmailRead],
+    summary="Listar catálogo de plantillas de correo",
+)
+async def list_plantillas_email(
+    only_active: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = PlantillaEmailService(db)
+    return await service.list_plantillas(only_active=only_active)
+
+
+@config_router.post(
+    "/plantillas-email",
+    response_model=PlantillaEmailRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear nueva plantilla de correo",
+)
+async def create_plantilla_email(
+    dto: PlantillaEmailCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = PlantillaEmailService(db)
+    return await service.create_plantilla(dto)
+
+
+@config_router.put(
+    "/plantillas-email/{plantilla_id}",
+    response_model=PlantillaEmailRead,
+    summary="Actualizar plantilla de correo",
+)
+async def update_plantilla_email(
+    plantilla_id: uuid.UUID,
+    dto: PlantillaEmailUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = PlantillaEmailService(db)
+    return await service.update_plantilla(plantilla_id, dto)
+
+
+@config_router.delete(
+    "/plantillas-email/{plantilla_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar plantilla de correo",
+)
+async def delete_plantilla_email(
+    plantilla_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = PlantillaEmailService(db)
+    await service.delete_plantilla(plantilla_id)
+
+
+
+@config_router.get(
+    "/plantillas-email-codigo-base",
+    response_model=dict,
+    summary="Obtener el código HTML original de la plantilla predeterminada",
+)
+async def get_plantilla_base_codigo(
+    current_user: User = Depends(get_current_user),
+):
+    from backend.app.core.templates_email import obtener_plantilla_base_html
+    return {"codigo_html": obtener_plantilla_base_html()}
