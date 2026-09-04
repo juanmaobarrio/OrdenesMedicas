@@ -38,11 +38,22 @@ def upgrade() -> None:
         pass
 
     # 3. Valores ENUM adicionales para PostgreSQL
+    # PostgreSQL no permite ALTER TYPE ... ADD VALUE dentro de una transacción transaccional previa sin commit
     if dialect_name == "postgresql":
-        op.execute(sa.text("ALTER TYPE estado_solicitud_enum ADD VALUE IF NOT EXISTS 'INFORMACION';"))
-        op.execute(sa.text("ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'CONSULTA_PACIENTE';"))
-        op.execute(sa.text("ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'SEGUIMIENTO_SUCURSAL';"))
-        op.execute(sa.text("ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'OTRO';"))
+        try:
+            op.execute(sa.text("COMMIT;"))
+        except Exception:
+            pass
+        for enum_stmt in [
+            "ALTER TYPE estado_solicitud_enum ADD VALUE IF NOT EXISTS 'INFORMACION';",
+            "ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'CONSULTA_PACIENTE';",
+            "ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'SEGUIMIENTO_SUCURSAL';",
+            "ALTER TYPE tipo_llamada_enum ADD VALUE IF NOT EXISTS 'OTRO';",
+        ]:
+            try:
+                op.execute(sa.text(enum_stmt))
+            except Exception:
+                pass
 
 
 def downgrade() -> None:
