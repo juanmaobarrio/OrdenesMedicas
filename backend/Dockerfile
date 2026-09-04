@@ -18,6 +18,7 @@ COPY backend/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ backend/
+COPY alembic.ini /app/alembic.ini
 RUN chmod +x /app/backend/entrypoint.sh
 
 # Crear carpetas requeridas para uploads y logs
