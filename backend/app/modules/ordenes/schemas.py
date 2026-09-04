@@ -368,6 +368,7 @@ class OrdenMedicaListItem(BaseModel):
     indicaciones_ids: List[str] = Field(default_factory=list)
     mail_enviado: bool = False
     paciente: Optional[PacienteRead] = None
+    sucursal_id: Optional[uuid.UUID] = None
     sucursal: Optional[SucursalRead] = None
     created_by_user: Optional[UserReadSummary] = None
     assigned_auditor: Optional[UserReadSummary] = None
@@ -429,6 +430,7 @@ class OrdenMedicaDetail(BaseModel):
     llamada_finalizada_fecha: Optional[datetime] = None
     llamada_finalizada_observacion: Optional[str] = None
     paciente: Optional[PacienteRead] = None
+    sucursal_id: Optional[uuid.UUID] = None
     sucursal: Optional[SucursalRead] = None
     created_by_user: Optional[UserReadSummary] = None
     assigned_auditor: Optional[UserReadSummary] = None

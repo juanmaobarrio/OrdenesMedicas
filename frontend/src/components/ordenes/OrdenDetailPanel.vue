@@ -240,7 +240,8 @@ const handleSaveEditOrden = async () => {
       }
     }
 
-    await ordenesService.update(props.ordenId, payload as any);
+    const updated = await ordenesService.update(props.ordenId, payload as any);
+    orden.value = updated;
     toast.add({
       severity: 'success',
       summary: 'Orden Actualizada',

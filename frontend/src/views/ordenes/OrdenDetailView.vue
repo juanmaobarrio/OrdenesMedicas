@@ -227,7 +227,8 @@ const handleSaveEditOrden = async () => {
       }
     }
 
-    await ordenesService.update(ordenId, payload as any);
+    const updated = await ordenesService.update(ordenId, payload as any);
+    orden.value = updated;
     toast.add({
       severity: 'success',
       summary: 'Orden Actualizada',
@@ -624,7 +625,7 @@ const handleCancelarEnvioAuto = async () => {
             <StatusTag :value="orden.estado" />
           </div>
           <p class="text-xs text-slate-500 mt-1">
-            Ingresada el {{ orden.created_at.slice(0, 10) }} por {{ orden.created_by_user?.full_name }} &bull; Sede {{ orden.sucursal?.nombre }}
+            Ingresada el {{ orden.created_at.slice(0, 10) }} por {{ orden.created_by_user?.full_name }} &bull; {{ orden.sucursal?.nombre?.startsWith('Sede') ? orden.sucursal?.nombre : 'Sede ' + (orden.sucursal?.nombre || 'S/D') }}
           </p>
         </div>
 

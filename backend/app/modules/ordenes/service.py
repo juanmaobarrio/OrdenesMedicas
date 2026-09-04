@@ -287,12 +287,13 @@ class OrdenMedicaService:
             diff["cantidad_ordenes_fisicas"] = dto.cantidad_ordenes_fisicas
             orden.cantidad_ordenes_fisicas = dto.cantidad_ordenes_fisicas
 
-        if dto.sucursal_id is not None and dto.sucursal_id != orden.sucursal_id:
+        if dto.sucursal_id is not None and str(dto.sucursal_id) != str(orden.sucursal_id):
             sucursal = await self.sucursal_repo.get_by_id(dto.sucursal_id)
             if not sucursal:
                 raise EntityNotFoundException("Sucursal", dto.sucursal_id)
             diff["sucursal"] = sucursal.nombre
-            orden.sucursal_id = dto.sucursal_id
+            orden.sucursal_id = sucursal.id
+            orden.sucursal = sucursal
 
         if dto.mutual is not None:
             diff["mutual"] = dto.mutual.strip().upper()
@@ -401,6 +402,7 @@ class OrdenMedicaService:
                 )
             )
 
+        await self.db.commit()
         return await self.get_by_id(orden_id)
 
     async def cambiar_estado(
