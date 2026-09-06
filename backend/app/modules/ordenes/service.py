@@ -209,12 +209,16 @@ class OrdenMedicaService:
             valor_estudios_no_autorizados=valor_no_aut or Decimal("0.00"),
             abona_apb=dto.abona_apb,
             valor_apb=dto.valor_apb if dto.abona_apb else Decimal("0.00"),
+            ya_se_atendio=dto.ya_se_atendio,
+            monto_abonado_atencion=dto.monto_abonado_atencion if dto.ya_se_atendio else Decimal("0.00"),
             fecha_vencimiento=dto.fecha_vencimiento,
             numeros_auditoria=dto.numeros_auditoria,
             estudios_autorizados=estudios_aut or [],
             estudios_no_autorizados=estudios_no_aut or [],
             estudios_detalle=detalle_dicts or [],
             debe_orden_medica=dto.debe_orden_medica,
+            indicaciones_ids=dto.indicaciones_ids or [],
+            indicaciones_texto=dto.indicaciones_texto,
 
             contacto_nombre=dto.contacto_nombre.strip() if dto.contacto_nombre else None,
             contacto_horario=dto.contacto_horario.strip() if dto.contacto_horario else None,
@@ -242,6 +246,8 @@ class OrdenMedicaService:
                     "mutual": dto.mutual,
                     "copago": str(dto.valor_copago),
                     "apb": str(dto.valor_apb if dto.abona_apb else Decimal("0.00")),
+                    "ya_se_atendio": dto.ya_se_atendio,
+                    "monto_abonado_atencion": str(dto.monto_abonado_atencion if dto.ya_se_atendio else Decimal("0.00")),
                 },
                 ip_address=client_ip,
                 user_agent=user_agent,
@@ -319,6 +325,14 @@ class OrdenMedicaService:
             diff["valor_apb"] = str(dto.valor_apb)
             orden.valor_apb = dto.valor_apb
 
+        if dto.ya_se_atendio is not None:
+            diff["ya_se_atendio"] = dto.ya_se_atendio
+            orden.ya_se_atendio = dto.ya_se_atendio
+
+        if dto.monto_abonado_atencion is not None:
+            diff["monto_abonado_atencion"] = str(dto.monto_abonado_atencion)
+            orden.monto_abonado_atencion = dto.monto_abonado_atencion
+
         if dto.fecha_vencimiento is not None:
             diff["fecha_vencimiento"] = str(dto.fecha_vencimiento)
             orden.fecha_vencimiento = dto.fecha_vencimiento
@@ -384,6 +398,14 @@ class OrdenMedicaService:
         if dto.debe_orden_medica is not None:
             diff["debe_orden_medica"] = dto.debe_orden_medica
             orden.debe_orden_medica = dto.debe_orden_medica
+
+        if dto.indicaciones_ids is not None:
+            diff["indicaciones_ids"] = dto.indicaciones_ids
+            orden.indicaciones_ids = dto.indicaciones_ids
+
+        if dto.indicaciones_texto is not None:
+            diff["indicaciones_texto"] = dto.indicaciones_texto
+            orden.indicaciones_texto = dto.indicaciones_texto
 
         await self.db.flush()
 
@@ -924,6 +946,8 @@ class OrdenMedicaService:
                 observaciones_ingreso=o.observaciones_ingreso,
                 observacion_resultado_auditoria=o.observacion_resultado_auditoria,
                 debe_orden_medica=o.debe_orden_medica,
+                ya_se_atendio=getattr(o, "ya_se_atendio", False) or False,
+                monto_abonado_atencion=getattr(o, "monto_abonado_atencion", Decimal("0.00")) or Decimal("0.00"),
                 cant_intentos_previos=intentos,
                 solicitudes_pendientes=sols_pendientes,
             )
@@ -1112,6 +1136,7 @@ class ConfiguracionSistemaService:
         "estudios_autorizacion": ("FEATURE_ESTUDIOS_AUTORIZACION", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
         "indicaciones_estudios": ("FEATURE_INDICACIONES_ESTUDIOS", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
         "asignar_auditor": ("FEATURE_ASIGNAR_AUDITOR", "Activa la asignación de auditor médico a la orden médica"),
+        "atencion_previa": ("FEATURE_ATENCION_PREVIA", "Activa el registro de paciente ya atendido/abonado y cálculo de reintegro"),
     }
 
     async def get_features(self) -> SystemFeaturesConfig:
@@ -1127,6 +1152,7 @@ class ConfiguracionSistemaService:
             estudios_autorizacion=rows.get(self.FEATURE_KEYS["estudios_autorizacion"][0], False),
             indicaciones_estudios=rows.get(self.FEATURE_KEYS["indicaciones_estudios"][0], False),
             asignar_auditor=rows.get(self.FEATURE_KEYS["asignar_auditor"][0], False),
+            atencion_previa=rows.get(self.FEATURE_KEYS["atencion_previa"][0], False),
         )
 
     async def update_features(self, dto: SystemFeaturesConfigUpdate) -> SystemFeaturesConfig:
@@ -1224,6 +1250,19 @@ class IndicacionEstudioService:
         ind = await self.get_by_id(indicacion_id)
         await self.db.delete(ind)
         await self.db.commit()
+
+    async def reorder_indicaciones(self, items: List[Any]) -> List[IndicacionEstudio]:
+        for item in items:
+            item_id = item.id if hasattr(item, "id") else item.get("id")
+            seq = item.orden_secuencia if hasattr(item, "orden_secuencia") else item.get("orden_secuencia", 0)
+            if item_id:
+                stmt = select(IndicacionEstudio).where(IndicacionEstudio.id == item_id)
+                res = await self.db.execute(stmt)
+                ind = res.scalar_one_or_none()
+                if ind:
+                    ind.orden_secuencia = seq
+        await self.db.commit()
+        return await self.list_indicaciones(only_active=False)
 
 
 class EmailResolucionService:

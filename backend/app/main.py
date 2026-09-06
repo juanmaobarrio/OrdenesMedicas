@@ -41,6 +41,10 @@ def sync_database_columns(connection):
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN abona_apb BOOLEAN DEFAULT 0"))
             if cols and "valor_apb" not in cols:
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN valor_apb NUMERIC(12, 2) DEFAULT 0.00"))
+            if cols and "ya_se_atendio" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN ya_se_atendio BOOLEAN DEFAULT 0"))
+            if cols and "monto_abonado_atencion" not in cols:
+                connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN monto_abonado_atencion NUMERIC(12, 2) DEFAULT 0.00"))
             if cols and "estudios_autorizados" not in cols:
                 connection.execute(text("ALTER TABLE ordenes_medicas ADD COLUMN estudios_autorizados JSON DEFAULT '[]'"))
             if cols and "estudios_no_autorizados" not in cols:
@@ -118,6 +122,8 @@ def sync_database_columns(connection):
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS ya_se_atendio BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS monto_abonado_atencion NUMERIC(12, 2) DEFAULT 0.00",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_autorizados JSONB DEFAULT '[]'",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_no_autorizados JSONB DEFAULT '[]'",
             "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_detalle JSONB DEFAULT '[]'",
@@ -180,6 +186,11 @@ def sync_database_columns(connection):
             """
             INSERT INTO configuracion_sistema (clave, valor, descripcion)
             VALUES ('FEATURE_ASIGNAR_AUDITOR', 'false', 'Activa la asignación de auditor médico a la orden médica')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_ATENCION_PREVIA', 'false', 'Activa el registro de paciente ya atendido/abonado y cálculo de reintegro')
             ON CONFLICT (clave) DO NOTHING
             """,
         ]

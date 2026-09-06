@@ -15,6 +15,8 @@ const props = defineProps<{
   pacienteNombre: string;
   telefono?: string | null;
   tipoLlamada: TipoLlamada;
+  yaSeAtendio?: boolean;
+  montoAbonadoAtencion?: number;
 }>();
 
 const emit = defineEmits<{
@@ -96,6 +98,25 @@ const handleSubmit = async () => {
         <p class="text-sm text-slate-600 mt-1">
           <i class="pi pi-phone text-xs mr-1 text-primary-600"></i>
           {{ telefono || 'Sin teléfono registrado' }}
+        </p>
+      </div>
+
+      <!-- Alerta Destacada: Paciente Ya Se Atendió / Buscar Reintegro -->
+      <div
+        v-if="yaSeAtendio"
+        class="p-3 bg-amber-50 rounded-xl border-2 border-amber-400 text-amber-950 space-y-1.5 shadow-sm"
+      >
+        <div class="flex items-center justify-between font-bold text-xs uppercase text-amber-900">
+          <span class="flex items-center gap-1.5">
+            <i class="pi pi-exclamation-circle text-amber-600"></i>
+            ¡ATENCIÓN: PACIENTE YA SE ATENDIÓ!
+          </span>
+          <span v-if="montoAbonadoAtencion" class="text-[10px] bg-amber-200 px-1.5 py-0.5 rounded font-mono border border-amber-300">
+            Abonó: ${{ Number(montoAbonadoAtencion).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+          </span>
+        </div>
+        <p class="text-xs text-amber-900 font-semibold leading-snug">
+          📢 <strong>Pauta de Comunicación:</strong> NO indicarle que venga a atenderse cuando quiera. Notificarle que la auditoría finalizó y que <strong>debe acercarse a retirar su reintegro</strong> económico si corresponde.
         </p>
       </div>
 

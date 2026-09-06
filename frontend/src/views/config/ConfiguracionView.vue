@@ -258,14 +258,59 @@ const handleSaveMailConfig = async () => {
 };
 
 // Indicaciones
+const isReorderingIndicaciones = ref(false);
+
 const loadIndicaciones = async () => {
   isLoadingIndicaciones.value = true;
   try {
-    indicaciones.value = await configService.listIndicaciones(false);
+    const list = await configService.listIndicaciones(false);
+    indicaciones.value = list.sort((a, b) => (a.orden_secuencia ?? 0) - (b.orden_secuencia ?? 0));
   } catch (err: any) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar las indicaciones', life: 3000 });
   } finally {
     isLoadingIndicaciones.value = false;
+  }
+};
+
+const handleMoveIndicacion = async (index: number, direction: 'up' | 'down') => {
+  if (direction === 'up' && index === 0) return;
+  if (direction === 'down' && index === indicaciones.value.length - 1) return;
+
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  const list = [...indicaciones.value];
+  const [moved] = list.splice(index, 1);
+  list.splice(targetIndex, 0, moved);
+
+  // Recalcular orden_secuencia secuencial
+  const updatedList = list.map((item, idx) => ({
+    ...item,
+    orden_secuencia: idx + 1,
+  }));
+  indicaciones.value = updatedList;
+
+  isReorderingIndicaciones.value = true;
+  try {
+    const payload = updatedList.map((item) => ({
+      id: item.id,
+      orden_secuencia: item.orden_secuencia,
+    }));
+    await configService.reorderIndicaciones(payload);
+    toast.add({
+      severity: 'success',
+      summary: 'Orden Actualizado',
+      detail: `La indicación ahora aparecerá en la posición #${targetIndex + 1}`,
+      life: 2000,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se pudo guardar el nuevo orden',
+      life: 3000,
+    });
+    await loadIndicaciones();
+  } finally {
+    isReorderingIndicaciones.value = false;
   }
 };
 
@@ -975,6 +1020,39 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
               <LoadingSpinner v-if="isLoadingIndicaciones" message="Cargando catálogo de indicaciones..." />
 
               <DataTable v-else :value="indicaciones" stripedRows responsiveLayout="scroll" class="p-datatable-sm" rowHover>
+                <!-- Columna Orden de Aparición con Botones Subir / Bajar -->
+                <Column header="Orden" style="width: 120px">
+                  <template #body="{ index }">
+                    <div class="flex items-center space-x-1">
+                      <span class="w-6 text-center font-mono font-bold text-xs text-slate-600 bg-slate-100 rounded py-0.5" title="Prioridad / Secuencia">
+                        #{{ index + 1 }}
+                      </span>
+                      <Button
+                        icon="pi pi-arrow-up"
+                        size="small"
+                        text
+                        rounded
+                        severity="secondary"
+                        :disabled="index === 0 || isReorderingIndicaciones"
+                        class="p-1 h-7 w-7 text-slate-600 hover:text-blue-600"
+                        title="Subir posición (aparece antes)"
+                        @click="handleMoveIndicacion(index, 'up')"
+                      />
+                      <Button
+                        icon="pi pi-arrow-down"
+                        size="small"
+                        text
+                        rounded
+                        severity="secondary"
+                        :disabled="index === indicaciones.length - 1 || isReorderingIndicaciones"
+                        class="p-1 h-7 w-7 text-slate-600 hover:text-blue-600"
+                        title="Bajar posición (aparece después)"
+                        @click="handleMoveIndicacion(index, 'down')"
+                      />
+                    </div>
+                  </template>
+                </Column>
+
                 <Column field="titulo" header="Indicación (Nombre en Chip)" sortable style="width: 240px">
                   <template #body="{ data }">
                     <div class="flex items-center space-x-2">
@@ -1347,6 +1425,40 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                       :value="featuresStore.isAsignarAuditorEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
                   </div>
                 </div>
+
+                <!-- 6. Control de Atención Previa y Reintegros -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isAtencionPreviaEnabled ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isAtencionPreviaEnabled ? 'bg-amber-600' : 'bg-slate-400'">
+                          <i class="pi pi-wallet text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Atención Previa y Reintegro</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isAtencionPreviaEnabled ? 'text-amber-600' : 'text-slate-400'">
+                            atencion_previa
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.atencion_previa"
+                        :disabled="isUpdatingFeature === 'atencion_previa'"
+                        @update:modelValue="handleToggleFeature('atencion_previa', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Habilita en la carga y el expediente el registro de si el paciente ya se atendió/abonó previamente, calculando el reintegro económico a su favor y mostrando las alertas en la bandeja de llamadas.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isAtencionPreviaEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isAtencionPreviaEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
               </div>
             </div>
           </TabPanel>
@@ -1543,7 +1655,7 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Categoría</label>
             <InputText
@@ -1560,6 +1672,16 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
               optionLabel="label"
               optionValue="value"
               class="w-full text-xs"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Orden / Secuencia</label>
+            <InputNumber
+              v-model="indicacionForm.orden_secuencia"
+              :min="1"
+              placeholder="1, 2, 3..."
+              class="w-full text-xs"
+              inputClass="w-full text-xs font-bold"
             />
           </div>
         </div>

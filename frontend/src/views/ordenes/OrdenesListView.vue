@@ -207,6 +207,13 @@ const handlePageChange = (event: any) => {
                       >
                         <i class="pi pi-exclamation-triangle text-xs"></i>
                       </span>
+                      <span
+                        v-if="featuresStore.isAtencionPreviaEnabled && data.ya_se_atendio"
+                        class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-0.5"
+                        :title="'Paciente ya se atendió previamente. Abonó: $' + Number(data.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })"
+                      >
+                        🩺 Atendido
+                      </span>
                     </div>
                     <StatusTag :value="data.estado" />
                   </div>
@@ -245,6 +252,9 @@ const handlePageChange = (event: any) => {
                     <span v-if="data.abona_apb || Number(data.valor_apb || 0) > 0" class="text-blue-700 font-medium">
                       | APB: ${{ Number(data.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
                     </span>
+                  </p>
+                  <p v-if="featuresStore.isAtencionPreviaEnabled && data.ya_se_atendio" class="text-[10px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
+                    Abonó previo: ${{ Number(data.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
                   </p>
                 </div>
               </template>

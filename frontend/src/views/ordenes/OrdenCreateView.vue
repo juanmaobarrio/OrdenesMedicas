@@ -21,8 +21,10 @@ import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import { useToast } from 'primevue/usetoast';
 import { PacienteCreate } from '../../types/pacientes';
-import { OrdenMedicaListItem } from '../../types/ordenes';
+import { IndicacionEstudio, OrdenMedicaListItem } from '../../types/ordenes';
 import StatusTag from '../../components/common/StatusTag.vue';
+import IndicacionesChipsSelector from '../../components/ordenes/IndicacionesChipsSelector.vue';
+import { useFeaturesStore } from '../../stores/features.store';
 
 
 
@@ -30,10 +32,12 @@ import StatusTag from '../../components/common/StatusTag.vue';
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
 
 const isSubmitting = ref(false);
 const sucursales = ref<Sucursal[]>([]);
 const mutuales = ref<ObraSocial[]>([]);
+const indicacionesDisponibles = ref<IndicacionEstudio[]>([]);
 
 const opcionesHorarios = [
   'Todo el día',
@@ -76,6 +80,8 @@ const form = ref({
   valor_estudios_no_autorizados: 0,
   abona_apb: false,
   valor_apb: 0,
+  ya_se_atendio: false,
+  monto_abonado_atencion: 0,
   fecha_vencimiento: null as Date | null,
   numeros_auditoria: [] as string[],
   debe_orden_medica: false,
@@ -85,6 +91,8 @@ const form = ref({
   contacto_celular: '',
   contacto_email: '',
   observaciones_ingreso: '',
+  indicaciones_ids: [] as string[],
+  indicaciones_texto: '',
 });
 
 const valorApbVigente = ref(0);
@@ -243,6 +251,14 @@ onMounted(async () => {
   } catch (err) {
     console.warn('No se pudo cargar valor de APB:', err);
   }
+
+  if (featuresStore.isIndicacionesEnabled) {
+    try {
+      indicacionesDisponibles.value = await configService.listIndicaciones(true);
+    } catch {
+      indicacionesDisponibles.value = [];
+    }
+  }
 });
 
 const handleMutualChange = (mutualSigla?: string) => {
@@ -382,6 +398,8 @@ const handleSubmit = async () => {
       valor_estudios_no_autorizados: form.value.valor_estudios_no_autorizados,
       abona_apb: form.value.abona_apb,
       valor_apb: form.value.abona_apb ? form.value.valor_apb : 0,
+      ya_se_atendio: form.value.ya_se_atendio,
+      monto_abonado_atencion: form.value.ya_se_atendio ? form.value.monto_abonado_atencion : 0,
       fecha_vencimiento: form.value.fecha_vencimiento ? formattedDate(form.value.fecha_vencimiento) : null,
       debe_orden_medica: form.value.debe_orden_medica,
 
@@ -392,6 +410,8 @@ const handleSubmit = async () => {
       contacto_celular: form.value.contacto_celular?.trim() || null,
       contacto_email: form.value.contacto_email?.trim() || null,
       observaciones_ingreso: form.value.observaciones_ingreso?.trim() || null,
+      indicaciones_ids: form.value.indicaciones_ids,
+      indicaciones_texto: form.value.indicaciones_texto?.trim() || null,
     };
 
     const newOrder = await ordenesService.create(payload as any);
@@ -662,6 +682,42 @@ const handleSubmit = async () => {
               </p>
             </div>
           </div>
+
+          <!-- Checkbox / Campo: Paciente Ya Se Atendió / Pago Previo y Reintegro (Feature Flag) -->
+          <div v-if="featuresStore.isAtencionPreviaEnabled" class="p-3.5 bg-amber-50/80 rounded-xl border border-amber-300 flex flex-col gap-2.5 transition">
+            <div class="flex items-start space-x-3">
+              <Checkbox v-model="form.ya_se_atendio" binary inputId="yaSeAtendioCheck" />
+              <div class="flex-1">
+                <label for="yaSeAtendioCheck" class="text-xs font-bold text-amber-950 cursor-pointer block flex items-center gap-1.5">
+                  <span>🩺 El paciente ya se atendió / realizó el estudio previamente</span>
+                </label>
+                <p class="text-[11px] text-amber-800 mt-0.5">
+                  Marque esta opción si el paciente abonó al concurrir y debe calcularse el reintegro económico al finalizar la auditoría médica.
+                </p>
+              </div>
+            </div>
+
+            <!-- Input para escribir el monto abonado por el paciente -->
+            <div v-if="form.ya_se_atendio" class="mt-1 pt-2.5 border-t border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/80 p-3 rounded-lg border border-amber-200">
+              <div>
+                <label class="block text-xs font-bold text-amber-950 uppercase">
+                  Monto abonado por el paciente al atenderse ($) <span class="text-red-500">*</span>
+                </label>
+                <span class="text-[10px] text-slate-500">
+                  Importe efectivamente pagado por el paciente al momento de la extracción / estudio.
+                </span>
+              </div>
+              <InputNumber
+                v-model="form.monto_abonado_atencion"
+                mode="currency"
+                currency="ARS"
+                locale="es-AR"
+                class="w-44 text-xs shrink-0"
+                inputClass="w-full text-right text-xs font-bold text-amber-950 bg-white"
+                :min="0"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Resumen Total a Abonar -->
@@ -686,6 +742,25 @@ const handleSubmit = async () => {
             </span>
           </div>
         </div>
+      </div>
+
+      <!-- Indicaciones Clínicas de Preparación (si está habilitado) -->
+      <div v-if="featuresStore.isIndicacionesEnabled" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i class="pi pi-book text-amber-600"></i>
+            <span>Indicaciones Clínicas de Preparación de Estudios</span>
+          </h3>
+          <span class="text-xs text-slate-400">Opcional</span>
+        </div>
+        <p class="text-xs text-slate-500">
+          Seleccione las indicaciones y preparaciones que aplican a las muestras de este paciente.
+        </p>
+        <IndicacionesChipsSelector
+          v-model="form.indicaciones_ids"
+          v-model:textoConsolidado="form.indicaciones_texto"
+          :indicacionesDisponibles="indicacionesDisponibles"
+        />
       </div>
 
       <!-- 3. Datos de Contacto y Seguimiento -->

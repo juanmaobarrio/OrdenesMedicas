@@ -182,6 +182,8 @@ class OrdenLlamadaPendienteItem(BaseModel):
     observaciones_ingreso: Optional[str] = None
     observacion_resultado_auditoria: Optional[str] = None
     debe_orden_medica: bool = False
+    ya_se_atendio: bool = False
+    monto_abonado_atencion: Decimal = Decimal("0.00")
     cant_intentos_previos: int = 0
     solicitudes_pendientes: List["AuditoriaSolicitudRead"] = []
 
@@ -244,6 +246,12 @@ class OrdenMedicaBase(BaseModel):
     valor_apb: Decimal = Field(
         default=Decimal("0.00"), ge=0, description="Monto de APB a abonar por el paciente"
     )
+    ya_se_atendio: bool = Field(
+        default=False, description="Indica si el paciente ya se atendió / realizó el estudio previamente"
+    )
+    monto_abonado_atencion: Decimal = Field(
+        default=Decimal("0.00"), ge=0, description="Valor que abonó el paciente al realizar el estudio previamente"
+    )
     fecha_vencimiento: Optional[date] = Field(
         None, description="Fecha de vencimiento de la prescripcion"
     )
@@ -261,6 +269,12 @@ class OrdenMedicaBase(BaseModel):
     )
     debe_orden_medica: bool = Field(
         default=False, description="Indica si el paciente debe la orden medica fisica (recibida digital/mail)"
+    )
+    indicaciones_ids: List[str] = Field(
+        default_factory=list, description="IDs o códigos de indicaciones clínicas asociadas"
+    )
+    indicaciones_texto: Optional[str] = Field(
+        None, description="Texto consolidado de indicaciones para preparación de estudios"
     )
 
     # Datos de contacto
@@ -296,6 +310,8 @@ class OrdenMedicaUpdate(BaseModel):
     valor_estudios_no_autorizados: Optional[Decimal] = Field(None, ge=0)
     abona_apb: Optional[bool] = None
     valor_apb: Optional[Decimal] = Field(None, ge=0)
+    ya_se_atendio: Optional[bool] = None
+    monto_abonado_atencion: Optional[Decimal] = Field(None, ge=0)
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: Optional[List[str]] = None
@@ -309,6 +325,8 @@ class OrdenMedicaUpdate(BaseModel):
     contacto_email: Optional[EmailStr] = None
     observaciones_ingreso: Optional[str] = None
     debe_orden_medica: Optional[bool] = None
+    indicaciones_ids: Optional[List[str]] = None
+    indicaciones_texto: Optional[str] = None
 
 
 class OrdenMedicaCambioEstado(BaseModel):
@@ -358,6 +376,8 @@ class OrdenMedicaListItem(BaseModel):
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
     valor_apb: Decimal = Decimal("0.00")
+    ya_se_atendio: bool = False
+    monto_abonado_atencion: Decimal = Decimal("0.00")
     cantidad_ordenes_fisicas: int = 1
 
     numeros_auditoria: List[str] = Field(default_factory=list)
@@ -394,6 +414,8 @@ class OrdenMedicaDetail(BaseModel):
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
     abona_apb: bool = False
     valor_apb: Decimal = Decimal("0.00")
+    ya_se_atendio: bool = False
+    monto_abonado_atencion: Decimal = Decimal("0.00")
     fecha_vencimiento: Optional[date] = None
 
     numeros_auditoria: List[str] = Field(default_factory=list)
@@ -471,6 +493,7 @@ class SystemFeaturesConfig(BaseModel):
     estudios_autorizacion: bool = Field(default=False, description="Activa los campos clínicos de prácticas autorizadas y no autorizadas")
     indicaciones_estudios: bool = Field(default=False, description="Activa la asignación y catálogo de indicaciones clínicas de preparación")
     asignar_auditor: bool = Field(default=False, description="Activa la asignación de auditor médico a la orden médica")
+    atencion_previa: bool = Field(default=False, description="Activa el registro de paciente ya atendido/abonado y cálculo de reintegro")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -481,6 +504,7 @@ class SystemFeaturesConfigUpdate(BaseModel):
     estudios_autorizacion: Optional[bool] = None
     indicaciones_estudios: Optional[bool] = None
     asignar_auditor: Optional[bool] = None
+    atencion_previa: Optional[bool] = None
 
 
 # ==========================================
@@ -508,6 +532,15 @@ class IndicacionEstudioUpdate(BaseModel):
     color: Optional[str] = None
     orden_secuencia: Optional[int] = None
     activa: Optional[bool] = None
+
+
+class IndicacionEstudioReorderItem(BaseModel):
+    id: uuid.UUID
+    orden_secuencia: int = Field(..., ge=0)
+
+
+class IndicacionesReorderRequest(BaseModel):
+    items: List[IndicacionEstudioReorderItem]
 
 
 class IndicacionEstudioRead(IndicacionEstudioBase):

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ordenesService } from '../../services/ordenes.service';
 import { usersService } from '../../services/users.service';
@@ -183,6 +183,22 @@ const editForm = ref({
   nro_afiliado: '',
   observaciones_ingreso: '',
   debe_orden_medica: false,
+  ya_se_atendio: false,
+  monto_abonado_atencion: 0,
+});
+
+const costoTotalAuditoria = computed(() => {
+  if (!orden.value) return 0;
+  const copago = Number(orden.value.valor_copago || 0);
+  const noAut = Number(orden.value.valor_estudios_no_autorizados || 0);
+  const apb = orden.value.abona_apb ? Number(orden.value.valor_apb || 0) : 0;
+  return copago + noAut + apb;
+});
+
+const reintegroCalculado = computed(() => {
+  if (!orden.value || !orden.value.ya_se_atendio) return 0;
+  const abonado = Number(orden.value.monto_abonado_atencion || 0);
+  return abonado - costoTotalAuditoria.value;
 });
 
 
@@ -207,6 +223,8 @@ const handleOpenEditOrden = () => {
     nro_afiliado: orden.value.nro_afiliado || orden.value.paciente?.nro_afiliado || '',
     observaciones_ingreso: orden.value.observaciones_ingreso || '',
     debe_orden_medica: Boolean(orden.value.debe_orden_medica),
+    ya_se_atendio: Boolean(orden.value.ya_se_atendio),
+    monto_abonado_atencion: Number(orden.value.monto_abonado_atencion) || 0,
   };
   isEditOrdenVisible.value = true;
 };
@@ -231,6 +249,8 @@ const handleSaveEditOrden = async () => {
       nro_afiliado: editForm.value.nro_afiliado.trim() || null,
       observaciones_ingreso: editForm.value.observaciones_ingreso.trim() || null,
       debe_orden_medica: editForm.value.debe_orden_medica,
+      ya_se_atendio: editForm.value.ya_se_atendio,
+      monto_abonado_atencion: editForm.value.ya_se_atendio ? editForm.value.monto_abonado_atencion : 0,
     };
 
     if (authStore.canEditSedeYCantidad) {
@@ -769,6 +789,44 @@ const handleCancelarEnvioAuto = async () => {
           </div>
         </div>
 
+        <!-- Banner: Paciente Ya Se Atendió / Reintegro Económico (Feature Flag) -->
+        <div
+          v-if="featuresStore.isAtencionPreviaEnabled && orden.ya_se_atendio"
+          class="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/70 border border-amber-300 rounded-xl text-xs space-y-2 shadow-sm"
+        >
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-950 uppercase flex items-center gap-1.5 text-xs">
+              <i class="pi pi-check-circle text-amber-600 text-sm"></i>
+              🩺 Paciente Ya Se Atendió Previamente
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+              Abonó al atenderse: ${{ Number(orden.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+            </span>
+          </div>
+
+          <div
+            class="p-2.5 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+            :class="reintegroCalculado > 0 ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : (reintegroCalculado < 0 ? 'bg-red-50 border-red-300 text-red-950' : 'bg-white border-slate-200 text-slate-800')"
+          >
+            <div>
+              <span class="font-bold block text-xs">
+                {{ reintegroCalculado > 0 ? '💵 REINTEGRO A FAVOR DEL PACIENTE' : (reintegroCalculado < 0 ? '⚠️ SALDO A COBRAR AL PACIENTE' : '✓ SALDO EXACTO / SIN DIFERENCIA') }}
+              </span>
+              <p class="text-[11px] opacity-85 mt-0.5">
+                {{ reintegroCalculado > 0 ? 'Al comunicarse con el paciente, avisarle que debe acercarse a retirar su reintegro.' : (reintegroCalculado < 0 ? 'Al comunicarse, avisarle que resta abonar la diferencia pendiente.' : 'No corresponde realizar reintegro ni cobro adicional.') }}
+              </p>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-base font-extrabold font-mono">
+                ${{ Math.abs(reintegroCalculado).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+              </span>
+              <span class="block text-[10px] font-bold uppercase" :class="reintegroCalculado > 0 ? 'text-emerald-700' : 'text-red-700'">
+                {{ reintegroCalculado > 0 ? 'Reintegro a favor' : (reintegroCalculado < 0 ? 'Saldo a abonar' : 'Exacto') }}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Patient & Order Details Card -->
         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-2 gap-3 text-xs">
           <div>
@@ -963,6 +1021,22 @@ const handleCancelarEnvioAuto = async () => {
                       <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">No Autorizados: <strong>${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
                       <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0">APB: <strong>${{ Number(orden.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
                       <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                    </div>
+                    <!-- Desglose de reintegro en resolución final si ya se atendió (Feature Flag) -->
+                    <div v-if="featuresStore.isAtencionPreviaEnabled && orden.ya_se_atendio" class="mt-2 pt-2 border-t border-emerald-300/80 bg-emerald-100/70 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                      <div>
+                        <span class="font-bold text-emerald-950 uppercase flex items-center gap-1">
+                          <i class="pi pi-wallet text-emerald-700"></i>
+                          {{ reintegroCalculado >= 0 ? 'Reintegro a Realizar al Paciente:' : 'Saldo a Abonar por el Paciente:' }}
+                        </span>
+                        <span class="text-[10px] text-emerald-800">
+                          Abonó al atenderse: ${{ Number(orden.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} | Costo según auditoría: ${{ costoTotalAuditoria.toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+                        </span>
+                      </div>
+                      <span class="font-mono font-extrabold text-sm" :class="reintegroCalculado >= 0 ? 'text-emerald-900' : 'text-red-700'">
+                        ${{ Math.abs(reintegroCalculado).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                        <span class="text-[10px] font-sans font-bold">({{ reintegroCalculado >= 0 ? 'A FAVOR' : 'A PAGAR' }})</span>
+                      </span>
                     </div>
                   </div>
 
@@ -1611,6 +1685,28 @@ const handleCancelarEnvioAuto = async () => {
             <label for="editDebeOrdenFisicaPanel" class="text-xs font-bold text-red-900 cursor-pointer">
               ⚠️ Paciente Debe Orden Física
             </label>
+          </div>
+        </div>
+
+        <!-- Paciente Ya Se Atendió / Reintegro en Modal de Edición (Feature Flag) -->
+        <div v-if="featuresStore.isAtencionPreviaEnabled" class="p-3 bg-amber-50 rounded-lg border border-amber-300 space-y-2">
+          <div class="flex items-center space-x-2">
+            <Checkbox v-model="editForm.ya_se_atendio" binary inputId="editYaSeAtendioPanel" />
+            <label for="editYaSeAtendioPanel" class="text-xs font-bold text-amber-950 cursor-pointer">
+              🩺 El Paciente Ya Se Atendió / Abonó Previamente
+            </label>
+          </div>
+          <div v-if="editForm.ya_se_atendio" class="pt-2 border-t border-amber-200 flex items-center justify-between gap-3">
+            <label class="block text-[11px] font-bold text-amber-950 uppercase">Monto abonado al atenderse ($):</label>
+            <InputNumber
+              v-model="editForm.monto_abonado_atencion"
+              mode="currency"
+              currency="ARS"
+              locale="es-AR"
+              class="w-36 text-xs"
+              inputClass="w-full text-right text-xs font-bold text-amber-950 bg-white"
+              :min="0"
+            />
           </div>
         </div>
       </div>

@@ -157,6 +157,14 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Monto de APB a abonar por el paciente"
     )
 
+    # Control de Atención Previa y Reintegro
+    ya_se_atendio: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, comment="Indica si el paciente ya se atendió / realizó el estudio previamente"
+    )
+    monto_abonado_atencion: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Valor que abonó el paciente al realizar el estudio previamente"
+    )
+
 
     # Datos de contacto para seguimiento
     contacto_nombre: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)

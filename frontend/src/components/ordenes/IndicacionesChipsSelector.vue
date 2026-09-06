@@ -22,6 +22,11 @@ const isSelectorOpen = ref(false);
 const isEditTextoOpen = ref(false);
 const textoManual = ref('');
 
+// Indicaciones ordenadas por orden_secuencia
+const sortedIndicaciones = computed(() => {
+  return [...props.indicacionesDisponibles].sort((a, b) => (a.orden_secuencia ?? 0) - (b.orden_secuencia ?? 0));
+});
+
 // Indicaciones seleccionadas completas
 const selectedObjects = computed(() => {
   return props.modelValue
@@ -156,7 +161,7 @@ const saveEditTexto = () => {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
           <div
-            v-for="ind in indicacionesDisponibles"
+            v-for="ind in sortedIndicaciones"
             :key="ind.codigo"
             class="p-2.5 rounded-lg border cursor-pointer transition flex items-start gap-2.5 text-xs select-none"
             :class="

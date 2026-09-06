@@ -8,6 +8,7 @@ import {
   IndicacionEstudio,
   IndicacionEstudioCreate,
   IndicacionEstudioUpdate,
+  IndicacionEstudioReorderItem,
   MotivoCancelacion,
   MotivoCancelacionCreate,
   MotivoCancelacionUpdate,
@@ -99,6 +100,11 @@ export const configService = {
 
   async updateIndicacion(id: string, dto: IndicacionEstudioUpdate): Promise<IndicacionEstudio> {
     const response = await api.put<IndicacionEstudio>(`/config/indicaciones/${id}`, dto);
+    return response.data;
+  },
+
+  async reorderIndicaciones(items: IndicacionEstudioReorderItem[]): Promise<IndicacionEstudio[]> {
+    const response = await api.post<IndicacionEstudio[]>('/config/indicaciones/reorder', { items });
     return response.data;
   },
 

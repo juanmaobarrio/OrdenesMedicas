@@ -713,9 +713,10 @@ Se diseñó un sistema desacoplado de conmutación de funcionalidades (Feature F
 - `FEATURE_ESTUDIOS_AUTORIZACION`: Controla los campos de prácticas autorizadas, no autorizadas y montos particulares en formularios y fichas.
 - `FEATURE_INDICACIONES_ESTUDIOS`: Controla el catálogo y chips de preparación clínica.
 - `FEATURE_ASIGNAR_AUDITOR`: Controla la asignación y visualización del auditor médico responsable.
+- `FEATURE_ATENCION_PREVIA`: Controla el registro de paciente ya atendido/abonado, banners de reintegro y alertas en bandeja de llamadas.
 
 ### 17.2 Integración Frontend (Pinia + Directivas Reactivas)
-- **Store Central:** `frontend/src/stores/features.store.ts` consulta el estado de las flags al iniciar la app o autenticarse y expone getters computados (`isMailEnabled`, `isCalculadoraEnabled`, `isEstudiosAutorizacionEnabled`, `isIndicacionesEnabled`, `isAsignarAuditorEnabled`).
+- **Store Central:** `frontend/src/stores/features.store.ts` consulta el estado de las flags al iniciar la app o autenticarse y expone getters computados (`isMailEnabled`, `isCalculadoraEnabled`, `isEstudiosAutorizacionEnabled`, `isIndicacionesEnabled`, `isAsignarAuditorEnabled`, `isAtencionPreviaEnabled`).
 - **Panel Administrativo:** Pestaña *"Funcionalidades (Feature Flags)"* en `ConfiguracionView.vue` con componentes `ToggleSwitch` de PrimeVue para activar o desactivar cada módulo con un clic y feedback inmediato vía Toast.
 - **Estado Inicial por Defecto:** Todas las flags mencionadas inician en estado **Inactivo (`false`)** para mantener el sistema limpio y permitir su habilitación progresiva cuando se decida el pase a producción.
 
@@ -770,3 +771,40 @@ Una vez ingresada una orden médica en el sistema:
 2. **Frontend (`frontend/src/views/ordenes/OrdenDetailView.vue` y `OrdenDetailPanel.vue`):**
    - En el modal **"Editar Datos de la Orden"**, los campos de *Sede de Ingreso* y *Cantidad de Recetas* se muestran deshabilitados con un ícono de candado 🔒 y una leyenda informativa cuando el usuario no cuenta con nivel jerárquico suficiente.
    - Si el usuario cuenta con nivel > 30, los campos son completamente editables.
+
+
+---
+
+## 20. CONTROL DE ATENCIÓN PREVIA, CÁLCULO DE REINTEGRO Y REORDENAMIENTO DE INDICACIONES
+
+### 20.1 Control de Atención Previa y Cálculo de Reintegro
+Se incorporó la trazabilidad completa para órdenes médicas donde el paciente ya concurrió a realizarse la práctica / extracción antes de la emisión de la resolución final de auditoría:
+- **Campos en base de datos (`ordenes_medicas`):**
+  - `ya_se_atendio` (`BOOLEAN DEFAULT FALSE`): Indica si el paciente ya fue atendido.
+  - `monto_abonado_atencion` (`NUMERIC(12, 2) DEFAULT 0.00`): Monto efectivamente pagado por el paciente al momento de concurrir.
+- **Fórmula económica de Reintegro:**
+  $$\text{Costo Real según Auditoría} = \text{Copago/Bono} + \text{Estudios No Autorizados} + (\text{Valor APB si abona})$$
+  $$\text{Reintegro a favor del Paciente} = \text{Monto Abonado al Atenderse} - \text{Costo Real según Auditoría}$$
+  - Si $\text{Reintegro} > 0$: El paciente abonó de más; le corresponde **reintegro a favor** y debe concurrir al laboratorio a retirar el importe.
+  - Si $\text{Reintegro} < 0$: El paciente adeuda una diferencia económica pendiente.
+  - Si $\text{Reintegro} = 0$: Saldo cancelado exacto sin diferencias.
+
+### 20.2 Pautas Operativas y Bandeja de Llamadas Telefónicas
+- **Bandeja de Llamadas (`LlamadasPendientesView.vue`):**
+  - Se identifica con badges distintivos `🩺 Ya se atendió` y `REINTEGRO PENDIENTE`.
+  - En la ventana modal de observaciones se incluye una alerta destacada advirtiendo al operador la pauta de comunicación obligatoria: **NO decirle que venga a atenderse cuando quiera, sino informarle que su auditoría finalizó y que debe acercarse a buscar su reintegro económico**.
+  - En el modal de registro de llamada (`RegistrarLlamadaModal.vue`) se visualiza el banner de advertencia para evitar confusiones operativas.
+- **Expediente de la Orden (`OrdenDetailView.vue` y `OrdenDetailPanel.vue`):**
+  - Banner interactivo de atención previa con desglose del reintegro.
+  - Desglose contable dentro de la tarjeta de "Resolución Final de Auditoría".
+  - Edición en el modal de actualización de datos de la orden.
+
+### 20.3 Reordenamiento del Catálogo de Indicaciones Clínicas
+- **Persistencia y Backend:**
+  - Endpoint `POST /api/v1/config/indicaciones/reorder` que recibe una lista de `{ id, orden_secuencia }` y actualiza atómicamente la base de datos.
+  - El listado en `IndicacionEstudioService` ordena por `orden_secuencia ASC, titulo ASC`.
+- **Panel Administrativo (`ConfiguracionView.vue`):**
+  - Se agregaron controles de orden en la tabla con botones de acción rápida **Subir (`▲`)** y **Bajar (`▼`)** con actualización optimista inmediata en la UI y sincronización al backend.
+  - Se incorporó el campo de entrada numérica `orden_secuencia` en el modal de creación y edición de indicaciones.
+- **Selector de Indicaciones (`IndicacionesChipsSelector.vue` y `OrdenCreateView.vue`):**
+  - Las indicaciones se presentan ordenadas por su secuencia configurada tanto en la carga inicial de la orden como en el expediente, garantizando que las más frecuentes aparezcan siempre en primer lugar.

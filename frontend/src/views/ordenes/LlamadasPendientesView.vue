@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useOrdenesStore } from '../../stores/ordenes.store';
 import { useAuthStore } from '../../stores/auth.store';
+import { useFeaturesStore } from '../../stores/features.store';
 import { usersService } from '../../services/users.service';
 import { OrdenLlamadaPendienteItem, Sucursal, TipoLlamada } from '../../types';
 import DataTable from 'primevue/datatable';
@@ -19,6 +20,7 @@ import { formatDateTime } from '../../utils/date';
 const router = useRouter();
 const ordenesStore = useOrdenesStore();
 const authStore = useAuthStore();
+const featuresStore = useFeaturesStore();
 
 const sucursales = ref<Sucursal[]>([]);
 const selectedSucursal = ref<string | undefined>(undefined);
@@ -33,6 +35,8 @@ const selectedOrden = ref<{
   pacienteNombre: string;
   telefono?: string | null;
   tipoLlamada: TipoLlamada;
+  yaSeAtendio?: boolean;
+  montoAbonadoAtencion?: number;
 } | null>(null);
 
 const handleOpenObservacionesModal = (item: OrdenLlamadaPendienteItem) => {
@@ -58,6 +62,8 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
     pacienteNombre: item.paciente_nombre,
     telefono: item.contacto_telefono || item.contacto_celular || item.paciente_telefono,
     tipoLlamada: item.tipo_llamada_requerida,
+    yaSeAtendio: item.ya_se_atendio,
+    montoAbonadoAtencion: item.monto_abonado_atencion,
   };
   isModalVisible.value = true;
 };
@@ -119,7 +125,7 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
         <!-- Nro Orden -->
         <Column field="nro_orden" header="N° Orden" sortable>
           <template #body="{ data }">
-            <div class="flex items-center space-x-1.5">
+            <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
               <router-link
                 :to="`/ordenes/${data.id}`"
                 class="font-mono text-xs font-bold text-blue-600 hover:underline"
@@ -132,6 +138,13 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
                 title="¡ATENCIÓN! El paciente DEBE la orden médica física"
               >
                 <i class="pi pi-exclamation-triangle text-[10px]"></i> Debe receta
+              </span>
+              <span
+                v-if="featuresStore.isAtencionPreviaEnabled && data.ya_se_atendio"
+                class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-0.5"
+                :title="'PACIENTE YA SE ATENDIÓ. Abonó: $' + Number(data.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })"
+              >
+                🩺 Ya se atendió
               </span>
             </div>
           </template>
@@ -156,12 +169,19 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
         <!-- Tipo de Aviso & Boton Observaciones -->
         <Column header="Motivo del Aviso" style="min-width: 280px">
           <template #body="{ data }">
-            <div class="flex items-center space-x-2 py-1">
+            <div class="flex items-center space-x-2 py-1 flex-wrap gap-y-1">
               <Tag
                 :value="data.tipo_llamada_requerida === 'SOLICITUD_AUDITORIA' ? 'OBSERVACIÓN DEL AUDITOR' : 'AUDITORÍA FINALIZADA'"
                 :severity="data.tipo_llamada_requerida === 'SOLICITUD_AUDITORIA' ? 'danger' : 'success'"
                 class="text-[10px]"
               />
+              <span
+                v-if="featuresStore.isAtencionPreviaEnabled && data.ya_se_atendio"
+                class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500 text-white inline-flex items-center gap-1 shadow-xs"
+                title="Avisar que debe venir a buscar reintegro"
+              >
+                <i class="pi pi-wallet text-[9px]"></i> REINTEGRO PENDIENTE
+              </span>
               <Button
                 icon="pi pi-comments"
                 label="Ver Observaciones"
@@ -233,6 +253,25 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
       :style="{ width: '560px' }"
     >
       <div v-if="selectedOrdenParaObs" class="space-y-4 text-xs">
+        <!-- ALERTA IMPORTANTE: PACIENTE YA SE ATENDIÓ - DEBE BUSCAR REINTEGRO (Feature Flag) -->
+        <div
+          v-if="featuresStore.isAtencionPreviaEnabled && selectedOrdenParaObs.ya_se_atendio"
+          class="p-3.5 bg-amber-50 border-2 border-amber-400 rounded-xl text-amber-950 text-xs space-y-1.5 shadow-sm"
+        >
+          <div class="flex items-center justify-between font-extrabold text-xs uppercase tracking-wide text-amber-900">
+            <span class="flex items-center gap-1.5">
+              <i class="pi pi-exclamation-circle text-amber-600 text-base animate-pulse"></i>
+              ¡ATENCIÓN: EL PACIENTE YA SE ATENDIÓ!
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+              Abonó al atenderse: ${{ Number(selectedOrdenParaObs.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+            </span>
+          </div>
+          <p class="font-bold text-[11px] text-amber-950 leading-tight">
+            📢 <strong>Pauta de llamada:</strong> No indicarle que puede venir a atenderse cuando quiera; informarle que su auditoría médica finalizó y que <strong>debe acercarse a retirar su reintegro</strong> económico si corresponde.
+          </p>
+        </div>
+
         <!-- ALERTA IMPORTANTE: DEBE RECETA MEDICA FISICA -->
         <div
           v-if="selectedOrdenParaObs.debe_orden_medica"
@@ -282,8 +321,11 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
           <p class="text-slate-800 font-medium text-xs leading-relaxed bg-white p-2.5 rounded-lg border border-blue-100">
             {{ selectedOrdenParaObs.observacion_resultado_auditoria || selectedOrdenParaObs.motivo_aviso }}
           </p>
-          <p class="text-[11px] text-blue-700 italic">
+          <p v-if="!featuresStore.isAtencionPreviaEnabled || !selectedOrdenParaObs.ya_se_atendio" class="text-[11px] text-blue-700 italic">
             * Indicar al paciente que su trámite está finalizado y puede acercarse al laboratorio para realizarse los estudios.
+          </p>
+          <p v-else class="text-[11px] text-amber-900 font-bold bg-amber-100/90 p-2 rounded-lg border border-amber-300">
+            * ¡El paciente ya se atendió! Comunicarle la resolución e informarle que pase a retirar su reintegro económico correspondiente.
           </p>
         </div>
 
@@ -364,6 +406,8 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
       :pacienteNombre="selectedOrden.pacienteNombre"
       :telefono="selectedOrden.telefono"
       :tipoLlamada="selectedOrden.tipoLlamada"
+      :yaSeAtendio="featuresStore.isAtencionPreviaEnabled && selectedOrden.yaSeAtendio"
+      :montoAbonadoAtencion="selectedOrden.montoAbonadoAtencion"
       @success="loadData"
     />
   </div>

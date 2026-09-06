@@ -148,6 +148,8 @@ export interface OrdenMedicaListItem {
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
   valor_apb?: number;
+  ya_se_atendio?: boolean;
+  monto_abonado_atencion?: number;
   cantidad_ordenes_fisicas: number;
 
   numeros_auditoria: string[];
@@ -182,6 +184,8 @@ export interface OrdenMedicaDetail {
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
   valor_apb?: number;
+  ya_se_atendio?: boolean;
+  monto_abonado_atencion?: number;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
@@ -237,6 +241,8 @@ export interface OrdenMedicaCreate {
   valor_estudios_no_autorizados?: number;
   abona_apb?: boolean;
   valor_apb?: number;
+  ya_se_atendio?: boolean;
+  monto_abonado_atencion?: number;
   fecha_vencimiento?: string | null;
 
   numeros_auditoria: string[];
@@ -248,6 +254,8 @@ export interface OrdenMedicaCreate {
   contacto_email?: string | null;
   observaciones_ingreso?: string | null;
   debe_orden_medica?: boolean;
+  indicaciones_ids?: string[];
+  indicaciones_texto?: string | null;
 }
 
 export interface OrdenLlamadaPendienteItem {
@@ -270,6 +278,8 @@ export interface OrdenLlamadaPendienteItem {
   observaciones_ingreso?: string | null;
   observacion_resultado_auditoria?: string | null;
   debe_orden_medica?: boolean;
+  ya_se_atendio?: boolean;
+  monto_abonado_atencion?: number;
   cant_intentos_previos: number;
   solicitudes_pendientes?: AuditoriaSolicitud[];
 }
@@ -289,6 +299,7 @@ export interface SystemFeaturesConfig {
   estudios_autorizacion: boolean;
   indicaciones_estudios: boolean;
   asignar_auditor: boolean;
+  atencion_previa: boolean;
 }
 
 export interface SystemFeaturesConfigUpdate {
@@ -297,6 +308,7 @@ export interface SystemFeaturesConfigUpdate {
   estudios_autorizacion?: boolean;
   indicaciones_estudios?: boolean;
   asignar_auditor?: boolean;
+  atencion_previa?: boolean;
 }
 
 
@@ -334,6 +346,15 @@ export interface IndicacionEstudioUpdate {
   color?: string;
   orden_secuencia?: number;
   activa?: boolean;
+}
+
+export interface IndicacionEstudioReorderItem {
+  id: string;
+  orden_secuencia: number;
+}
+
+export interface IndicacionesReorderRequest {
+  items: IndicacionEstudioReorderItem[];
 }
 
 export interface ConfiguracionMailAutomatizacion {

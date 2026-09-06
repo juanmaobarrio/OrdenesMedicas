@@ -119,6 +119,9 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
   "valor_copago": 2500.00,
   "valor_estudios_no_autorizados": 0,
   "abona_apb": true,
+  "valor_apb": 0,
+  "ya_se_atendio": true,
+  "monto_abonado_atencion": 15000.00,
   "fecha_vencimiento": "2026-09-26",
   "numeros_auditoria": ["AUT-1002", "AUT-1003"],
   "debe_orden_medica": true,
@@ -142,6 +145,8 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
   "sucursal_id": "e67e3a9c-0c3a-4467-bc18-eb34d168346f",
   "mutual": "OSDE",
   "valor_copago": 3000.00,
+  "ya_se_atendio": true,
+  "monto_abonado_atencion": 12000.00,
   "contacto_telefono": "1144556677",
   "debe_orden_medica": false
 }
@@ -304,7 +309,15 @@ Valores válidos para `resultado`:
 - `PUT /api/v1/config/estados/{id}`
 - `PATCH /api/v1/config/estados/{id}/toggle-active`
 
-#### D. Roles y Permisos (RBAC)
+#### D. Indicaciones Clínicas de Estudios
+- `GET /api/v1/config/indicaciones?only_active=true`
+- `POST /api/v1/config/indicaciones`
+- `POST /api/v1/config/indicaciones/reorder`
+  - Body: `{ "items": [{ "id": "uuid", "orden_secuencia": 1 }, { "id": "uuid", "orden_secuencia": 2 }] }`
+- `PUT /api/v1/config/indicaciones/{id}`
+- `DELETE /api/v1/config/indicaciones/{id}`
+
+#### E. Roles y Permisos (RBAC)
 - `GET /api/v1/roles` (listar roles)
 - `GET /api/v1/permissions` (listar catálogo de permisos atómicos)
 - `POST /api/v1/roles` (crear rol con lista de `permission_ids`)
@@ -462,7 +475,8 @@ El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistid
   "calculadora_estudios": false,
   "estudios_autorizacion": false,
   "indicaciones_estudios": false,
-  "asignar_auditor": false
+  "asignar_auditor": false,
+  "atencion_previa": false
 }
 ```
 
@@ -481,3 +495,4 @@ El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistid
   - `estudios_autorizacion` (boolean): Activa los campos de prácticas autorizadas, no autorizadas y aranceles particulares.
   - `indicaciones_estudios` (boolean): Activa el selector y gestión de indicaciones clínicas de preparación.
   - `asignar_auditor` (boolean): Activa la vinculación y filtros de auditor médico en las órdenes.
+  - `atencion_previa` (boolean): Activa el control de paciente ya atendido/abonado, banners de reintegro y alertas en bandeja de llamadas.

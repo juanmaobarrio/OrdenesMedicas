@@ -20,6 +20,8 @@ async def fix_and_inspect():
                 ("ordenes_medicas", "debe_orden_medica", "BOOLEAN DEFAULT 0"),
                 ("ordenes_medicas", "abona_apb", "BOOLEAN DEFAULT 0"),
                 ("ordenes_medicas", "valor_apb", "NUMERIC(12, 2) DEFAULT 0.00"),
+                ("ordenes_medicas", "ya_se_atendio", "BOOLEAN DEFAULT 0"),
+                ("ordenes_medicas", "monto_abonado_atencion", "NUMERIC(12, 2) DEFAULT 0.00"),
                 ("ordenes_medicas", "estudios_autorizados", "JSON DEFAULT '[]'"),
                 ("ordenes_medicas", "estudios_no_autorizados", "JSON DEFAULT '[]'"),
                 ("ordenes_medicas", "estudios_detalle", "JSON DEFAULT '[]'"),
@@ -66,6 +68,8 @@ async def fix_and_inspect():
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS debe_orden_medica BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS abona_apb BOOLEAN DEFAULT FALSE;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS valor_apb NUMERIC(12, 2) DEFAULT 0.00;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS ya_se_atendio BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS monto_abonado_atencion NUMERIC(12, 2) DEFAULT 0.00;",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_autorizados JSONB DEFAULT '[]';",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_no_autorizados JSONB DEFAULT '[]';",
                 "ALTER TABLE ordenes_medicas ADD COLUMN IF NOT EXISTS estudios_detalle JSONB DEFAULT '[]';",
@@ -103,6 +107,11 @@ async def fix_and_inspect():
                 """
                 INSERT INTO configuracion_sistema (clave, valor, descripcion)
                 VALUES ('MINUTOS_GRACIA_ENVIO_MAIL', '120', 'Minutos de espera programada antes del envio automatico del mail (permite cancelacion manual)')
+                ON CONFLICT (clave) DO NOTHING;
+                """,
+                """
+                INSERT INTO configuracion_sistema (clave, valor, descripcion)
+                VALUES ('FEATURE_ATENCION_PREVIA', 'false', 'Activa el registro de paciente ya atendido/abonado y cálculo de reintegro')
                 ON CONFLICT (clave) DO NOTHING;
                 """,
             ]

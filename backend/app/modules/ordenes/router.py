@@ -46,6 +46,7 @@ from backend.app.modules.ordenes.schemas import (
     IndicacionEstudioCreate,
     IndicacionEstudioRead,
     IndicacionEstudioUpdate,
+    IndicacionesReorderRequest,
     MotivoCancelacionCreate,
     MotivoCancelacionRead,
     MotivoCancelacionUpdate,
@@ -783,6 +784,20 @@ async def list_indicaciones(
 ):
     service = IndicacionEstudioService(db)
     return await service.list_indicaciones(only_active=only_active)
+
+
+@config_router.post(
+    "/indicaciones/reorder",
+    response_model=List[IndicacionEstudioRead],
+    summary="Reordenar catálogo de indicaciones",
+)
+async def reorder_indicaciones(
+    dto: IndicacionesReorderRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = IndicacionEstudioService(db)
+    return await service.reorder_indicaciones(dto.items)
 
 
 @config_router.post(
