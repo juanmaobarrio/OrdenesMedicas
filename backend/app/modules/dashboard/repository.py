@@ -179,3 +179,43 @@ class DashboardRepository:
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
+
+
+    async def get_ordenes_para_reporte_personalizado(
+        self,
+        fecha_desde: Optional[date] = None,
+        fecha_hasta: Optional[date] = None,
+        mutuales: Optional[List[str]] = None,
+        sucursal_id: Optional[uuid.UUID] = None,
+        estado: Optional[str] = None,
+        solo_con_reintegro: bool = False,
+    ) -> Sequence[OrdenMedica]:
+        """Consulta con filtros para agregaciones dinámicas y estadísticas."""
+        stmt = (
+            select(OrdenMedica)
+            .options(
+                selectinload(OrdenMedica.sucursal),
+                selectinload(OrdenMedica.paciente),
+                selectinload(OrdenMedica.assigned_auditor),
+                selectinload(OrdenMedica.created_by_user),
+            )
+            .order_by(OrdenMedica.fecha_prescripcion.asc(), OrdenMedica.created_at.asc())
+        )
+
+        if fecha_desde:
+            stmt = stmt.where(OrdenMedica.fecha_prescripcion >= fecha_desde)
+        if fecha_hasta:
+            stmt = stmt.where(OrdenMedica.fecha_prescripcion <= fecha_hasta)
+        if mutuales and len(mutuales) > 0:
+            mut_clean = [m.strip().upper() for m in mutuales if m.strip()]
+            if mut_clean:
+                stmt = stmt.where(OrdenMedica.mutual.in_(mut_clean))
+        if sucursal_id:
+            stmt = stmt.where(OrdenMedica.sucursal_id == sucursal_id)
+        if estado:
+            stmt = stmt.where(OrdenMedica.estado == estado)
+        if solo_con_reintegro:
+            stmt = stmt.where(OrdenMedica.ya_se_atendio.is_(True))
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()

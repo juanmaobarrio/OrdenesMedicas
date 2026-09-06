@@ -11,6 +11,7 @@ export const useFeaturesStore = defineStore('features', () => {
     indicaciones_estudios: false,
     asignar_auditor: false,
     atencion_previa: false,
+    reportes_estadisticas: false,
   });
 
   const isLoaded = ref(false);
@@ -23,6 +24,7 @@ export const useFeaturesStore = defineStore('features', () => {
   const isIndicacionesEnabled = computed(() => Boolean(features.value.indicaciones_estudios));
   const isAsignarAuditorEnabled = computed(() => Boolean(features.value.asignar_auditor));
   const isAtencionPreviaEnabled = computed(() => Boolean(features.value.atencion_previa));
+  const isReportesEnabled = computed(() => Boolean(features.value.reportes_estadisticas));
 
   const fetchFeatures = async (force = false) => {
     if (isLoaded.value && !force) return features.value;
@@ -61,6 +63,7 @@ export const useFeaturesStore = defineStore('features', () => {
     isIndicacionesEnabled,
     isAsignarAuditorEnabled,
     isAtencionPreviaEnabled,
+    isReportesEnabled,
     fetchFeatures,
     updateFeatures,
   };

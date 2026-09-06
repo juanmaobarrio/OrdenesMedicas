@@ -9,6 +9,8 @@ from backend.app.modules.auth.dependencies import get_current_user, require_perm
 from backend.app.modules.dashboard.schemas import (
     DashboardChartsResponse,
     KpiMetricsResponse,
+    ReporteConfigurableRequest,
+    ReporteConfigurableResponse,
 )
 from backend.app.modules.dashboard.service import DashboardService
 from backend.app.modules.users.models import User
@@ -84,4 +86,18 @@ async def export_ordenes_csv(
     )
     response.headers["Content-Disposition"] = "attachment; filename=reporte_ordenes_medicas.csv"
     return response
+
+
+@router.post(
+    "/reportes/ejecutar",
+    response_model=ReporteConfigurableResponse,
+    summary="Ejecutar reporte estadístico configurable (Exclusivo Administrador)",
+)
+async def ejecutar_reporte_personalizado(
+    dto: ReporteConfigurableRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("ADMIN")),
+):
+    service = DashboardService(db)
+    return await service.generar_reporte_personalizado(dto, current_user=current_user)
 

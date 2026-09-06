@@ -1,5 +1,10 @@
 import api from './api';
-import { DashboardCharts, KpiMetrics } from '../types/dashboard';
+import {
+  DashboardCharts,
+  KpiMetrics,
+  ReporteConfigurableRequest,
+  ReporteConfigurableResponse,
+} from '../types/dashboard';
 
 export const dashboardService = {
   async getKpis(sucursalId?: string): Promise<KpiMetrics> {
@@ -27,6 +32,11 @@ export const dashboardService = {
       params,
       responseType: 'blob',
     });
+    return response.data;
+  },
+
+  async ejecutarReporte(payload: ReporteConfigurableRequest): Promise<ReporteConfigurableResponse> {
+    const response = await api.post<ReporteConfigurableResponse>('/dashboard/reportes/ejecutar', payload);
     return response.data;
   },
 };

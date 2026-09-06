@@ -808,3 +808,38 @@ Se incorporó la trazabilidad completa para órdenes médicas donde el paciente 
   - Se incorporó el campo de entrada numérica `orden_secuencia` en el modal de creación y edición de indicaciones.
 - **Selector de Indicaciones (`IndicacionesChipsSelector.vue` y `OrdenCreateView.vue`):**
   - Las indicaciones se presentan ordenadas por su secuencia configurada tanto en la carga inicial de la orden como en el expediente, garantizando que las más frecuentes aparezcan siempre en primer lugar.
+
+
+---
+
+## 21. MÓDULO DE ESTADÍSTICAS Y REPORTES PERSONALIZADOS (ANALYTICS & CUSTOM REPORT BUILDER)
+
+### 21.1 Arquitectura y Feature Flag
+- **Feature Flag:** `FEATURE_REPORTES_ESTADISTICAS` (almacenada en `configuracion_sistema` e inactiva por defecto).
+- **Restricción de Acceso:** Exclusivo para usuarios con rol `ADMIN` (`is_superuser=True` o `role.code == 'ADMIN'`). Tanto el backend (`require_roles("ADMIN")`) como el frontend (`requiresAdmin: true` y comprobación en navegación) protegen el acceso al módulo.
+
+### 21.2 Motor Dinámico de Agregación Backend
+- **Endpoint:** `POST /api/v1/dashboard/reportes/ejecutar`
+- **Capacidades Multidimensionales:**
+  - **Eje Primario (Agrupar por):** `mutual` (Obra social), `tiempo` (Evolución temporal), `motivo_cancelacion` (Motivos de rechazo/baja), `sucursal` (Sede emisora), `estado` (Ciclo de vida).
+  - **Eje Secundario (Cruce opcional):** Permite cruces analíticos (ej. Motivos de cancelación divididos por obra social, o volumen de órdenes por mutual y tiempo).
+  - **Agrupación Temporal:** Por Mes (`mes`), Semana (`semana`), Día (`dia`) o Año (`anio`).
+  - **Filtros Globales:** Rango de fechas de prescripción, selector múltiple de obras sociales, filtro por sucursal, filtro por estado y filtro booleano de `solo_con_reintegro`.
+
+### 21.3 Presets de Acceso Rápido (1 Clic)
+1. **Órdenes vs. Tiempo:** Agrupación temporal mensual/semanal por obra social.
+2. **Motivos de Cancelación:** Desglose de motivos de anulación cruzados por mutual.
+3. **Tasa de Rechazo de Estudios:** Porcentaje de prácticas no autorizadas respecto al total evaluado por obra social.
+4. **Liquidación Financiera y Reintegros:** Consolidado de copagos, estudios particulares rechazados, APB y saldos de reintegro a favor del paciente.
+5. **Generador Personalizado:** Formulario abierto con selección libre de variables.
+
+### 21.4 Visualización y Salidas (Impresión PDF y Excel)
+- **Pantalla Interactiva (`ReportesView.vue`):**
+  - Tarjetas KPI globales de período (Órdenes evaluadas, % rechazo, copagos recaudados, reintegros calculados).
+  - Gráfico comparativo interactivo renderizado con Chart.js / PrimeVue Chart.
+  - Tabla de datos estructurada con indicadores porcentuales y valores monetarios en ARS ($).
+- **Impresión / Exportación a PDF:**
+  - Maquetación `@media print` que oculta menús, barras de navegación y controles interactivos.
+  - Genera automáticamente membrete formal institucional (*"LABORATORIO DE ANÁLISIS CLÍNICOS - INFORME ESTADÍSTICO DE GESTIÓN"*), metadatos del período, tabla compacta para hoja A4 y pie de firmas de Dirección Médica y Auditoría.
+- **Exportación a CSV:**
+  - Descarga directa de archivo CSV delimitado por punto y coma con codificación UTF-8 BOM para apertura nativa en Microsoft Excel.

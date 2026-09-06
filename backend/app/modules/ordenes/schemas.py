@@ -494,6 +494,7 @@ class SystemFeaturesConfig(BaseModel):
     indicaciones_estudios: bool = Field(default=False, description="Activa la asignación y catálogo de indicaciones clínicas de preparación")
     asignar_auditor: bool = Field(default=False, description="Activa la asignación de auditor médico a la orden médica")
     atencion_previa: bool = Field(default=False, description="Activa el registro de paciente ya atendido/abonado y cálculo de reintegro")
+    reportes_estadisticas: bool = Field(default=False, description="Activa el módulo de estadísticas configurables y reportes personalizados imprimibles")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -505,6 +506,7 @@ class SystemFeaturesConfigUpdate(BaseModel):
     indicaciones_estudios: Optional[bool] = None
     asignar_auditor: Optional[bool] = None
     atencion_previa: Optional[bool] = None
+    reportes_estadisticas: Optional[bool] = None
 
 
 # ==========================================

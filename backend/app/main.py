@@ -193,6 +193,11 @@ def sync_database_columns(connection):
             VALUES ('FEATURE_ATENCION_PREVIA', 'false', 'Activa el registro de paciente ya atendido/abonado y cálculo de reintegro')
             ON CONFLICT (clave) DO NOTHING
             """,
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_REPORTES_ESTADISTICAS', 'false', 'Activa el módulo de estadísticas configurables y reportes personalizados imprimibles')
+            ON CONFLICT (clave) DO NOTHING
+            """,
         ]
         for stmt in postgres_statements:
             try:

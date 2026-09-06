@@ -1137,6 +1137,7 @@ class ConfiguracionSistemaService:
         "indicaciones_estudios": ("FEATURE_INDICACIONES_ESTUDIOS", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
         "asignar_auditor": ("FEATURE_ASIGNAR_AUDITOR", "Activa la asignación de auditor médico a la orden médica"),
         "atencion_previa": ("FEATURE_ATENCION_PREVIA", "Activa el registro de paciente ya atendido/abonado y cálculo de reintegro"),
+        "reportes_estadisticas": ("FEATURE_REPORTES_ESTADISTICAS", "Activa el módulo de estadísticas configurables y reportes personalizados imprimibles"),
     }
 
     async def get_features(self) -> SystemFeaturesConfig:
@@ -1153,6 +1154,7 @@ class ConfiguracionSistemaService:
             indicaciones_estudios=rows.get(self.FEATURE_KEYS["indicaciones_estudios"][0], False),
             asignar_auditor=rows.get(self.FEATURE_KEYS["asignar_auditor"][0], False),
             atencion_previa=rows.get(self.FEATURE_KEYS["atencion_previa"][0], False),
+            reportes_estadisticas=rows.get(self.FEATURE_KEYS["reportes_estadisticas"][0], False),
         )
 
     async def update_features(self, dto: SystemFeaturesConfigUpdate) -> SystemFeaturesConfig:

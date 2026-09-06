@@ -476,7 +476,8 @@ El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistid
   "estudios_autorizacion": false,
   "indicaciones_estudios": false,
   "asignar_auditor": false,
-  "atencion_previa": false
+  "atencion_previa": false,
+  "reportes_estadisticas": false
 }
 ```
 
@@ -496,3 +497,32 @@ El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistid
   - `indicaciones_estudios` (boolean): Activa el selector y gestión de indicaciones clínicas de preparación.
   - `asignar_auditor` (boolean): Activa la vinculación y filtros de auditor médico en las órdenes.
   - `atencion_previa` (boolean): Activa el control de paciente ya atendido/abonado, banners de reintegro y alertas en bandeja de llamadas.
+  - `reportes_estadisticas` (boolean): Activa el generador avanzado de reportes, estadísticas multidimensionales e impresión PDF (solo Admin).
+
+---
+
+### 5.8 Motor de Reportes y Estadísticas Configurables (Exclusivo Administrador)
+
+- **Endpoint:** `POST /api/v1/dashboard/reportes/ejecutar`
+- **Permiso / Rol:** Exclusivo rol `ADMIN`
+- **Request Body:**
+```json
+{
+  "preset": "tasa_rechazo",
+  "dimension_primaria": "mutual",
+  "dimension_secundaria": "tiempo",
+  "agrupacion_tiempo": "mes",
+  "fecha_desde": "2026-06-01",
+  "fecha_hasta": "2026-09-04",
+  "mutuales": ["OSDE", "SWISS MEDICAL"],
+  "solo_con_reintegro": false
+}
+```
+- **Campos del Request:**
+  - `preset` (opcional): `"ordenes_tiempo"`, `"motivos_cancelacion"`, `"tasa_rechazo"`, `"financiero_reintegros"`.
+  - `dimension_primaria`: `"mutual"`, `"tiempo"`, `"motivo_cancelacion"`, `"sucursal"`, `"estado"`.
+  - `dimension_secundaria` (opcional): Cruce analítico secundario.
+  - `agrupacion_tiempo`: `"mes"`, `"semana"`, `"dia"`, `"anio"`.
+  - `fecha_desde` / `fecha_hasta`: Filtro por fecha de prescripción (formato `YYYY-MM-DD`).
+  - `mutuales` (array opcional): Filtro por siglas de obras sociales.
+  - `solo_con_reintegro` (boolean opcional): Filtrar órdenes de pacientes que ya se atendieron.

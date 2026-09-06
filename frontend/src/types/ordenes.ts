@@ -300,6 +300,7 @@ export interface SystemFeaturesConfig {
   indicaciones_estudios: boolean;
   asignar_auditor: boolean;
   atencion_previa: boolean;
+  reportes_estadisticas: boolean;
 }
 
 export interface SystemFeaturesConfigUpdate {
@@ -309,6 +310,7 @@ export interface SystemFeaturesConfigUpdate {
   indicaciones_estudios?: boolean;
   asignar_auditor?: boolean;
   atencion_previa?: boolean;
+  reportes_estadisticas?: boolean;
 }
 
 

@@ -1459,6 +1459,40 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                       :value="featuresStore.isAtencionPreviaEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
                   </div>
                 </div>
+
+                <!-- 7. Estadísticas y Reportes Personalizados -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isReportesEnabled ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isReportesEnabled ? 'bg-indigo-600' : 'bg-slate-400'">
+                          <i class="pi pi-chart-bar text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Estadísticas y Reportes Personalizados</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isReportesEnabled ? 'text-indigo-600' : 'text-slate-400'">
+                            reportes_estadisticas
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.reportes_estadisticas"
+                        :disabled="isUpdatingFeature === 'reportes_estadisticas'"
+                        @update:modelValue="handleToggleFeature('reportes_estadisticas', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                      Habilita la página de reportes estadísticos avanzados con cruce dinámico de variables, gráficos y exportación/impresión en formato PDF. Disponible exclusivamente para Administradores.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isReportesEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isReportesEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
               </div>
             </div>
           </TabPanel>

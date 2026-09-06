@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
         meta: { permission: 'dashboard:view' },
       },
       {
+        path: 'reportes',
+        name: 'Reportes',
+        component: () => import('../views/dashboard/ReportesView.vue'),
+        meta: { requiresAdmin: true },
+      },
+      {
         path: 'ordenes',
         name: 'OrdenesList',
         component: () => import('../views/ordenes/OrdenesListView.vue'),
@@ -173,6 +179,11 @@ router.beforeEach(async (to, _from, next) => {
     if (!hasRequiredRole) {
       return next(getDefaultRoute(authStore));
     }
+  }
+
+  // Validación exclusiva Administrador
+  if (to.meta.requiresAdmin === true && !authStore.isAdmin) {
+    return next(getDefaultRoute(authStore));
   }
 
   next();

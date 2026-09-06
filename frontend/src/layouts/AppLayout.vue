@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth.store';
 import { useOrdenesStore } from '../stores/ordenes.store';
+import { useFeaturesStore } from '../stores/features.store';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import Toast from 'primevue/toast';
@@ -12,13 +13,15 @@ const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const ordenesStore = useOrdenesStore();
+const featuresStore = useFeaturesStore();
 
 const isSidebarOpen = ref(false);
 
 
 onMounted(async () => {
-  // Cargar llamadas pendientes para el badge
+  // Cargar llamadas pendientes para el badge y estado de features
   ordenesStore.fetchLlamadasPendientes();
+  featuresStore.fetchFeatures();
 });
 
 const pendingCallsCount = computed(() => ordenesStore.llamadasPendientes.length);
@@ -88,6 +91,11 @@ const navigationItems = computed(() => {
     items.push({ label: 'Configuración', icon: 'pi pi-cog', to: '/configuracion' });
   }
 
+  // Reportes y Estadísticas Avanzadas: Exclusivo Administrador y si está activa la feature
+  if (authStore.isAdmin && featuresStore.isReportesEnabled) {
+    items.push({ label: 'Reportes y Estadísticas', icon: 'pi pi-chart-bar', to: '/reportes' });
+  }
+
   // Manual de Usuario accesible para todos
   items.push({ label: 'Manual de Usuario', icon: 'pi pi-book', to: '/manual_usuario' });
 
@@ -105,6 +113,8 @@ const pageTitle = computed(() => {
   switch (route.name) {
     case 'Dashboard':
       return 'Panel de Control & Indicadores';
+    case 'Reportes':
+      return 'Reportes Estadísticos Personalizados';
     case 'OrdenesList':
       return 'Gestión de Órdenes Médicas';
     case 'OrdenCreate':
