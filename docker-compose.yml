@@ -48,6 +48,12 @@ services:
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-*}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-15}
+      # Configuración de ZeptoMail
+      ZEPTOMAIL_API_URL: ${ZEPTOMAIL_API_URL:-https://api.zeptomail.com/v1.1/email}
+      ZEPTOMAIL_API_TOKEN: ${ZEPTOMAIL_API_TOKEN:-}
+      ZEPTOMAIL_FROM_EMAIL: ${ZEPTOMAIL_FROM_EMAIL:-notificaciones@auditoriasmedicas.local}
+      ZEPTOMAIL_FROM_NAME: ${ZEPTOMAIL_FROM_NAME:-Laboratorio de Análisis Clínicos}
+      ZEPTOMAIL_BOUNCE_ADDRESS: ${ZEPTOMAIL_BOUNCE_ADDRESS:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

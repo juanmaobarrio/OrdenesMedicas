@@ -7,12 +7,25 @@ from backend.app.core.config import settings
 class ZeptoMailService:
     """Cliente asíncrono para envío de correos transaccionales a través de ZeptoMail (Zoho)."""
 
-    def __init__(self):
-        self.api_url = settings.ZEPTOMAIL_API_URL
-        self.api_token = settings.ZEPTOMAIL_API_TOKEN
-        self.from_email = settings.ZEPTOMAIL_FROM_EMAIL
-        self.from_name = settings.ZEPTOMAIL_FROM_NAME
-        self.bounce_address = settings.ZEPTOMAIL_BOUNCE_ADDRESS
+    @property
+    def api_url(self) -> str:
+        return settings.ZEPTOMAIL_API_URL
+
+    @property
+    def api_token(self) -> Optional[str]:
+        return settings.ZEPTOMAIL_API_TOKEN
+
+    @property
+    def from_email(self) -> str:
+        return settings.ZEPTOMAIL_FROM_EMAIL
+
+    @property
+    def from_name(self) -> str:
+        return settings.ZEPTOMAIL_FROM_NAME
+
+    @property
+    def bounce_address(self) -> Optional[str]:
+        return settings.ZEPTOMAIL_BOUNCE_ADDRESS
 
     @property
     def is_configured(self) -> bool:
@@ -42,10 +55,13 @@ class ZeptoMailService:
                 "message": "Envío simulado correctamente (modo desarrollo sin API Token de ZeptoMail)",
             }
 
+        auth_token = self.api_token.strip()
+        auth_header = auth_token if auth_token.startswith("Zoho-enczapikey ") else f"Zoho-enczapikey {auth_token}"
+
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "Authorization": f"Zoho-enczapikey {self.api_token.strip()}",
+            "Authorization": auth_header,
         }
 
         payload: Dict[str, Any] = {
@@ -71,7 +87,7 @@ class ZeptoMailService:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.post(self.api_url, json=payload, headers=headers)
-                
+
                 if response.status_code in (200, 201):
                     res_data = response.json()
                     data_obj = res_data.get("data", [{}])[0] if isinstance(res_data.get("data"), list) and res_data.get("data") else {}

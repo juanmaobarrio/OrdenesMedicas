@@ -612,6 +612,12 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - Modal `EmailResolucionModal.vue` que permite previsualizar el correo renderizado, alternar a edición de código HTML/texto, validar o ingresar la dirección de correo y despachar el mensaje.
 - **Integración con ZeptoMail de Zoho (`backend/app/core/zeptomail.py`):**
   - Cliente HTTP asíncrono con `httpx` que conecta con la API REST de ZeptoMail (`POST /api/v1/ordenes/{id}/enviar-email`).
+  - **Variables de Entorno (`.env`):**
+    - `ZEPTOMAIL_API_TOKEN`: Send Mail Token generado en Zoho ZeptoMail (*Mail Agent -> Setup Info*). Admite tanto el token solo como el formato con prefijo `Zoho-enczapikey <token>`.
+    - `ZEPTOMAIL_FROM_EMAIL`: Dirección remitente validada en ZeptoMail (ej: `notificaciones@tudominio.com`).
+    - `ZEPTOMAIL_FROM_NAME`: Nombre visible del remitente (ej: `"Laboratorio de Análisis Clínicos"`).
+    - `ZEPTOMAIL_API_URL`: URL del endpoint (por defecto `https://api.zeptomail.com/v1.1/email`, o `.eu`, `.in` según el centro de datos).
+    - `ZEPTOMAIL_BOUNCE_ADDRESS`: Dirección de rebote configurada en el Mail Agent (opcional).
   - En entornos de desarrollo o sin API Token configurado, opera en **modo simulación / mock** registrando en log sin generar caídas.
   - Al enviarse, marca `mail_enviado = true`, guarda fecha y usuario en `mail_enviado_fecha` y `mail_enviado_por_id`, almacena el `mail_message_id` para trazabilidad y asienta el evento en el Audit Trail (`AuditoriaLog`).
 - **Control de Automatización: Modo Manual vs Automático con Ventana de Gracia:**
