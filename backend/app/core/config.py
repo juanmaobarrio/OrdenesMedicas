@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     ZEPTOMAIL_FROM_EMAIL: str = "notificaciones@auditoriasmedicas.local"
     ZEPTOMAIL_FROM_NAME: str = "Laboratorio de Análisis Clínicos"
     ZEPTOMAIL_BOUNCE_ADDRESS: Optional[str] = None
+    ZEPTOMAIL_TEST_REDIRECT_EMAIL: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

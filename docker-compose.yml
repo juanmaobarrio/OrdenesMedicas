@@ -54,6 +54,7 @@ services:
       ZEPTOMAIL_FROM_EMAIL: ${ZEPTOMAIL_FROM_EMAIL:-notificaciones@auditoriasmedicas.local}
       ZEPTOMAIL_FROM_NAME: ${ZEPTOMAIL_FROM_NAME:-Laboratorio de Análisis Clínicos}
       ZEPTOMAIL_BOUNCE_ADDRESS: ${ZEPTOMAIL_BOUNCE_ADDRESS:-}
+      ZEPTOMAIL_TEST_REDIRECT_EMAIL: ${ZEPTOMAIL_TEST_REDIRECT_EMAIL:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:

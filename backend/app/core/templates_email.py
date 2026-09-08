@@ -30,7 +30,13 @@ def generar_plantilla_email_resolucion(
     aut_list = [s.strip() for s in (lista_estudios_autorizados or []) if s.strip()]
     no_aut_list = [s.strip() for s in (lista_estudios_no_autorizados or []) if s.strip()]
 
-    aut_str = ", ".join(aut_list) if aut_list else "Todas las prácticas de la prescripción médica"
+    if aut_list:
+        aut_str = ", ".join(aut_list)
+    elif no_aut_list:
+        aut_str = "Se autorizan las restantes prácticas de la orden médica no detalladas entre los estudios no autorizados"
+    else:
+        aut_str = "Se autoriza la totalidad de los estudios de la prescripción médica"
+
     no_aut_str = ", ".join(no_aut_list) if no_aut_list else "Ninguno (100% autorizado)"
 
     # Bloque HTML para Estudios Autorizados y No Autorizados

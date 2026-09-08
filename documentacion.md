@@ -615,9 +615,10 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
   - **Variables de Entorno (`.env`):**
     - `ZEPTOMAIL_API_TOKEN`: Send Mail Token generado en Zoho ZeptoMail (*Mail Agent -> Setup Info*). Admite tanto el token solo como el formato con prefijo `Zoho-enczapikey <token>`.
     - `ZEPTOMAIL_FROM_EMAIL`: Dirección remitente validada en ZeptoMail (ej: `notificaciones@tudominio.com`).
-    - `ZEPTOMAIL_FROM_NAME`: Nombre visible del remitente (ej: `"Laboratorio de Análisis Clínicos"`).
+    - `ZEPTOMAIL_FROM_NAME`: Nombre visible del remitente (ej: `"Laboratorios Obarrio"`).
     - `ZEPTOMAIL_API_URL`: URL del endpoint (por defecto `https://api.zeptomail.com/v1.1/email`, o `.eu`, `.in` según el centro de datos).
-    - `ZEPTOMAIL_BOUNCE_ADDRESS`: Dirección de rebote configurada en el Mail Agent (opcional).
+    - `ZEPTOMAIL_BOUNCE_ADDRESS`: Dirección de rebote configurada en el Mail Agent (opcional, debe omitirse o dejarse en blanco salvo que Zoho requiera una casilla específica configurada en la consola).
+    - `ZEPTOMAIL_TEST_REDIRECT_EMAIL`: Dirección de correo global de pruebas (opcional). Cuando está definida (ej: `juanmaobarrio@gmail.com`), el sistema intercepta todos los envíos y los despacha a dicha casilla indicando el destinatario original en el asunto, impidiendo envíos involuntarios a pacientes reales durante etapas de prueba.
   - En entornos de desarrollo o sin API Token configurado, opera en **modo simulación / mock** registrando en log sin generar caídas.
   - Al enviarse, marca `mail_enviado = true`, guarda fecha y usuario en `mail_enviado_fecha` y `mail_enviado_por_id`, almacena el `mail_message_id` para trazabilidad y asienta el evento en el Audit Trail (`AuditoriaLog`).
 - **Control de Automatización: Modo Manual vs Automático con Ventana de Gracia:**
@@ -640,8 +641,11 @@ El stack está diseñado bajo el patrón de **Dominio Unificado (Same-Origin Rev
     - Endpoint dedicado: `PUT /api/v1/ordenes/{id}/estudios-auditoria`.
 - **Inclusión en el Correo Electrónico:**
   - El generador de correo HTML (`backend/app/core/templates_email.py`) renderiza dos bloques destacados:
-    1. **✓ Estudios Autorizados por la Mutual:** Listado separado por coma o indicación de 100% cubierto.
-    2. **✕ Estudios No Autorizados (a cargo del paciente):** Listado destacado en rojo claro de las prácticas que el paciente debe abonar de forma particular, enlazado directamente con el importe de *Estudios No Autorizados ($)* en la tabla de desglose.
+    1. **✓ Estudios Autorizados por la Mutual:**
+       - Si se cargaron estudios autorizados explícitos: muestra el listado separado por coma.
+       - Si solo se cargaron estudios no autorizados (para ahorrar tiempo del auditor): muestra la leyenda clara: *"Se autorizan las restantes prácticas de la orden médica no detalladas entre los estudios no autorizados"*.
+       - Si no se cargó ni autorizados ni no autorizados: muestra *"Se autoriza la totalidad de los estudios de la prescripción médica"*.
+    2. **✕ Estudios No Autorizados (a cargo del paciente):** Listado destacado en rojo claro de las prácticas que el paciente debe abonar de forma particular, enlazado directamente con el importe de *Estudios No Autorizados ($)* en la tabla de desglose. Si no hay, muestra *"Ninguno (100% autorizado)"*.
 - **Catálogo Administrable de Plantillas de Correo (`plantillas_email`):**
   - Módulo en la pestaña **Automatización y Correos** de **Configuración** (`/configuracion`).
   - Permite crear múltiples plantillas con nombre descriptivo, código único, asunto por defecto y cuerpo HTML editable con variables dinámicas:

@@ -71,8 +71,19 @@ const handleSelectPlantilla = (tplId: string) => {
   // Re-renderizar si la plantilla tiene custom HTML
   if (tpl.cuerpo_html && tpl.cuerpo_html.trim()) {
     let html = tpl.cuerpo_html;
-    const autStr = (props.orden.estudios_autorizados || []).join(', ') || 'Todas las prácticas de la prescripción médica';
-    const noAutStr = (props.orden.estudios_no_autorizados || []).join(', ') || 'Ninguno (100% autorizado)';
+    const autList = (props.orden.estudios_autorizados || []).filter((s) => s && s.trim());
+    const noAutList = (props.orden.estudios_no_autorizados || []).filter((s) => s && s.trim());
+
+    let autStr = '';
+    if (autList.length > 0) {
+      autStr = autList.join(', ');
+    } else if (noAutList.length > 0) {
+      autStr = 'Se autorizan las restantes prácticas de la orden médica no detalladas entre los estudios no autorizados';
+    } else {
+      autStr = 'Se autoriza la totalidad de los estudios de la prescripción médica';
+    }
+
+    const noAutStr = noAutList.length > 0 ? noAutList.join(', ') : 'Ninguno (100% autorizado)';
     const copago = Number(props.orden.valor_copago || 0);
     const noAut = Number(props.orden.valor_estudios_no_autorizados || 0);
     const apb = Number(props.orden.valor_apb || 0);

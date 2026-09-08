@@ -28,6 +28,10 @@ class ZeptoMailService:
         return settings.ZEPTOMAIL_BOUNCE_ADDRESS
 
     @property
+    def test_redirect_email(self) -> Optional[str]:
+        return settings.ZEPTOMAIL_TEST_REDIRECT_EMAIL
+
+    @property
     def is_configured(self) -> bool:
         return bool(self.api_token and self.api_token.strip() and "dummy" not in self.api_token.lower())
 
@@ -43,6 +47,15 @@ class ZeptoMailService:
         """
         destinatario_email = destinatario_email.strip().lower()
         destinatario_nombre = destinatario_nombre.strip() if destinatario_nombre else "Paciente"
+
+        # Modo redirección de pruebas: Si ZEPTOMAIL_TEST_REDIRECT_EMAIL está definido, redirigir todos los envíos a esa casilla
+        if self.test_redirect_email and self.test_redirect_email.strip():
+            redirect_to = self.test_redirect_email.strip().lower()
+            logger.info(
+                f"[ZeptoMail Test-Mode] Redirigiendo correo destinado originalmente a '{destinatario_email}' hacia '{redirect_to}'"
+            )
+            asunto = f"[TEST -> Original: {destinatario_email}] {asunto}"
+            destinatario_email = redirect_to
 
         if not self.is_configured:
             logger.warning(
@@ -81,8 +94,9 @@ class ZeptoMailService:
             "htmlbody": cuerpo_html,
         }
 
-        if self.bounce_address:
-            payload["bounce_address"] = self.bounce_address
+        # bounce_address solo debe enviarse si no está vacío
+        if self.bounce_address and self.bounce_address.strip():
+            payload["bounce_address"] = self.bounce_address.strip()
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
@@ -100,7 +114,16 @@ class ZeptoMailService:
                         "message": "Correo enviado exitosamente vía ZeptoMail",
                     }
                 else:
-                    error_msg = f"Error ZeptoMail [{response.status_code}]: {response.text}"
+                    try:
+                        err_json = response.json()
+                        err_desc = err_json.get("message") or ""
+                        err_details = err_json.get("error", {}).get("details", [])
+                        detail_msgs = [f"{d.get('target', '')}: {d.get('message', '')}" for d in err_details if isinstance(d, dict)]
+                        if detail_msgs:
+                            err_desc += f" ({', '.join(detail_msgs)})"
+                        error_msg = f"Error ZeptoMail [{response.status_code}]: {err_desc or response.text}"
+                    except Exception:
+                        error_msg = f"Error ZeptoMail [{response.status_code}]: {response.text}"
                     logger.error(error_msg)
                     return {
                         "success": False,
