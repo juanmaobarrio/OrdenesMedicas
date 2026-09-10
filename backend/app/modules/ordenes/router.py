@@ -1092,7 +1092,7 @@ async def get_orden_imprimir_indicaciones_data(
     current_user: User = Depends(get_current_user),
 ):
     service = OrdenMedicaService(db)
-    orden = await service.get_orden_by_id(id)
+    orden = await service.get_by_id(id)
     cfg_service = ConfiguracionSistemaService(db)
     cfg_impresion = await cfg_service.get_config_impresion_indicaciones()
 
