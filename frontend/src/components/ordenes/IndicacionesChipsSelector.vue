@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { IndicacionEstudio } from '../../types/ordenes';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
-import Textarea from 'primevue/textarea';
+import RichTextEditor from '../common/RichTextEditor.vue';
 
 const props = defineProps<{
   modelValue: string[]; // IDs o códigos seleccionados
@@ -40,7 +40,9 @@ const autoTexto = computed(() => {
   if (props.textoConsolidado && props.textoConsolidado.trim()) {
     return props.textoConsolidado;
   }
-  return selectedObjects.value.map((i) => `• ${i.titulo}: ${i.instrucciones}`).join('\n\n');
+  return selectedObjects.value
+    .map((i) => `<p><strong>• ${i.titulo}:</strong> ${i.instrucciones}</p>`)
+    .join('');
 });
 
 const toggleIndicacion = (ind: IndicacionEstudio) => {
@@ -54,11 +56,13 @@ const toggleIndicacion = (ind: IndicacionEstudio) => {
   }
   emit('update:modelValue', current);
 
-  // Recalcular texto sugerido
+  // Recalcular texto sugerido en HTML enriquecido
   const newSelected = current
     .map((code) => props.indicacionesDisponibles.find((i) => i.codigo === code))
     .filter(Boolean) as IndicacionEstudio[];
-  const newTexto = newSelected.map((i) => `• ${i.titulo}: ${i.instrucciones}`).join('\n\n');
+  const newTexto = newSelected
+    .map((i) => `<p><strong>• ${i.titulo}:</strong> ${i.instrucciones}</p>`)
+    .join('');
   emit('update:textoConsolidado', newTexto);
   emit('change', { ids: current, texto: newTexto });
 };
@@ -71,7 +75,9 @@ const removeIndicacion = (code: string) => {
   const newSelected = current
     .map((c) => props.indicacionesDisponibles.find((i) => i.codigo === c))
     .filter(Boolean) as IndicacionEstudio[];
-  const newTexto = newSelected.map((i) => `• ${i.titulo}: ${i.instrucciones}`).join('\n\n');
+  const newTexto = newSelected
+    .map((i) => `<p><strong>• ${i.titulo}:</strong> ${i.instrucciones}</p>`)
+    .join('');
   emit('update:textoConsolidado', newTexto);
   emit('change', { ids: current, texto: newTexto });
 };
@@ -201,13 +207,17 @@ const saveEditTexto = () => {
       v-model:visible="isEditTextoOpen"
       modal
       header="Personalizar Texto de Instrucciones para el Paciente"
-      :style="{ width: '560px' }"
+      :style="{ width: '640px', maxWidth: '95vw' }"
     >
       <div class="space-y-3">
         <p class="text-xs text-slate-500">
-          Este es el texto que se incorporará en el correo electrónico de resolución y preparación que recibirá el paciente:
+          Personalice las indicaciones con negritas, listas o resaltador. Este contenido se utilizará tanto para la impresión como para el envío por correo:
         </p>
-        <Textarea v-model="textoManual" rows="7" class="w-full text-xs font-normal leading-relaxed" placeholder="Instrucciones al paciente..." />
+        <RichTextEditor
+          v-model="textoManual"
+          min-height="180px"
+          placeholder="Escriba o ajuste las indicaciones..."
+        />
       </div>
       <template #footer>
         <Button label="Cancelar" text severity="secondary" @click="isEditTextoOpen = false" />

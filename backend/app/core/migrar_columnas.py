@@ -119,6 +119,12 @@ async def fix_and_inspect():
                 VALUES ('FEATURE_REPORTES_ESTADISTICAS', 'false', 'Activa el módulo de estadísticas configurables y reportes personalizados imprimibles')
                 ON CONFLICT (clave) DO NOTHING;
                 """,
+                "ALTER TABLE configuracion_sistema ALTER COLUMN valor TYPE TEXT;",
+                """
+                INSERT INTO configuracion_sistema (clave, valor, descripcion)
+                VALUES ('FEATURE_IMPRESION_INDICACIONES', 'false', 'Activa la impresión de indicaciones clínicas y accesos directos')
+                ON CONFLICT (clave) DO NOTHING;
+                """,
             ]
             for stmt in postgres_statements:
                 try:

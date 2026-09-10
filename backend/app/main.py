@@ -105,6 +105,9 @@ def sync_database_columns(connection):
                 ("FEATURE_ESTUDIOS_AUTORIZACION", "false", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
                 ("FEATURE_INDICACIONES_ESTUDIOS", "false", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
                 ("FEATURE_ASIGNAR_AUDITOR", "false", "Activa la asignación de auditor médico a la orden médica"),
+                ("FEATURE_ATENCION_PREVIA", "false", "Activa el registro de paciente ya atendido/abonado y cálculo de reintegro"),
+                ("FEATURE_REPORTES_ESTADISTICAS", "false", "Activa el módulo de estadísticas configurables y reportes personalizados imprimibles"),
+                ("FEATURE_IMPRESION_INDICACIONES", "false", "Activa la impresión de indicaciones clínicas y accesos directos"),
             ]
             for f_key, f_val, f_desc in feature_defaults:
                 r_feat = connection.execute(text(f"SELECT clave FROM configuracion_sistema WHERE clave = '{f_key}'")).fetchone()
@@ -196,6 +199,12 @@ def sync_database_columns(connection):
             """
             INSERT INTO configuracion_sistema (clave, valor, descripcion)
             VALUES ('FEATURE_REPORTES_ESTADISTICAS', 'false', 'Activa el módulo de estadísticas configurables y reportes personalizados imprimibles')
+            ON CONFLICT (clave) DO NOTHING
+            """,
+            "ALTER TABLE configuracion_sistema ALTER COLUMN valor TYPE TEXT",
+            """
+            INSERT INTO configuracion_sistema (clave, valor, descripcion)
+            VALUES ('FEATURE_IMPRESION_INDICACIONES', 'false', 'Activa la impresión de indicaciones clínicas y accesos directos')
             ON CONFLICT (clave) DO NOTHING
             """,
         ]

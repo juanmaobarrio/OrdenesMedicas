@@ -31,6 +31,7 @@ import RegistrarLlamadaModal from './RegistrarLlamadaModal.vue';
 import IndicacionesChipsSelector from './IndicacionesChipsSelector.vue';
 import EmailResolucionModal from './EmailResolucionModal.vue';
 import CalculadoraEstudiosModal from './CalculadoraEstudiosModal.vue';
+import ImpresionIndicacionesModal from './ImpresionIndicacionesModal.vue';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
@@ -57,6 +58,7 @@ const sucursales = ref<any[]>([]);
 const motivosCancelacion = ref<MotivoCancelacion[]>([]);
 const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
 const isEmailModalVisible = ref(false);
+const isImpresionIndicacionesVisible = ref(false);
 const isCalculadoraModalVisible = ref(false);
 
 const opcionesHorarios = [
@@ -761,6 +763,18 @@ const handleCancelarEnvioAuto = async () => {
           :outlined="!orden.mail_enviado"
           size="small"
           @click="isEmailModalVisible = true"
+        />
+
+        <!-- Imprimir Indicaciones Clínicas (Controlado por Feature Flag) -->
+        <Button
+          v-if="featuresStore.isImpresionIndicacionesEnabled"
+          label="Imprimir Indicaciones"
+          icon="pi pi-print"
+          severity="secondary"
+          outlined
+          size="small"
+          title="Imprimir hoja de indicaciones y preparación para el paciente"
+          @click="isImpresionIndicacionesVisible = true"
         />
 
         <!-- Asignar Auditor (Admin o con permiso) -->
@@ -1845,6 +1859,13 @@ const handleCancelarEnvioAuto = async () => {
       v-if="orden"
       v-model:visible="isCalculadoraModalVisible"
       :orden="orden"
+    />
+
+    <!-- Modal Impresión de Indicaciones -->
+    <ImpresionIndicacionesModal
+      v-if="orden"
+      v-model:visible="isImpresionIndicacionesVisible"
+      :orden-id="orden.id"
     />
   </div>
 </template>

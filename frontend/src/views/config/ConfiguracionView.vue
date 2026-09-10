@@ -32,6 +32,8 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
+import RichTextEditor from '../../components/common/RichTextEditor.vue';
+import ImpresionIndicacionesModal from '../../components/ordenes/ImpresionIndicacionesModal.vue';
 import { formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
@@ -545,7 +547,114 @@ onMounted(() => {
   loadIndicaciones();
   loadMailConfig();
   loadPlantillas();
+  loadConfigImpresion();
 });
+
+// Configuración de Impresión de Indicaciones
+const formImpresion = ref<{
+  template_html: string;
+  indicacion_default: string;
+}>({
+  template_html: '',
+  indicacion_default: '',
+});
+const isLoadingImpresion = ref(false);
+const isSavingImpresionTemplate = ref(false);
+const isSavingIndicacionDefault = ref(false);
+const showVariablesHelpImpresionModal = ref(false);
+const isPreviewImpresionTestVisible = ref(false);
+const previewImpresionTestData = ref<any>(null);
+
+const loadConfigImpresion = async () => {
+  isLoadingImpresion.value = true;
+  try {
+    const res = await configService.getImpresionIndicaciones();
+    formImpresion.value = {
+      template_html: res.template_html,
+      indicacion_default: res.indicacion_default,
+    };
+  } catch (err: any) {
+    console.error('Error cargando configuración de impresión:', err);
+  } finally {
+    isLoadingImpresion.value = false;
+  }
+};
+
+const saveIndicacionDefault = async () => {
+  isSavingIndicacionDefault.value = true;
+  try {
+    await configService.updateImpresionIndicaciones({
+      indicacion_default: formImpresion.value.indicacion_default,
+    });
+    toast.add({
+      severity: 'success',
+      summary: 'Guardado',
+      detail: 'Indicación institucional predeterminada actualizada correctamente.',
+      life: 3000,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err?.response?.data?.detail || 'No se pudo guardar la indicación predeterminada',
+      life: 4000,
+    });
+  } finally {
+    isSavingIndicacionDefault.value = false;
+  }
+};
+
+const saveTemplateImpresion = async () => {
+  isSavingImpresionTemplate.value = true;
+  try {
+    await configService.updateImpresionIndicaciones({
+      template_html: formImpresion.value.template_html,
+    });
+    toast.add({
+      severity: 'success',
+      summary: 'Guardado',
+      detail: 'Plantilla HTML de impresión actualizada con éxito.',
+      life: 3000,
+    });
+  } catch (err: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: err?.response?.data?.detail || 'No se pudo guardar la plantilla de impresión',
+      life: 4000,
+    });
+  } finally {
+    isSavingImpresionTemplate.value = false;
+  }
+};
+
+const handleRestaurarTemplateBase = async () => {
+  try {
+    const base = await configService.getTemplateBaseImpresion();
+    formImpresion.value.template_html = base.template_html;
+    toast.add({
+      severity: 'info',
+      summary: 'Plantilla Base Cargada',
+      detail: 'Se cargó el código base oficial. Recuerde hacer clic en "Guardar Plantilla" para confirmar.',
+      life: 4000,
+    });
+  } catch (err) {
+    console.error('Error restaurando template base:', err);
+  }
+};
+
+const handleAbrirPruebaImpresion = () => {
+  previewImpresionTestData.value = {
+    paciente_nombre: 'GONZÁLEZ, MARÍA LAURA',
+    mutual: 'OSDE 210',
+    contacto_telefono: '4567-8900',
+    fecha: new Date().toLocaleDateString('es-AR'),
+    indicaciones_html:
+      '<p><strong>• Ayuno de 8 a 12 hs:</strong> No ingerir alimentos sólidos ni lácteos durante 8 a 12 horas previas a la extracción. Puede beber agua en cantidades moderadas.</p>' +
+      '<p><strong>• Primera Orina de la Mañana:</strong> Descartar el primer chorro de orina y recolectar el chorro medio en frasco estéril.</p>',
+  };
+  isPreviewImpresionTestVisible.value = true;
+};
 
 const openNewDialog = () => {
   isEditing.value = false;
@@ -765,6 +874,9 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           </Tab>
           <Tab value="6">
             <i class="pi pi-sliders-h mr-1.5 text-violet-600"></i> Funcionalidades (Feature Flags)
+          </Tab>
+          <Tab value="7">
+            <i class="pi pi-print mr-1.5 text-blue-600"></i> Plantilla e Impresión de Indicaciones
           </Tab>
         </TabList>
 
@@ -1493,6 +1605,154 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                       :value="featuresStore.isReportesEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
                   </div>
                 </div>
+
+                <!-- Feature 8: Impresión de Indicaciones y Accesos Rápidos -->
+                <div class="p-4 rounded-xl border transition bg-white shadow-sm flex flex-col justify-between"
+                  :class="featuresStore.isImpresionIndicacionesEnabled ? 'border-blue-300 ring-1 ring-blue-200' : 'border-slate-200 opacity-90'">
+                  <div>
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-sm"
+                          :class="featuresStore.isImpresionIndicacionesEnabled ? 'bg-blue-600' : 'bg-slate-400'">
+                          <i class="pi pi-print text-base"></i>
+                        </div>
+                        <div>
+                          <h5 class="text-sm font-bold text-slate-800">Impresión de Indicaciones y Accesos Rápidos</h5>
+                          <span class="text-[10px] font-mono font-semibold" :class="featuresStore.isImpresionIndicacionesEnabled ? 'text-blue-600' : 'text-slate-400'">
+                            impresion_indicaciones
+                          </span>
+                        </div>
+                      </div>
+                      <ToggleSwitch
+                        :modelValue="featuresStore.features.impresion_indicaciones"
+                        :disabled="isUpdatingFeature === 'impresion_indicaciones'"
+                        @update:modelValue="handleToggleFeature('impresion_indicaciones', $event)"
+                      />
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed mb-4">
+                      Activa la plantilla oficial de impresión de indicaciones, el botón de impresión en el expediente de órdenes y el popup de emisión rápida en la barra superior de recepción.
+                    </p>
+                  </div>
+                  <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Estado actual:</span>
+                    <Tag :severity="featuresStore.isImpresionIndicacionesEnabled ? 'success' : 'secondary'"
+                      :value="featuresStore.isImpresionIndicacionesEnabled ? 'Módulo Activo' : 'Módulo Inactivo'" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Tab 7: Plantilla e Impresión de Indicaciones -->
+          <TabPanel value="7">
+            <div class="p-6 max-w-4xl space-y-6">
+              <!-- Banner Cabecera -->
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50/70 p-5 rounded-2xl border border-blue-200 shadow-sm">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+                    🖨️
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-blue-950">Plantilla y Configuración de Impresión de Indicaciones</h3>
+                    <p class="text-xs text-blue-900/80 mt-1 leading-relaxed">
+                      Configure el texto institucional predeterminado (DNI, orden médica física y horarios de atención) y personalice la plantilla HTML del documento membretado que se imprime para los pacientes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tarjeta 1: Indicación por Defecto de Recepción -->
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <i class="pi pi-info-circle text-amber-500"></i>
+                      Indicación Predeterminada de Recepción (Horarios, DNI, Requisitos)
+                    </h4>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      Este bloque se incluye automáticamente en un recuadro destacado al imprimir indicaciones tanto desde el expediente como desde la barra superior.
+                    </p>
+                  </div>
+                  <Button
+                    label="Guardar Indicación"
+                    icon="pi pi-check"
+                    severity="primary"
+                    size="small"
+                    :loading="isSavingIndicacionDefault"
+                    @click="saveIndicacionDefault"
+                  />
+                </div>
+
+                <div>
+                  <RichTextEditor
+                    v-model="formImpresion.indicacion_default"
+                    min-height="150px"
+                    placeholder="Escriba aquí los horarios, recordatorios sobre DNI y orden física..."
+                  />
+                </div>
+              </div>
+
+              <!-- Tarjeta 2: Plantilla HTML del Documento Imprimible -->
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <i class="pi pi-code text-blue-600"></i>
+                      Plantilla HTML del Documento Imprimible (A4 / Membrete Oficial)
+                    </h4>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      Código HTML estructurado con membrete, logotipo, estilos CSS, márgenes de impresión y pie de página institucional.
+                    </p>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <Button
+                      label="Variables (Ayuda)"
+                      icon="pi pi-question-circle"
+                      severity="secondary"
+                      text
+                      size="small"
+                      class="text-xs"
+                      @click="showVariablesHelpImpresionModal = true"
+                    />
+                    <Button
+                      label="Restaurar Oficial"
+                      icon="pi pi-refresh"
+                      severity="warn"
+                      text
+                      size="small"
+                      class="text-xs"
+                      @click="handleRestaurarTemplateBase"
+                      title="Carga nuevamente el diseño oficial base"
+                    />
+                    <Button
+                      label="Probar Impresión"
+                      icon="pi pi-eye"
+                      severity="secondary"
+                      size="small"
+                      class="text-xs"
+                      @click="handleAbrirPruebaImpresion"
+                      title="Genera un documento de ejemplo para previsualizar"
+                    />
+                    <Button
+                      label="Guardar Plantilla"
+                      icon="pi pi-check"
+                      severity="primary"
+                      size="small"
+                      :loading="isSavingImpresionTemplate"
+                      @click="saveTemplateImpresion"
+                    />
+                  </div>
+                </div>
+
+                <div class="relative">
+                  <textarea
+                    v-model="formImpresion.template_html"
+                    rows="18"
+                    class="font-mono text-xs w-full p-3.5 bg-slate-900 text-slate-100 rounded-lg outline-none resize-y border border-slate-700 leading-relaxed focus:border-blue-500"
+                    placeholder="Código HTML de la plantilla de impresión..."
+                  ></textarea>
+                </div>
               </div>
             </div>
           </TabPanel>
@@ -1918,5 +2178,65 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
         <Button label="Entendido" severity="primary" size="small" @click="isHelpVariablesVisible = false" />
       </template>
     </Dialog>
+    <!-- Modal: Ayuda de Variables Dinámicas para Impresión -->
+    <Dialog v-model:visible="showVariablesHelpImpresionModal" modal header="Variables Dinámicas para la Plantilla de Impresión" :style="{ width: '560px' }">
+      <div class="space-y-3">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Al generar el documento para el paciente, el sistema reemplazará automáticamente los siguientes marcadores por sus datos reales:
+        </p>
+
+        <div class="divide-y divide-slate-100 text-xs">
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;paciente_nombre&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Nombre y Apellido del paciente</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;fecha&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Fecha actual de emisión (ej: 08/09/2026)</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;sucursal_nombre&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Nombre de la sede o sucursal emisora</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;contacto_telefono&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Teléfono de atención del laboratorio o del paciente</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;nro_orden&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Número correlativo de orden médica (o S/N si es emisión rápida)</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;mutual&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Obra Social o Prepaga consignada</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;indicaciones&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Texto enriquecido con las indicaciones clínicas de preparación</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;indicacion_default&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Recuadro con los requisitos generales y horarios de atención</span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Entendido" severity="primary" size="small" @click="showVariablesHelpImpresionModal = false" />
+      </template>
+    </Dialog>
+
+    <!-- Modal para Probar Impresión desde Configuración -->
+    <ImpresionIndicacionesModal
+      v-model:visible="isPreviewImpresionTestVisible"
+      :initial-data="previewImpresionTestData"
+    />
   </div>
 </template>

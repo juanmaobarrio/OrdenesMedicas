@@ -1,6 +1,33 @@
 import html
+import re
 from typing import List, Optional
 from decimal import Decimal
+
+
+def formatear_indicaciones_html(texto: Optional[str]) -> str:
+    """
+    Formatea las indicaciones de estudio para visualización segura en correos e impresiones.
+    Si ya contiene etiquetas HTML permitidas (<b>, <ul>, <p>, etc.), las conserva limpiando etiquetas peligrosas.
+    Si es texto plano, aplica escape de caracteres y reemplaza saltos de línea por <br>.
+    """
+    if not texto or not texto.strip():
+        return ""
+
+    raw = texto.strip()
+
+    # Detectar si contiene marcado HTML básico
+    tiene_html = bool(re.search(r"<(p|b|strong|i|em|u|ul|ol|li|br|mark|span|div)[^>]*>", raw, re.IGNORECASE))
+
+    if tiene_html:
+        # Sanitizar removiendo scripts, iframes, objetos y eventos inline (on...)
+        limpio = re.sub(r"<(script|iframe|object|embed|style)[^>]*>.*?</\1>", "", raw, flags=re.DOTALL | re.IGNORECASE)
+        limpio = re.sub(r"<(script|iframe|object|embed)[^>]*>", "", limpio, flags=re.IGNORECASE)
+        limpio = re.sub(r"\bon\w+\s*=", "data-disabled=", limpio, flags=re.IGNORECASE)
+        limpio = re.sub(r"javascript\s*:", "disabled:", limpio, flags=re.IGNORECASE)
+        return limpio
+    else:
+        # Texto plano legacy
+        return html.escape(raw).replace("\n", "<br>")
 
 
 def generar_plantilla_email_resolucion(
@@ -25,7 +52,7 @@ def generar_plantilla_email_resolucion(
     safe_mutual = html.escape(mutual_nombre or "")
     safe_resolucion = html.escape(observacion_resolucion or "").replace("\n", "<br>")
     safe_sucursal = html.escape(sucursal_nombre or "Sede Central")
-    safe_indicaciones = html.escape(indicaciones_texto or "").replace("\n", "<br>") if indicaciones_texto else ""
+    safe_indicaciones = formatear_indicaciones_html(indicaciones_texto)
 
     aut_list = [s.strip() for s in (lista_estudios_autorizados or []) if s.strip()]
     no_aut_list = [s.strip() for s in (lista_estudios_no_autorizados or []) if s.strip()]

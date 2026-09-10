@@ -430,7 +430,7 @@ class ConfiguracionSistema(Base):
     __tablename__ = "configuracion_sistema"
 
     clave: Mapped[str] = mapped_column(String(100), primary_key=True, index=True)
-    valor: Mapped[str] = mapped_column(String(255), nullable=False)
+    valor: Mapped[str] = mapped_column(Text, nullable=False)
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

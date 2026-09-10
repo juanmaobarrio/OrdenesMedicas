@@ -185,6 +185,7 @@ class OrdenLlamadaPendienteItem(BaseModel):
     ya_se_atendio: bool = False
     monto_abonado_atencion: Decimal = Decimal("0.00")
     cant_intentos_previos: int = 0
+    ultima_llamada_fecha: Optional[datetime] = None
     solicitudes_pendientes: List["AuditoriaSolicitudRead"] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -495,6 +496,7 @@ class SystemFeaturesConfig(BaseModel):
     asignar_auditor: bool = Field(default=False, description="Activa la asignación de auditor médico a la orden médica")
     atencion_previa: bool = Field(default=False, description="Activa el registro de paciente ya atendido/abonado y cálculo de reintegro")
     reportes_estadisticas: bool = Field(default=False, description="Activa el módulo de estadísticas configurables y reportes personalizados imprimibles")
+    impresion_indicaciones: bool = Field(default=False, description="Activa la impresión de indicaciones clínicas y accesos directos")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -507,6 +509,7 @@ class SystemFeaturesConfigUpdate(BaseModel):
     asignar_auditor: Optional[bool] = None
     atencion_previa: Optional[bool] = None
     reportes_estadisticas: Optional[bool] = None
+    impresion_indicaciones: Optional[bool] = None
 
 
 # ==========================================
@@ -572,6 +575,19 @@ class ConfiguracionMailAutomatizacionRead(BaseModel):
 class ConfiguracionMailAutomatizacionUpdate(BaseModel):
     envio_automatico: bool = Field(..., description="Habilitar o pausar envío automático")
     minutos_gracia: int = Field(default=120, ge=1, le=1440, description="Minutos de gracia (1 a 1440)")
+
+
+# ==========================================
+# CONFIGURACION IMPRESION INDICACIONES
+# ==========================================
+class ConfiguracionImpresionIndicacionesRead(BaseModel):
+    template_html: str = Field(..., description="Plantilla HTML oficial para imprimir indicaciones")
+    indicacion_default: str = Field(..., description="Texto enriquecido o HTML de la indicación por defecto")
+
+
+class ConfiguracionImpresionIndicacionesUpdate(BaseModel):
+    template_html: Optional[str] = Field(None, description="Nueva plantilla HTML")
+    indicacion_default: Optional[str] = Field(None, description="Nueva indicación por defecto")
 
 
 class PreviewEmailResolucionRead(BaseModel):

@@ -8,6 +8,7 @@ import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import Toast from 'primevue/toast';
 import ConfirmDialog from 'primevue/confirmdialog';
+import IndicacionesRapidasModal from '../components/ordenes/IndicacionesRapidasModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -16,6 +17,7 @@ const ordenesStore = useOrdenesStore();
 const featuresStore = useFeaturesStore();
 
 const isSidebarOpen = ref(false);
+const isIndicacionesRapidasVisible = ref(false);
 
 
 onMounted(async () => {
@@ -234,6 +236,18 @@ const pageTitle = computed(() => {
         </div>
 
         <div class="flex items-center space-x-4">
+          <!-- Botón de Indicaciones Rápidas -->
+          <button
+            v-if="featuresStore.isImpresionIndicacionesEnabled"
+            type="button"
+            @click="isIndicacionesRapidasVisible = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 shadow-2xs transition"
+            title="Emitir e imprimir indicaciones rápidas para un paciente sin ingresar orden"
+          >
+            <i class="pi pi-print text-sm"></i>
+            <span class="hidden sm:inline">Indicaciones Rápidas</span>
+          </button>
+
           <div class="flex items-center space-x-2 text-xs font-medium text-slate-600 bg-slate-100 py-1.5 px-3 rounded-full border border-slate-200">
             <i class="pi pi-building text-blue-600"></i>
             <span>{{ authStore.user?.sucursal_nombre || 'Sede Central' }}</span>
@@ -260,6 +274,9 @@ const pageTitle = computed(() => {
       <main class="flex-1 overflow-y-auto p-6">
         <router-view />
       </main>
+
+      <!-- Modal Indicaciones Rápidas -->
+      <IndicacionesRapidasModal v-model:visible="isIndicacionesRapidasVisible" />
     </div>
   </div>
 </template>

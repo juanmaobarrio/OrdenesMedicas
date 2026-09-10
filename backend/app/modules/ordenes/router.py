@@ -1,7 +1,7 @@
 import os
 import shutil
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, List, Optional, Union
 from loguru import logger
@@ -36,6 +36,8 @@ from backend.app.modules.ordenes.schemas import (
     AuditoriaSolicitudResponder,
     ConfiguracionAPBRead,
     ConfiguracionAPBUpdate,
+    ConfiguracionImpresionIndicacionesRead,
+    ConfiguracionImpresionIndicacionesUpdate,
     ConfiguracionMailAutomatizacionRead,
     ConfiguracionMailAutomatizacionUpdate,
     EnviarEmailResolucionRequest,
@@ -989,3 +991,142 @@ async def get_plantilla_base_codigo(
 ):
     from backend.app.core.templates_email import obtener_plantilla_base_html
     return {"codigo_html": obtener_plantilla_base_html()}
+
+
+# ==========================================
+# CONFIGURACIÓN DE PLANTILLA E INDICACIÓN POR DEFECTO PARA IMPRESIÓN
+# ==========================================
+@config_router.get(
+    "/impresion-indicaciones",
+    response_model=ConfiguracionImpresionIndicacionesRead,
+    summary="Consultar plantilla HTML e indicación por defecto para impresión",
+)
+async def get_config_impresion_indicaciones(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.get_config_impresion_indicaciones()
+
+
+@config_router.put(
+    "/impresion-indicaciones",
+    response_model=ConfiguracionImpresionIndicacionesRead,
+    summary="Actualizar plantilla HTML o indicación por defecto para impresión",
+)
+async def update_config_impresion_indicaciones(
+    dto: ConfiguracionImpresionIndicacionesUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission("config:manage")),
+):
+    service = ConfiguracionSistemaService(db)
+    return await service.update_config_impresion_indicaciones(dto)
+
+
+@config_router.get(
+    "/impresion-indicaciones/template-base",
+    response_model=dict,
+    summary="Obtener la plantilla oficial base y la indicación por defecto original",
+)
+async def get_template_base_impresion(
+    current_user: User = Depends(get_current_user),
+):
+    return ConfiguracionSistemaService.get_template_base_impresion()
+
+
+# ==========================================
+# ENDPOINTS PARA IMPRESIÓN DE INDICACIONES
+# ==========================================
+@router.post(
+    "/imprimir-indicaciones-preview",
+    summary="Generar HTML ensamblado de indicaciones para previsualizar e imprimir",
+)
+async def preview_imprimir_indicaciones(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cfg_service = ConfiguracionSistemaService(db)
+    cfg_impresion = await cfg_service.get_config_impresion_indicaciones()
+    from backend.app.core.templates_email import formatear_indicaciones_html
+    from backend.app.core.templates_impresion import generar_html_impresion_indicaciones
+
+    paciente_nombre = payload.get("paciente_nombre", "Paciente")
+    fecha_str = payload.get("fecha") or datetime.now().strftime("%d/%m/%Y")
+    sucursal_nombre = current_user.sucursal.nombre if getattr(current_user, "sucursal", None) else "Sede Central"
+    telefono = payload.get("contacto_telefono") or ""
+    nro_orden = payload.get("nro_orden") or ""
+    mutual = payload.get("mutual") or ""
+
+    raw_ind = payload.get("indicaciones_html") or payload.get("indicaciones_texto") or ""
+    ind_html = formatear_indicaciones_html(raw_ind)
+
+    incluir_default = payload.get("incluir_default", True)
+    ind_default = cfg_impresion.indicacion_default if incluir_default else ""
+
+    html_ensamblado = generar_html_impresion_indicaciones(
+        paciente_nombre=paciente_nombre,
+        fecha=fecha_str,
+        sucursal_nombre=sucursal_nombre,
+        contacto_telefono=telefono,
+        nro_orden=nro_orden,
+        mutual=mutual,
+        indicaciones_html=ind_html,
+        indicacion_default_html=ind_default,
+        template_custom=cfg_impresion.template_html,
+    )
+
+    return {
+        "html_ensamblado": html_ensamblado,
+        "indicacion_default": cfg_impresion.indicacion_default,
+    }
+
+
+@router.get(
+    "/{id}/imprimir-indicaciones-data",
+    summary="Obtener datos consolidados y template para imprimir indicaciones de una orden",
+)
+async def get_orden_imprimir_indicaciones_data(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = OrdenMedicaService(db)
+    orden = await service.get_orden_by_id(id)
+    cfg_service = ConfiguracionSistemaService(db)
+    cfg_impresion = await cfg_service.get_config_impresion_indicaciones()
+
+    from backend.app.core.templates_email import formatear_indicaciones_html
+    from backend.app.core.templates_impresion import generar_html_impresion_indicaciones
+
+    paciente_nombre = orden.paciente.nombre_completo if orden.paciente else (orden.contacto_nombre or "Paciente")
+    fecha_str = datetime.now().strftime("%d/%m/%Y")
+    sucursal_nombre = orden.sucursal.nombre if orden.sucursal else "Sede Central"
+    telefono = orden.contacto_telefono or (orden.paciente.telefono if orden.paciente else "") or ""
+
+    ind_html = formatear_indicaciones_html(orden.indicaciones_texto)
+
+    html_ensamblado = generar_html_impresion_indicaciones(
+        paciente_nombre=paciente_nombre,
+        fecha=fecha_str,
+        sucursal_nombre=sucursal_nombre,
+        contacto_telefono=telefono,
+        nro_orden=orden.nro_orden,
+        mutual=orden.mutual,
+        indicaciones_html=ind_html,
+        indicacion_default_html=cfg_impresion.indicacion_default,
+        template_custom=cfg_impresion.template_html,
+    )
+
+    return {
+        "paciente_nombre": paciente_nombre,
+        "nro_orden": orden.nro_orden,
+        "mutual": orden.mutual,
+        "fecha": fecha_str,
+        "sucursal_nombre": sucursal_nombre,
+        "contacto_telefono": telefono,
+        "indicaciones_html": ind_html,
+        "indicacion_default": cfg_impresion.indicacion_default,
+        "template_html": cfg_impresion.template_html,
+        "html_ensamblado": html_ensamblado,
+    }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useOrdenesStore } from '../../stores/ordenes.store';
 import { useAuthStore } from '../../stores/auth.store';
@@ -12,6 +12,7 @@ import Button from 'primevue/button';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
+import ToggleSwitch from 'primevue/toggleswitch';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModal.vue';
@@ -24,6 +25,53 @@ const featuresStore = useFeaturesStore();
 
 const sucursales = ref<Sucursal[]>([]);
 const selectedSucursal = ref<string | undefined>(undefined);
+
+// Control de ocultar llamadas con intento hace menos de 1 hora
+const ocultarLlamadasRecientes = ref(true);
+
+const parseDateUTC = (dateStr: string): number => {
+  if (!dateStr) return 0;
+  const hasTimezone = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr);
+  const safeStr = hasTimezone ? dateStr : `${dateStr}Z`;
+  return new Date(safeStr).getTime();
+};
+
+const esLlamadaEnEspera = (item: OrdenLlamadaPendienteItem): boolean => {
+  if (!item.cant_intentos_previos || item.cant_intentos_previos < 1 || !item.ultima_llamada_fecha) {
+    return false;
+  }
+  const callTime = parseDateUTC(item.ultima_llamada_fecha);
+  if (isNaN(callTime) || callTime === 0) return false;
+  const now = Date.now();
+  const diffMinutes = (now - callTime) / (1000 * 60);
+  // Tolerancia de 2 minutos por eventual desfase horario local hasta 60 minutos
+  return diffMinutes >= -2 && diffMinutes < 60;
+};
+
+const tiempoRestanteEspera = (item: OrdenLlamadaPendienteItem): string => {
+  if (!item.ultima_llamada_fecha) return '';
+  const callTime = parseDateUTC(item.ultima_llamada_fecha);
+  const now = Date.now();
+  const diffMinutes = Math.floor((now - callTime) / (1000 * 60));
+  if (diffMinutes < 0) return 'Hace instantes (espera: 60m)';
+  if (diffMinutes < 60) {
+    const restante = Math.max(1, 60 - diffMinutes);
+    return `Intento hace ${diffMinutes}m (espera: ${restante}m)`;
+  }
+  return `Hace ${diffMinutes}m`;
+};
+
+const llamadasFiltradas = computed(() => {
+  const list = ordenesStore.llamadasPendientes;
+  if (!ocultarLlamadasRecientes.value) {
+    return list;
+  }
+  return list.filter((item) => !esLlamadaEnEspera(item));
+});
+
+const cantOcultasPorEspera = computed(() => {
+  return ordenesStore.llamadasPendientes.filter(esLlamadaEnEspera).length;
+});
 
 // Modal state
 const isModalVisible = ref(false);
@@ -89,6 +137,15 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
       </div>
 
       <div class="flex items-center space-x-3">
+        <!-- Switch Ocultar llamadas con intentos en la última hora -->
+        <div class="flex items-center gap-2 bg-white py-1.5 px-3 rounded-xl border border-slate-300 shadow-2xs text-xs">
+          <i class="pi pi-hourglass text-amber-600"></i>
+          <span class="font-medium text-slate-700 select-none cursor-pointer" @click="ocultarLlamadasRecientes = !ocultarLlamadasRecientes">
+            Ocultar con intento &lt; 1h
+          </span>
+          <ToggleSwitch v-model="ocultarLlamadasRecientes" />
+        </div>
+
         <Dropdown
           v-if="authStore.isAdmin"
           v-model="selectedSucursal"
@@ -112,12 +169,49 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
       </div>
     </div>
 
+    <!-- Banner Informativo de Período de Espera (1 Hora) -->
+    <div
+      v-if="cantOcultasPorEspera > 0"
+      class="p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs transition shadow-2xs"
+      :class="ocultarLlamadasRecientes ? 'bg-amber-50/80 border-amber-300 text-amber-950' : 'bg-blue-50/80 border-blue-200 text-blue-950'"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs"
+          :class="ocultarLlamadasRecientes ? 'bg-amber-200 text-amber-800' : 'bg-blue-200 text-blue-800'"
+        >
+          <i :class="ocultarLlamadasRecientes ? 'pi pi-clock' : 'pi pi-eye'" class="text-base"></i>
+        </div>
+        <div>
+          <span v-if="ocultarLlamadasRecientes" class="font-bold">
+            Hay {{ cantOcultasPorEspera }} llamada(s) en período de espera (último intento realizado hace menos de 1 hora).
+          </span>
+          <span v-else class="font-bold">
+            Mostrando todas las llamadas (incluyendo las {{ cantOcultasPorEspera }} en período de espera).
+          </span>
+          <p class="text-[11px] opacity-80 mt-0.5">
+            {{ ocultarLlamadasRecientes ? 'Se ocultan temporalmente para evitar reiterar llamados de forma inmediata.' : 'Las llamadas con intento reciente muestran el tiempo de espera restante en la columna de Intentos.' }}
+          </p>
+        </div>
+      </div>
+
+      <Button
+        :label="ocultarLlamadasRecientes ? `Mostrar Todas (${ordenesStore.llamadasPendientes.length})` : 'Ocultar Recientes (< 1h)'"
+        :icon="ocultarLlamadasRecientes ? 'pi pi-eye' : 'pi pi-eye-slash'"
+        :severity="ocultarLlamadasRecientes ? 'warn' : 'secondary'"
+        size="small"
+        class="text-xs shrink-0 font-bold"
+        @click="ocultarLlamadasRecientes = !ocultarLlamadasRecientes"
+      />
+    </div>
+
     <!-- Content -->
     <LoadingSpinner v-if="ordenesStore.isLoadingLlamadas" message="Cargando llamadas pendientes..." />
 
-    <div v-else-if="ordenesStore.llamadasPendientes.length > 0" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <!-- Tabla con llamadas visibles -->
+    <div v-else-if="llamadasFiltradas.length > 0" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <DataTable
-        :value="ordenesStore.llamadasPendientes"
+        :value="llamadasFiltradas"
         stripedRows
         responsiveLayout="scroll"
         class="p-datatable-sm"
@@ -200,14 +294,25 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
         <Column field="sucursal_nombre" header="Sucursal" sortable style="width: 120px" />
 
         <!-- Intentos Previos -->
-        <Column field="cant_intentos_previos" header="Intentos" sortable style="width: 100px">
+        <Column field="cant_intentos_previos" header="Intentos" sortable style="min-width: 140px">
           <template #body="{ data }">
-            <span
-              class="px-2 py-0.5 rounded text-xs font-semibold"
-              :class="data.cant_intentos_previos > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'"
-            >
-              {{ data.cant_intentos_previos }} intentos
-            </span>
+            <div class="space-y-1">
+              <span
+                class="px-2 py-0.5 rounded text-xs font-semibold inline-block"
+                :class="data.cant_intentos_previos > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'"
+              >
+                {{ data.cant_intentos_previos }} intento(s)
+              </span>
+
+              <div
+                v-if="esLlamadaEnEspera(data)"
+                class="text-[10px] text-amber-800 font-bold flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300 w-fit"
+                title="Llamada realizada hace menos de 1 hora"
+              >
+                <i class="pi pi-hourglass text-[10px] text-amber-600"></i>
+                <span>{{ tiempoRestanteEspera(data) }}</span>
+              </div>
+            </div>
           </template>
         </Column>
 
@@ -236,6 +341,31 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
           </template>
         </Column>
       </DataTable>
+    </div>
+
+    <!-- Estado si hay llamadas en la bandeja pero todas están en período de espera de 1 hora -->
+    <div
+      v-else-if="cantOcultasPorEspera > 0"
+      class="p-8 bg-white rounded-xl border border-amber-200 shadow-sm text-center space-y-4"
+    >
+      <div class="w-14 h-14 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto text-2xl">
+        <i class="pi pi-hourglass"></i>
+      </div>
+      <div class="space-y-1">
+        <h3 class="text-base font-bold text-slate-800">
+          Todas las llamadas pendientes están en período de espera
+        </h3>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">
+          Hay {{ cantOcultasPorEspera }} llamada(s) con un intento realizado hace menos de 1 hora. Están ocultas para evitar reiterar llamadas inmediatamente.
+        </p>
+      </div>
+      <Button
+        label="Mostrar las llamadas en período de espera"
+        icon="pi pi-eye"
+        severity="warn"
+        size="small"
+        @click="ocultarLlamadasRecientes = false"
+      />
     </div>
 
     <EmptyState

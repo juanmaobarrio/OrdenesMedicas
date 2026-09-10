@@ -18,7 +18,9 @@ async def seed_initial_data():
     import backend.app.modules.pacientes.models  # noqa
     import backend.app.modules.ordenes.models  # noqa
 
-    # Asegurar que todas las tablas y esquemas existan en PostgreSQL / SQLite
+    # Asegurar que todas las tablas y esquemas existan en PostgreSQL / SQLite sin alterar datos
+    # NOTA DE SEGURIDAD PARA PRODUCCIÓN: Base.metadata.create_all SOLO ejecuta CREATE TABLE IF NOT EXISTS.
+    # No modifica, no elimina, ni toca ninguna tabla, fila ni dato preexistente.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -78,6 +80,7 @@ async def seed_initial_data():
                 "description": "Evaluación técnica, auditoría, observaciones, llamadas y gestión",
                 "permissions": [
                     permission_map["ordenes:view"],
+                    permission_map["ordenes:create"],
                     permission_map["ordenes:update"],
                     permission_map["ordenes:audit"],
                     permission_map["ordenes:calls"],
@@ -125,12 +128,16 @@ async def seed_initial_data():
                 if code == "ADMIN":
                     role.permissions = list(permission_map.values())
                     role.hierarchy_level = 100
-                elif code == "AUDITOR":
-                    role.permissions = data["permissions"]
-                    role.hierarchy_level = 50
-                elif code == "USUARIO":
-                    role.permissions = data["permissions"]
-                    role.hierarchy_level = 10
+                else:
+                    # En lugar de sobreescribir ciegamente eliminando permisos que el usuario haya agregado manualmente en la UI,
+                    # aseguramos la unión de permisos base mínimos requeridos:
+                    current_codes = {p.code for p in (role.permissions or [])}
+                    for req_perm in data["permissions"]:
+                        if req_perm.code not in current_codes:
+                            role.permissions.append(req_perm)
+                    # Mantener hierarchy_level adecuado
+                    if not role.hierarchy_level or role.hierarchy_level < data["hierarchy_level"]:
+                        role.hierarchy_level = data["hierarchy_level"]
                 await db.flush()
             role_map[code] = role
 
@@ -297,6 +304,9 @@ async def seed_initial_data():
             ("FEATURE_ESTUDIOS_AUTORIZACION", "false", "Activa los campos clínicos de prácticas autorizadas y no autorizadas"),
             ("FEATURE_INDICACIONES_ESTUDIOS", "false", "Activa la asignación y catálogo de indicaciones clínicas de preparación"),
             ("FEATURE_ASIGNAR_AUDITOR", "false", "Activa la asignación de auditor médico a la orden médica"),
+            ("FEATURE_ATENCION_PREVIA", "false", "Activa el registro de paciente ya atendido/abonado y cálculo de reintegro"),
+            ("FEATURE_REPORTES_ESTADISTICAS", "false", "Activa el módulo de estadísticas configurables y reportes personalizados imprimibles"),
+            ("FEATURE_IMPRESION_INDICACIONES", "false", "Activa la impresión de indicaciones clínicas y accesos directos"),
         ]
         for f_key, f_val, f_desc in feature_defaults:
             stmt_f = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == f_key)

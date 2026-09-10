@@ -281,6 +281,7 @@ export interface OrdenLlamadaPendienteItem {
   ya_se_atendio?: boolean;
   monto_abonado_atencion?: number;
   cant_intentos_previos: number;
+  ultima_llamada_fecha?: string | null;
   solicitudes_pendientes?: AuditoriaSolicitud[];
 }
 
@@ -301,6 +302,7 @@ export interface SystemFeaturesConfig {
   asignar_auditor: boolean;
   atencion_previa: boolean;
   reportes_estadisticas: boolean;
+  impresion_indicaciones: boolean;
 }
 
 export interface SystemFeaturesConfigUpdate {
@@ -311,6 +313,17 @@ export interface SystemFeaturesConfigUpdate {
   asignar_auditor?: boolean;
   atencion_previa?: boolean;
   reportes_estadisticas?: boolean;
+  impresion_indicaciones?: boolean;
+}
+
+export interface ConfiguracionImpresionIndicaciones {
+  template_html: string;
+  indicacion_default: string;
+}
+
+export interface ConfiguracionImpresionIndicacionesUpdate {
+  template_html?: string;
+  indicacion_default?: string;
 }
 
 

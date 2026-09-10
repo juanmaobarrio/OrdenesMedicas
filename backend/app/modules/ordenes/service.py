@@ -41,6 +41,8 @@ from backend.app.modules.ordenes.schemas import (
     AuditoriaSolicitudResponder,
     ConfiguracionAPBRead,
     ConfiguracionAPBUpdate,
+    ConfiguracionImpresionIndicacionesRead,
+    ConfiguracionImpresionIndicacionesUpdate,
     ConfiguracionMailAutomatizacionRead,
     ConfiguracionMailAutomatizacionUpdate,
     EnviarEmailResolucionRequest,
@@ -923,8 +925,25 @@ class OrdenMedicaService:
             else:
                 continue
 
-            # Cantidad de llamadas previas para este tipo
-            intentos = len([l for l in o.llamadas_registro if l.tipo_llamada == tipo])
+            # Cantidad de llamadas previas para este tipo y fecha del último intento
+            llamadas_orden = list(o.llamadas_registro or [])
+            llamadas_tipo = [l for l in llamadas_orden if l.tipo_llamada == tipo]
+            intentos = len(llamadas_tipo)
+
+            ultima_llamada_fecha = None
+            if llamadas_orden:
+                llamadas_sorted = sorted(
+                    llamadas_orden,
+                    key=lambda x: x.created_at or datetime.min,
+                    reverse=True
+                )
+                dt_call = llamadas_sorted[0].created_at
+                if dt_call:
+                    ultima_llamada_fecha = dt_call.replace(tzinfo=timezone.utc) if dt_call.tzinfo is None else dt_call
+
+            dt_estado = o.updated_at
+            if dt_estado and dt_estado.tzinfo is None:
+                dt_estado = dt_estado.replace(tzinfo=timezone.utc)
 
             item = OrdenLlamadaPendienteItem(
                 id=o.id,
@@ -932,7 +951,7 @@ class OrdenMedicaService:
                 estado=o.estado,
                 tipo_llamada_requerida=tipo,
                 motivo_aviso=motivo,
-                fecha_estado=o.updated_at,
+                fecha_estado=dt_estado or datetime.now(timezone.utc),
                 paciente_nombre=o.paciente.nombre_completo,
                 paciente_documento=o.paciente.documento,
                 paciente_telefono=o.paciente.telefono,
@@ -949,6 +968,7 @@ class OrdenMedicaService:
                 ya_se_atendio=getattr(o, "ya_se_atendio", False) or False,
                 monto_abonado_atencion=getattr(o, "monto_abonado_atencion", Decimal("0.00")) or Decimal("0.00"),
                 cant_intentos_previos=intentos,
+                ultima_llamada_fecha=ultima_llamada_fecha,
                 solicitudes_pendientes=sols_pendientes,
             )
             items.append(item)
@@ -1138,6 +1158,7 @@ class ConfiguracionSistemaService:
         "asignar_auditor": ("FEATURE_ASIGNAR_AUDITOR", "Activa la asignación de auditor médico a la orden médica"),
         "atencion_previa": ("FEATURE_ATENCION_PREVIA", "Activa el registro de paciente ya atendido/abonado y cálculo de reintegro"),
         "reportes_estadisticas": ("FEATURE_REPORTES_ESTADISTICAS", "Activa el módulo de estadísticas configurables y reportes personalizados imprimibles"),
+        "impresion_indicaciones": ("FEATURE_IMPRESION_INDICACIONES", "Activa la impresión de indicaciones clínicas y accesos directos"),
     }
 
     async def get_features(self) -> SystemFeaturesConfig:
@@ -1155,6 +1176,7 @@ class ConfiguracionSistemaService:
             asignar_auditor=rows.get(self.FEATURE_KEYS["asignar_auditor"][0], False),
             atencion_previa=rows.get(self.FEATURE_KEYS["atencion_previa"][0], False),
             reportes_estadisticas=rows.get(self.FEATURE_KEYS["reportes_estadisticas"][0], False),
+            impresion_indicaciones=rows.get(self.FEATURE_KEYS["impresion_indicaciones"][0], False),
         )
 
     async def update_features(self, dto: SystemFeaturesConfigUpdate) -> SystemFeaturesConfig:
@@ -1175,6 +1197,81 @@ class ConfiguracionSistemaService:
                     cfg.valor = "true" if val else "false"
         await self.db.commit()
         return await self.get_features()
+
+    async def get_config_impresion_indicaciones(self) -> ConfiguracionImpresionIndicacionesRead:
+        from backend.app.core.templates_impresion import (
+            INDICACION_DEFAULT_HTML,
+            obtener_template_base_impresion_html,
+        )
+        stmt = select(ConfiguracionSistema).where(
+            ConfiguracionSistema.clave.in_(["TEMPLATE_IMPRESION_INDICACIONES_HTML", "INDICACION_DEFAULT_RECEPCION"])
+        )
+        res = await self.db.execute(stmt)
+        rows = {r.clave: r.valor for r in res.scalars().all()}
+
+        template_html = rows.get("TEMPLATE_IMPRESION_INDICACIONES_HTML")
+        if not template_html or not template_html.strip():
+            template_html = obtener_template_base_impresion_html()
+
+        indicacion_default = rows.get("INDICACION_DEFAULT_RECEPCION")
+        if not indicacion_default or not indicacion_default.strip():
+            indicacion_default = INDICACION_DEFAULT_HTML
+
+        return ConfiguracionImpresionIndicacionesRead(
+            template_html=template_html,
+            indicacion_default=indicacion_default,
+        )
+
+    async def update_config_impresion_indicaciones(
+        self, dto: ConfiguracionImpresionIndicacionesUpdate
+    ) -> ConfiguracionImpresionIndicacionesRead:
+        from backend.app.core.templates_impresion import (
+            INDICACION_DEFAULT_HTML,
+            obtener_template_base_impresion_html,
+        )
+        if dto.template_html is not None:
+            stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "TEMPLATE_IMPRESION_INDICACIONES_HTML")
+            res = await self.db.execute(stmt)
+            cfg_tpl = res.scalar_one_or_none()
+            nuevo_tpl = dto.template_html.strip() or obtener_template_base_impresion_html()
+            if not cfg_tpl:
+                cfg_tpl = ConfiguracionSistema(
+                    clave="TEMPLATE_IMPRESION_INDICACIONES_HTML",
+                    valor=nuevo_tpl,
+                    descripcion="Plantilla HTML oficial para imprimir indicaciones",
+                )
+                self.db.add(cfg_tpl)
+            else:
+                cfg_tpl.valor = nuevo_tpl
+
+        if dto.indicacion_default is not None:
+            stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "INDICACION_DEFAULT_RECEPCION")
+            res = await self.db.execute(stmt)
+            cfg_ind = res.scalar_one_or_none()
+            nuevo_ind = dto.indicacion_default.strip() or INDICACION_DEFAULT_HTML
+            if not cfg_ind:
+                cfg_ind = ConfiguracionSistema(
+                    clave="INDICACION_DEFAULT_RECEPCION",
+                    valor=nuevo_ind,
+                    descripcion="Texto o HTML de indicación por defecto en recepción",
+                )
+                self.db.add(cfg_ind)
+            else:
+                cfg_ind.valor = nuevo_ind
+
+        await self.db.commit()
+        return await self.get_config_impresion_indicaciones()
+
+    @staticmethod
+    def get_template_base_impresion() -> dict:
+        from backend.app.core.templates_impresion import (
+            INDICACION_DEFAULT_HTML,
+            obtener_template_base_impresion_html,
+        )
+        return {
+            "template_html": obtener_template_base_impresion_html(),
+            "indicacion_default_base": INDICACION_DEFAULT_HTML,
+        }
 
 
 

@@ -1,6 +1,8 @@
 import api from './api';
 import {
   ConfiguracionAPB,
+  ConfiguracionImpresionIndicaciones,
+  ConfiguracionImpresionIndicacionesUpdate,
   ConfiguracionMailAutomatizacion,
   EstadoOrdenConfig,
   EstadoOrdenConfigCreate,
@@ -158,6 +160,22 @@ export const configService = {
 
   async updateFeatures(dto: SystemFeaturesConfigUpdate): Promise<SystemFeaturesConfig> {
     const response = await api.put<SystemFeaturesConfig>('/config/features', dto);
+    return response.data;
+  },
+
+  // Configuración de Impresión de Indicaciones
+  async getImpresionIndicaciones(): Promise<ConfiguracionImpresionIndicaciones> {
+    const response = await api.get<ConfiguracionImpresionIndicaciones>('/config/impresion-indicaciones');
+    return response.data;
+  },
+
+  async updateImpresionIndicaciones(dto: ConfiguracionImpresionIndicacionesUpdate): Promise<ConfiguracionImpresionIndicaciones> {
+    const response = await api.put<ConfiguracionImpresionIndicaciones>('/config/impresion-indicaciones', dto);
+    return response.data;
+  },
+
+  async getTemplateBaseImpresion(): Promise<{ template_html: string; indicacion_default_base: string }> {
+    const response = await api.get<{ template_html: string; indicacion_default_base: string }>('/config/impresion-indicaciones/template-base');
     return response.data;
   },
 };

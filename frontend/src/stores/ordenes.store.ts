@@ -75,6 +75,12 @@ export const useOrdenesStore = defineStore('ordenes', () => {
     // Si fue exitosa, remover de la lista local de llamadas pendientes
     if (resultado === 'EXITOSA') {
       llamadasPendientes.value = llamadasPendientes.value.filter((o) => o.id !== ordenId);
+    } else {
+      const item = llamadasPendientes.value.find((o) => o.id === ordenId);
+      if (item) {
+        item.cant_intentos_previos = (item.cant_intentos_previos || 0) + 1;
+        item.ultima_llamada_fecha = new Date().toISOString();
+      }
     }
     return res;
   };

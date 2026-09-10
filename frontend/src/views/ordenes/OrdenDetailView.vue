@@ -27,6 +27,7 @@ import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModa
 import IndicacionesChipsSelector from '../../components/ordenes/IndicacionesChipsSelector.vue';
 import EmailResolucionModal from '../../components/ordenes/EmailResolucionModal.vue';
 import CalculadoraEstudiosModal from '../../components/ordenes/CalculadoraEstudiosModal.vue';
+import ImpresionIndicacionesModal from '../../components/ordenes/ImpresionIndicacionesModal.vue';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
@@ -46,6 +47,7 @@ const sucursales = ref<any[]>([]);
 const motivosCancelacion = ref<MotivoCancelacion[]>([]);
 const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
 const isEmailModalVisible = ref(false);
+const isImpresionIndicacionesVisible = ref(false);
 const isCalculadoraModalVisible = ref(false);
 
 const opcionesHorarios = [
@@ -714,6 +716,18 @@ const handleCancelarEnvioAuto = async () => {
             :outlined="!orden.mail_enviado"
             size="small"
             @click="isEmailModalVisible = true"
+          />
+
+          <!-- Imprimir Indicaciones Clínicas (Controlado por Feature Flag) -->
+          <Button
+            v-if="featuresStore.isImpresionIndicacionesEnabled"
+            label="Imprimir Indicaciones"
+            icon="pi pi-print"
+            severity="secondary"
+            outlined
+            size="small"
+            title="Imprimir hoja de indicaciones y preparación para el paciente"
+            @click="isImpresionIndicacionesVisible = true"
           />
 
           <!-- Asignar Auditor -->
@@ -1754,6 +1768,13 @@ const handleCancelarEnvioAuto = async () => {
       v-if="orden"
       v-model:visible="isCalculadoraModalVisible"
       :orden="orden"
+    />
+
+    <!-- Modal Impresión de Indicaciones -->
+    <ImpresionIndicacionesModal
+      v-if="orden"
+      v-model:visible="isImpresionIndicacionesVisible"
+      :orden-id="orden.id"
     />
   </div>
 </template>

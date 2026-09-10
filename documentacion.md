@@ -853,3 +853,86 @@ Se incorporó la trazabilidad completa para órdenes médicas donde el paciente 
   - Genera automáticamente membrete formal institucional (*"LABORATORIO DE ANÁLISIS CLÍNICOS - INFORME ESTADÍSTICO DE GESTIÓN"*), metadatos del período, tabla compacta para hoja A4 y pie de firmas de Dirección Médica y Auditoría.
 - **Exportación a CSV:**
   - Descarga directa de archivo CSV delimitado por punto y coma con codificación UTF-8 BOM para apertura nativa en Microsoft Excel.
+
+
+---
+
+## 22. SISTEMA DE EDICIÓN ENRIQUECIDA E IMPRESIÓN DE INDICACIONES CLÍNICAS
+
+### 22.1 Feature Flag y Control de Activación
+- **Clave en Base de Datos:** `FEATURE_IMPRESION_INDICACIONES` (almacenada en `configuracion_sistema` e inactiva por defecto).
+- **Store Pinia:** `features.store.ts` expone el getter reactivo `isImpresionIndicacionesEnabled`.
+- **Efecto de Conmutación:**
+  - Cuando está activa: muestra el botón de acceso directo `[ 🖨️ Indicaciones Rápidas ]` en la barra superior (Topbar), el botón `[ Imprimir Indicaciones ]` en los expedientes de órdenes médicas (`OrdenDetailPanel.vue` y `OrdenDetailView.vue`), y la pestaña de configuración en `/configuracion`.
+  - Cuando está inactiva: mantiene una interfaz despejada sin controles de impresión.
+
+### 22.2 Editor de Texto Enriquecido (`RichTextEditor.vue`)
+- Componente ligero y nativo desarrollado sin dependencias pesadas:
+  - Soporta negrita (`B`), cursiva (`I`), subrayado (`U`), listas con viñetas (`•`), listas numeradas (`1. 2.`), resaltador visual de textos críticos (`<mark>`) y botón para limpiar formato.
+  - Alternador visual / código HTML (`</> HTML`) para inspección o edición manual directa.
+  - Sincronización reactiva bidireccional con `v-model`.
+- Integrado en:
+  - Personalización de indicaciones clínicas en el expediente (`IndicacionesChipsSelector.vue`).
+  - Modal de emisión rápida desde recepción (`IndicacionesRapidasModal.vue`).
+  - Configuración de la indicación predeterminada en `/configuracion`.
+
+### 22.3 Soporte de Formato Enriquecido en Correos Electrónicos
+- `backend/app/core/templates_email.py`:
+  - Se incorporó la función de sanitización segura `formatear_indicaciones_html(texto: Optional[str]) -> str`.
+  - Si el texto contiene marcado HTML (`<p>`, `<b>`, `<ul>`, `<li>`, `<mark>`), se eliminan scripts o eventos inseguros y se preserva el formato estructurado para que los correos despachados vía ZeptoMail luzcan con sus negritas y viñetas intactas.
+  - Soporte de compatibilidad hacia atrás: si se reciben textos planos preexistentes, se escapan caracteres y se convierten saltos de línea a `<br>`.
+
+### 22.4 Plantilla Oficial de Impresión y Configuración Administrable
+- **Módulo Backend (`backend/app/core/templates_impresion.py`):**
+  - Define el diseño oficial membretado en hoja A4 con estilos CSS `@media print`, encabezado del laboratorio, caja de datos del paciente, sección de indicaciones específicas, bloque destacado de requisitos de recepción y pie de página con firma y datos de la sucursal.
+- **Parámetros Persistidos en `configuracion_sistema`:**
+  - `TEMPLATE_IMPRESION_INDICACIONES_HTML`: Código HTML completo editable por el administrador.
+  - `INDICACION_DEFAULT_RECEPCION`: Texto enriquecido predeterminado con los requisitos institucionales (concurrencia con DNI original, orden médica física y horarios habituales de atención y extracción).
+- **Marcadores Dinámicos Soportados:**
+  - `{{paciente_nombre}}`, `{{fecha}}`, `{{sucursal_nombre}}`, `{{contacto_telefono}}`, `{{nro_orden}}`, `{{mutual}}`, `{{indicaciones}}`, `{{indicacion_default}}`.
+- **Panel Administrativo (`ConfiguracionView.vue` - Pestaña 7):**
+  - Editor enriquecido para modificar la indicación institucional predeterminada.
+  - Editor de código HTML con soporte para visualizar variables disponibles, restaurar la plantilla base oficial y botón "Probar Impresión" con datos de muestra.
+
+### 22.5 Modales y Flujos de Impresión en el Frontend
+1. **Modal de Impresión (`ImpresionIndicacionesModal.vue`):**
+   - Emplea un contenedor `<iframe>` aislado que garantiza renderizado fidedigno de los estilos de hoja y tipografía.
+   - Casilla de verificación para incluir o excluir en tiempo real los requisitos generales de recepción.
+   - Botón directo **"Imprimir / Guardar PDF"** que invoca `iframe.contentWindow.print()`, disparando de inmediato el diálogo nativo del navegador (impresora física o PDF) sin descargas previas.
+   - Opción para abrir el documento en una pestaña independiente.
+2. **Modal de Indicaciones Rápidas (`IndicacionesRapidasModal.vue`):**
+   - Accesible desde el Topbar del sistema.
+   - Permite al personal de recepción emitir e imprimir indicaciones para pacientes que consultan en ventanilla o por teléfono, solicitando únicamente el nombre del paciente y permitiendo seleccionar indicaciones clínicas del catálogo o redactar notas libres, sin necesidad de crear una orden médica en la base de datos.
+3. **Expediente de Órdenes (`OrdenDetailPanel.vue` y `OrdenDetailView.vue`):**
+   - Botón **"Imprimir Indicaciones"** en la barra de acciones superior, precargando de forma automática los datos del paciente, mutual, sede y las indicaciones clínicas asignadas a la orden.
+
+### 22.6 Endpoints REST Expuestos
+| Método | Endpoint | Descripción | Acceso / Permiso |
+|---|---|---|---|
+| `GET` | `/api/v1/config/impresion-indicaciones` | Obtener plantilla HTML vigente e indicación institucional por defecto | Autenticado |
+| `PUT` | `/api/v1/config/impresion-indicaciones` | Actualizar plantilla HTML o indicación institucional por defecto | Permiso: `config:manage` |
+| `GET` | `/api/v1/config/impresion-indicaciones/template-base` | Obtener código base original de la plantilla y texto predeterminado | Autenticado |
+| `POST` | `/api/v1/ordenes/imprimir-indicaciones-preview` | Generar documento HTML ensamblado para previsualización e impresión rápida | Autenticado |
+| `GET` | `/api/v1/ordenes/{id}/imprimir-indicaciones-data` | Obtener datos consolidados y documento listo para imprimir de una orden | Autenticado |
+
+
+---
+
+## 23. BANDEJA DE LLAMADAS: VENTANA DE ESPERA (COOLDOWN DE 1 HORA TRAS INTENTOS PREVIOS)
+
+### 23.1 Regla Operativa y Razón de Negocio
+- Cuando un operador realiza un intento de llamada a un paciente (ej: no contesta, ocupado o para reintentar) y registra la llamada:
+  - La orden médica no debe saturar la vista operativa inmediata del personal ni inducir a llamadas repetidas sucesivas al mismo número.
+  - El sistema implementa una **Ventana de Espera / Cooldown de 1 Hora (60 minutos)** a partir de la fecha y hora del último intento registrado (`ultima_llamada_fecha`).
+
+### 23.2 Comportamiento en la Bandeja de Llamadas (`LlamadasPendientesView.vue`)
+- **Filtro Automático por Defecto:**
+  - El interruptor **"Ocultar con intento < 1h"** inicia activado por defecto.
+  - Las órdenes que cuenten con $\ge 1$ intento realizado hace menos de 60 minutos se ocultan de la tabla principal para evitar confusiones al operador.
+- **Banner Informativo y Alternador "Mostrar Todas":**
+  - Si existen llamadas en período de espera, se visualiza un banner superior indicando la cantidad de órdenes en espera (ej: *"Hay X llamada(s) en período de espera (último intento realizado hace menos de 1 hora)"*).
+  - Un botón directo `[ Mostrar Todas ]` permite desactivar el filtro temporalmente para auditar o forzar la visualización de la totalidad de las órdenes pendientes.
+- **Identificador de Tiempo Restante en la Tabla:**
+  - Al visualizar llamadas que están en el período de 60 minutos, la columna de **Intentos** exhibe un badge de alerta con ícono de reloj de arena `⏳` y el tiempo transcurrido / restante (ej: *"Intento hace 15m (espera: 45m)"*).
+- **Estado Vacío Amigable:**
+  - Si no quedan llamadas por realizar salvo aquellas que están en su ventana de espera de 1 hora, se presenta un estado visual limpio con un botón de acceso directo para visualizarlas si el operador lo requiere.
