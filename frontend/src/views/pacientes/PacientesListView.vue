@@ -181,8 +181,8 @@ const onPageChange = (event: any) => {
     <!-- Search Bar -->
     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
       <div class="flex-1">
-        <span class="p-input-icon-left w-full">
-          <i class="pi pi-search text-slate-400"></i>
+        <span class="p-icon-field p-icon-field-left w-full">
+          <i class="pi pi-search p-input-icon"></i>
           <InputText
             v-model="search"
             placeholder="Buscar por DNI o Apellidos / Nombres..."

@@ -74,6 +74,17 @@ def obtener_template_base_impresion_html() -> str:
     .meta-date strong {
       color: #0f172a;
     }
+    .meta-orden {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0369a1;
+      letter-spacing: -0.2px;
+    }
+    .meta-usuario {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
 
     /* Caja de Datos del Paciente */
     .patient-box {
@@ -225,6 +236,8 @@ def obtener_template_base_impresion_html() -> str:
         <div class="brand-subtitle">Indicaciones y Preparación Previa para Estudios Médicos</div>
       </div>
       <div class="meta-date">
+        <div class="meta-orden">Orden N°: {{nro_orden}}</div>
+        <div class="meta-usuario">Impreso por: {{usuario_nombre}}</div>
         <div>Fecha: <strong>{{fecha}}</strong></div>
         <div>Sede: <strong>{{sucursal_nombre}}</strong></div>
       </div>
@@ -284,6 +297,7 @@ def generar_html_impresion_indicaciones(
     indicaciones_html: Optional[str] = None,
     indicacion_default_html: Optional[str] = None,
     template_custom: Optional[str] = None,
+    usuario_nombre: Optional[str] = None,
 ) -> str:
     """
     Ensambla el documento HTML completo para imprimir reemplazando los marcadores dinámicos.
@@ -296,6 +310,8 @@ def generar_html_impresion_indicaciones(
     telefono_str = contacto_telefono.strip() if contacto_telefono and contacto_telefono.strip() else "Recepción"
     orden_str = nro_orden.strip() if nro_orden and nro_orden.strip() else "S/N"
     mutual_str = mutual.strip() if mutual and mutual.strip() else "Particular / Sin especificar"
+    # Se informa unicamente el nombre de pila del operador que emite la impresion
+    usuario_str = usuario_nombre.strip() if usuario_nombre and usuario_nombre.strip() else "Sistema"
 
     ind_html = indicaciones_html.strip() if indicaciones_html and indicaciones_html.strip() else "<p><em>No se especificaron indicaciones adicionales.</em></p>"
     ind_def = indicacion_default_html.strip() if indicacion_default_html and indicacion_default_html.strip() else INDICACION_DEFAULT_HTML
@@ -309,6 +325,7 @@ def generar_html_impresion_indicaciones(
         "{{mutual}}": html.escape(mutual_str),
         "{{indicaciones}}": ind_html,
         "{{indicacion_default}}": ind_def,
+        "{{usuario_nombre}}": html.escape(usuario_str),
     }
 
     for key, val in replacements.items():

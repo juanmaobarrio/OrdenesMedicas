@@ -294,8 +294,8 @@ const handleToggleActive = async (m: ObraSocial) => {
     <div
       class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
       <div class="flex-1 min-w-[260px] max-w-md">
-        <span class="p-input-icon-left w-full">
-          <i class="pi pi-search text-slate-400 text-xs"></i>
+        <span class="p-icon-field p-icon-field-left w-full">
+          <i class="pi pi-search p-input-icon"></i>
           <InputText v-model="searchInput" placeholder="Buscar por Sigla, Nombre o Código..." class="w-full text-xs" />
         </span>
       </div>

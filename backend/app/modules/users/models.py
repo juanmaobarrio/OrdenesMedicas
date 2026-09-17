@@ -108,6 +108,13 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         return f"{self.first_name} {self.last_name}".strip()
 
     @property
+    def nombre_pila(self) -> str:
+        # Nombre de pila (sin apellido) usado en la impresion de indicaciones clinicas,
+        # donde por politica solo se informa quien emitio el documento con su nombre.
+        # Si no hubiera nombre cargado, cae al username para no dejar el campo vacio.
+        return (self.first_name or "").strip() or (self.username or "").strip() or "Sistema"
+
+    @property
     def role_code(self) -> Optional[str]:
         return self.role.code if self.role else None
 

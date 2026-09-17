@@ -526,3 +526,86 @@ El sistema cuenta con un conmutador de funcionalidades (Feature Flags) persistid
   - `fecha_desde` / `fecha_hasta`: Filtro por fecha de prescripción (formato `YYYY-MM-DD`).
   - `mutuales` (array opcional): Filtro por siglas de obras sociales.
   - `solo_con_reintegro` (boolean opcional): Filtrar órdenes de pacientes que ya se atendieron.
+
+---
+
+### 5.9 Plantilla de Correo, Variables Dinámicas y Aviso de Orden Médica Física
+El correo de resolución de auditoría se genera con la plantilla predeterminada o con cualquier plantilla personalizada del catálogo (`plantillas_email`).
+
+#### A. Previsualizar el Correo Generado
+- **Endpoint:** `GET /api/v1/ordenes/{id}/preview-email`
+- **Response Body (extracto):**
+```json
+{
+  "destinatario_email": "paciente@correo.com",
+  "destinatario_nombre": "Laura Martínez",
+  "asunto": "Resolución de Auditoría Médica - Orden N° ORD-2026-000021",
+  "cuerpo_html": "<!DOCTYPE html>...",
+  "tiene_email": true,
+  "ya_enviado": false,
+  "mail_enviado_fecha": null,
+  "plantilla_id": "uuid-de-la-plantilla-default",
+  "plantillas_disponibles": [],
+  "debe_orden_medica": true
+}
+```
+- El campo `debe_orden_medica` refleja el flag homónimo de la orden y permite a las integraciones externas saber si el aviso de receta física fue incluido en el cuerpo.
+
+#### B. Variables Dinámicas Soportadas en Plantillas
+| Variable | Contenido |
+|---|---|
+| `{{paciente_nombre}}` | Nombre y apellido del paciente o persona de contacto. |
+| `{{nro_orden}}` | Identificador de la orden (ej: `ORD-2026-000001`). |
+| `{{mutual}}` | Obra Social / Prepaga aplicada. |
+| `{{observacion_resultado}}` | Dictamen médico de la resolución de auditoría. |
+| `{{copago}}` | Importe del copago / bono mutual. |
+| `{{estudios_no_autorizados_valor}}` | Suma de prácticas no autorizadas. |
+| `{{valor_apb}}` | Importe del Acto Profesional Bioquímico. |
+| `{{total_abonar}}` | Total a abonar (Copago + No autorizados + APB). |
+| `{{estudios_autorizados}}` | Listado de prácticas autorizadas. |
+| `{{estudios_no_autorizados}}` | Listado de prácticas a cargo del paciente. |
+| `{{indicaciones}}` | Indicaciones de preparación clínica consolidadas. |
+| `{{sucursal_nombre}}` | Sede emisora de la orden. |
+| `{{debe_orden_medica}}` | **Recuadro naranja de advertencia** que recuerda al paciente traer la orden médica física original. Se renderiza **solo si la orden tiene marcada la deuda de receta física**; en caso contrario el marcador se reemplaza por cadena vacía y el recuadro no aparece. |
+| `{{aviso_orden_fisica}}` | Alias equivalente del anterior, para nombres semánticos en plantillas personalizadas. |
+
+> **💡 Consejo para n8n:** si tu workflow arma el correo por fuera del sistema (SMTP / SendGrid / WhatsApp), consultá `debe_orden_medica` en `GET /api/v1/ordenes/{id}` y agregá el recordatorio de la receta física en el mensaje. El flag también viene incluido en la bandeja de llamadas (`GET /api/v1/ordenes/llamadas-pendientes`), lo que permite ramificar el texto del aviso automático según corresponda.
+
+#### C. Obtener el Código HTML Base de la Plantilla
+- **Endpoint:** `GET /api/v1/config/plantillas-email-codigo-base`
+- Devuelve el HTML corporativo oficial con todos los marcadores, incluyendo `{{debe_orden_medica}}`.
+
+---
+
+#### D. Aviso de Orden Médica Física Adeudada en el Correo de Resolución
+
+Cuando la orden tiene marcado el flag `debe_orden_medica` (el paciente recibió la prescripción de forma digital y **adeuda la receta física original**), el correo de resolución de auditoría incluye un **recuadro de advertencia** recordándole que debe traer la orden original el día de la toma de muestra.
+
+- **Ubicación:** inmediatamente después del bloque de *Indicaciones de Preparación* y antes del aviso de *Comunicación Directa*.
+- **Diseño:** fondo ámbar (`#fff7ed`), borde naranja de 2px con barra lateral de 6px (`#ea580c`), título con ícono ⚠️ y frases clave en negrita.
+- **Condicional:** si `debe_orden_medica = false`, el marcador se reemplaza por **cadena vacía** y el recuadro no se renderiza (no queda hueco ni borde residual).
+
+**Variables dinámicas equivalentes disponibles en el gestor de plantillas:**
+
+| Marcador | Contenido |
+|---|---|
+| `{{debe_orden_medica}}` | Recuadro HTML completo de advertencia, o cadena vacía si la orden no adeuda la receta física. |
+| `{{aviso_orden_fisica}}` | Alias del anterior (misma salida), para nombres semánticos en plantillas personalizadas. |
+
+**Implementación:**
+- `generar_plantilla_email_resolucion()` acepta el parámetro `debe_orden_medica: bool`. El bloque se inyecta tanto en el diseño corporativo por defecto como en el diccionario de reemplazo de plantillas personalizadas.
+- `build_preview_email()` y `enviar_email_resolucion()` pasan `bool(orden.debe_orden_medica)`. El preview expone el campo `debe_orden_medica` en `PreviewEmailResolucionRead`.
+- `EmailResolucionModal.vue` resuelve ambos marcadores al cambiar de plantilla.
+- `migrate_plantilla_aviso_orden_fisica()` en `backend/app/main.py`: migración **aditiva e idempotente** ejecutada al arrancar para **SQLite y PostgreSQL**, que inyecta el bloque en la plantilla `DEFAULT` ya persistida. **No modifica** plantillas personalizadas por el usuario.
+
+---
+
+### 5.10 Nombre del Usuario que Imprime las Indicaciones
+
+El documento de impresión de indicaciones clínicas muestra el **nombre de pila del usuario que emite la impresión**, en el encabezado, inmediatamente debajo del número de orden (por política institucional **no se incluye el apellido**).
+
+- **Marcador de plantilla:** `{{usuario_nombre}}`, disponible en el editor de la plantilla de impresión (`/configuracion`) y documentado en el popup de variables.
+- **Origen del dato:** propiedad `nombre_pila` del modelo `User` (`backend/app/modules/users/models.py`), que devuelve `first_name` y cae a `username` y luego a `"Sistema"` si no hubiera nombre cargado.
+- **Endpoint:** `GET /api/v1/ordenes/{id}/imprimir-indicaciones-data` y `POST /api/v1/ordenes/imprimir-indicaciones-preview` devuelven `usuario_nombre` y lo inyectan en el HTML ensamblado.
+- **Frontend:** `ImpresionIndicacionesModal.vue` resuelve el marcador en los reemplazos locales; `ordenes.service.ts` tipa `usuario_nombre` en ambas respuestas.
+- **Validación:** verificado end-to-end contra la API — el encabezado renderiza `Orden N°: ORD-2026-000021` seguido de `Impreso por: Administrador`, sin filtrar el apellido. Captura: `impresion_header_usuario.png`.

@@ -41,6 +41,7 @@ const cachedData = ref<{
   indicaciones_html: string;
   indicacion_default: string;
   template_html: string;
+  usuario_nombre: string;
 } | null>(null);
 
 const loadData = async () => {
@@ -58,6 +59,7 @@ const loadData = async () => {
         indicaciones_html: res.indicaciones_html,
         indicacion_default: res.indicacion_default,
         template_html: res.template_html,
+        usuario_nombre: res.usuario_nombre || '',
       };
       renderHtml();
     } else if (props.initialData) {
@@ -101,6 +103,7 @@ const renderHtml = () => {
     '{{mutual}}': data.mutual || 'Particular',
     '{{indicaciones}}': data.indicaciones_html || '<p><em>No se registraron indicaciones adicionales.</em></p>',
     '{{indicacion_default}}': defaultHtml,
+    '{{usuario_nombre}}': data.usuario_nombre || '',
   };
 
   for (const [key, val] of Object.entries(replacements)) {

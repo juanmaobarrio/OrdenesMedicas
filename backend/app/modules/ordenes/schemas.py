@@ -600,6 +600,7 @@ class PreviewEmailResolucionRead(BaseModel):
     mail_enviado_fecha: Optional[datetime] = None
     plantilla_id: Optional[uuid.UUID] = None
     plantillas_disponibles: List["PlantillaEmailRead"] = []
+    debe_orden_medica: bool = False
 
 
 class EnviarEmailResolucionRequest(BaseModel):

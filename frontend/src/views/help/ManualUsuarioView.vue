@@ -77,8 +77,8 @@ const scrollToChapter = (id: string) => {
           <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <i class="pi pi-list text-blue-600"></i> Tabla de Contenidos
           </h3>
-          <span class="p-input-icon-left w-full">
-            <i class="pi pi-search text-slate-400 text-xs"></i>
+          <span class="p-icon-field p-icon-field-left w-full">
+            <i class="pi pi-search p-input-icon"></i>
             <InputText v-model="searchQuery" placeholder="Buscar en el manual..." class="w-full text-xs" />
           </span>
 

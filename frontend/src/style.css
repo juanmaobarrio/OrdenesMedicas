@@ -29,3 +29,115 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+/* ============================================================
+   Semáforo de vigencia de la Fecha de Vencimiento de prescripción.
+
+   El componente Calendar de PrimeVue aplica la clase al <span> contenedor, y las
+   utilidades de Tailwind (`bg-white`, `w-full`) se aplican al mismo elemento, por lo
+   que se necesita `!important` para ganarle en especificidad.
+   Se colorea TODO el campo (contenedor, borde e input) sin leyendas de texto.
+   ============================================================ */
+.semaforo-vencida,
+.semaforo-vencida .p-inputtext,
+.semaforo-vencida .p-datepicker-input {
+  background-color: #fef2f2 !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #fca5a5 !important;
+  color: #991b1b !important;
+}
+
+.semaforo-vencida .p-datepicker-dropdown,
+.semaforo-vencida .p-datepicker-trigger,
+.semaforo-vencida .p-button {
+  background-color: #fee2e2 !important;
+  border-color: #ef4444 !important;
+  color: #991b1b !important;
+}
+
+.semaforo-proxima,
+.semaforo-proxima .p-inputtext,
+.semaforo-proxima .p-datepicker-input {
+  background-color: #fffbeb !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 1px #fcd34d !important;
+  color: #92400e !important;
+}
+
+.semaforo-proxima .p-datepicker-dropdown,
+.semaforo-proxima .p-datepicker-trigger,
+.semaforo-proxima .p-button {
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #92400e !important;
+}
+
+.semaforo-vigente,
+.semaforo-vigente .p-inputtext,
+.semaforo-vigente .p-datepicker-input {
+  background-color: #f0fdf4 !important;
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 1px #86efac !important;
+  color: #166534 !important;
+}
+
+.semaforo-vigente .p-datepicker-dropdown,
+.semaforo-vigente .p-datepicker-trigger,
+.semaforo-vigente .p-button {
+  background-color: #dcfce7 !important;
+  border-color: #22c55e !important;
+  color: #166534 !important;
+}
+/* ============================================================
+   Compatibilidad de campos con ícono: migración PrimeVue 3 -> 4.
+   La clase `p-input-icon-left` (PV3) dejó de posicionar el ícono en PV4, lo que
+   empujaba el input debajo de la lupa. La sintaxis correcta es `p-icon-field` +
+   `p-input-icon`. Estas reglas actúan como red de seguridad por si alguna vista
+   conserva la clase antigua, evitando que el campo se desacomode.
+   ============================================================ */
+.p-icon-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.p-icon-field > .p-input-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 0;
+  left: 0.75rem;
+  color: #94a3b8;
+  pointer-events: none;
+  font-size: 0.875rem;
+  z-index: 1;
+}
+
+.p-icon-field-left > .p-inputtext,
+.p-icon-field-left > .p-inputwrapper > .p-inputtext {
+  padding-left: 2.25rem;
+  width: 100%;
+}
+
+/* Red de seguridad: si aún quedara una clase PV3 suelta, no debe romper el layout. */
+.p-input-icon-left {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.p-input-icon-left > i {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0.75rem;
+  color: #94a3b8;
+  pointer-events: none;
+  font-size: 0.875rem;
+  z-index: 1;
+}
+
+.p-input-icon-left > .p-inputtext,
+.p-input-icon-left > .p-inputwrapper > .p-inputtext {
+  padding-left: 2.25rem;
+  width: 100%;
+}

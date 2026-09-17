@@ -37,9 +37,11 @@ import ImpresionIndicacionesModal from '../../components/ordenes/ImpresionIndica
 import { formatDateTime } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
+import { useEstadosStore } from '../../stores/estados.store';
 
 const toast = useToast();
 const featuresStore = useFeaturesStore();
+const estadosStore = useEstadosStore();
 const isUpdatingFeature = ref<string | null>(null);
 
 const handleToggleFeature = async (featureKey: keyof SystemFeaturesConfig, newValue: boolean) => {
@@ -532,6 +534,9 @@ const loadEstados = async () => {
   isLoadingEstados.value = true;
   try {
     estados.value = await configService.listEstados(false);
+    // Refresca el catálogo compartido para que StatusTag pinte los colores
+    // recién configurados en toda la aplicación (órdenes, filtros, bandejas).
+    await estadosStore.fetchEstados(true);
   } catch (err: any) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron cargar los estados', life: 3000 });
   } finally {
@@ -2172,6 +2177,14 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
             <code class="text-slate-700 font-bold font-mono">&#123;&#123;sucursal_nombre&#125;&#125;</code>
             <p class="text-[11px] text-slate-500 mt-0.5">Nombre de la sede o sucursal donde se emitió la orden médica.</p>
           </div>
+          <div class="p-2 bg-amber-50 rounded border-amber-200">
+            <code class="text-orange-700 font-bold font-mono">&#123;&#123;debe_orden_medica&#125;&#125;</code>
+            <code class="text-orange-700 font-bold font-mono ml-2">&#123;&#123;aviso_orden_fisica&#125;&#125;</code>
+            <p class="text-[11px] text-slate-500 mt-0.5">
+              Recuadro naranja de <strong>advertencia</strong> que recuerda al paciente traer la orden / receta física original.
+              Se renderiza <strong>solo si la orden tiene marcada la deuda</strong> de orden médica física; si no, el marcador desaparece por completo (ambas variables son equivalentes).
+            </p>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -2224,6 +2237,11 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
           <div class="py-2 flex items-start justify-between gap-2">
             <code class="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;indicacion_default&#125;&#125;</code>
             <span class="text-slate-600 text-right">Recuadro con los requisitos generales y horarios de atención</span>
+          </div>
+
+          <div class="py-2 flex items-start justify-between gap-2">
+            <code class="text-cyan-700 font-bold bg-cyan-50 px-1.5 py-0.5 rounded text-[11px] font-mono">&#123;&#123;usuario_nombre&#125;&#125;</code>
+            <span class="text-slate-600 text-right">Nombre del usuario que imprime el documento (solo nombre, sin apellido)</span>
           </div>
         </div>
       </div>

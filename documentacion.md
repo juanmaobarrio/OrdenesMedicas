@@ -936,3 +936,172 @@ Se incorporó la trazabilidad completa para órdenes médicas donde el paciente 
   - Al visualizar llamadas que están en el período de 60 minutos, la columna de **Intentos** exhibe un badge de alerta con ícono de reloj de arena `⏳` y el tiempo transcurrido / restante (ej: *"Intento hace 15m (espera: 45m)"*).
 - **Estado Vacío Amigable:**
   - Si no quedan llamadas por realizar salvo aquellas que están en su ventana de espera de 1 hora, se presenta un estado visual limpio con un botón de acceso directo para visualizarlas si el operador lo requiere.
+---
+
+## 24. AVISO DE ORDEN MÉDICA FÍSICA ADEUDADA EN EL CORREO DE RESOLUCIÓN
+
+### 24.1 Regla de Negocio y Variable Dinámica
+Cuando una orden médica tiene marcado el flag `debe_orden_medica` (el paciente recibió la prescripción de forma digital / por mail y **adeuda la receta física original**), el correo de resolución de auditoría incluye un **recuadro de advertencia destacado** recordándole que debe **traer la orden original el día de la toma de muestra** (requisito obligatorio para poder realizar las extracciones).
+
+- **Ubicación en el cuerpo del correo:** inmediatamente después del bloque de *Indicaciones de Preparación* y antes del aviso de *Comunicación Directa*.
+- **Diseño:** fondo ámbar (`#fff7ed`), borde naranja de 2px con barra lateral de 6px (`#ea580c`), título con ícono `⚠️`, y las frases clave resaltadas en negrita.
+- **Comportamiento condicional:** si `debe_orden_medica = false`, el marcador se reemplaza por **cadena vacía** y el recuadro **no se renderiza** en absoluto (no queda hueco ni borde residual).
+
+### 24.2 Nuevas Variables Dinámicas de Plantilla
+Se incorporaron dos marcadores equivalentes para el gestor de plantillas de correo:
+
+| Marcador | Contenido |
+|---|---|
+| `{{debe_orden_medica}}` | Recuadro HTML completo de advertencia, o cadena vacía si la orden no adeuda la receta física. |
+| `{{aviso_orden_fisica}}` | Alias del anterior (misma salida), para permitir nombres semánticos en plantillas personalizadas. |
+
+Ambos están documentados en el popup **"Variables Disponibles (Ayuda)"** del gestor de plantillas en `/configuracion`.
+
+### 24.3 Implementación Técnica
+1. **`backend/app/core/templates_email.py`:**
+   - `generar_plantilla_email_resolucion()` recibe el nuevo parámetro `debe_orden_medica: bool = False` y construye `aviso_orden_fisica_html` antes del armado del cuerpo.
+   - El bloque se inyecta tanto en el **diseño corporativo por defecto** como en el **diccionario de reemplazo** de plantillas personalizadas (`cuerpo_template_custom`).
+   - `obtener_plantilla_base_html()` incluye el marcador `{{debe_orden_medica}}` con un comentario explicativo.
+   - Se exportan las constantes `ESTUDIOS_MARKER` y `AVISO_ORDEN_FISICA_MARKER`, usadas por la migración aditiva.
+2. **`backend/app/modules/ordenes/service.py`:**
+   - `build_preview_email()` y `enviar_email_resolucion()` pasan `debe_orden_medica=bool(orden.debe_orden_medica)` al generador.
+   - `build_preview_email()` expone el flag en la respuesta para que el frontend pueda resolver el marcador en vivo.
+3. **`backend/app/modules/ordenes/schemas.py`:**
+   - `PreviewEmailResolucionRead` incorpora el campo `debe_orden_medica: bool = False`.
+4. **`backend/app/main.py` - `migrate_plantilla_aviso_orden_fisica()`:**
+   - Migración **aditiva e idempotente** ejecutada en el arranque para **ambos dialectos** (SQLite y PostgreSQL).
+   - Localiza la plantilla `DEFAULT` y, si su HTML aún no contiene `{{debe_orden_medica}}` pero conserva el marcador `{{estudios_no_autorizados}}`, inserta el bloque de aviso inmediatamente después.
+   - **No modifica** plantillas cuya estructura fue personalizada por el usuario (la variable puede insertarse manualmente desde el gestor).
+   - Envuelta en `try/except` con log de advertencia: nunca impide el arranque del backend.
+5. **Frontend:**
+   - `EmailResolucionModal.vue`: al cambiar de plantilla, resuelve `{{debe_orden_medica}}` y `{{aviso_orden_fisica}}` con el mismo HTML del backend según `props.orden.debe_orden_medica`.
+   - `types/ordenes.ts`: `PreviewEmailResolucion` incorpora `debe_orden_medica?: boolean`.
+   - `ConfiguracionView.vue`: nueva entrada destacada en el popup de ayuda memoria de variables.
+
+### 24.4 Validación Ejecutada
+- Suite de humo del generador: recuadro presente con `debe_orden_medica=True`, ausente con `False`, resolución correcta en plantillas personalizadas y migración idempotente.
+- Verificación end-to-end contra la API local (`GET /api/v1/ordenes/{id}/preview-email`): la orden de prueba con deuda renderiza el aviso y la orden sin deuda no.
+- Compilación TypeScript del frontend (`vue-tsc --noEmit`) sin errores.
+- Render visual en navegador headless sobre el HTML real devuelto por la API: sin errores de consola ni peticiones fallidas; captura `recuadro_orden_fisica_mail.png`.
+---
+
+## 25. FECHA DE VENCIMIENTO CON SEMÁFORO, FECHAS EDITABLES Y REORDENAMIENTO DEL ALTA
+
+### 25.1 Semáforo de Vigencia en la Fecha de Vencimiento
+La **Fecha de Vencimiento** de la prescripción se colorea según su vigencia, **sin leyendas ni badges de texto** (solo color en todo el campo, para no desacomodar el layout):
+
+| Estado | Condición | Color | Clase CSS |
+|---|---|
+| **Vencida** | fecha ≤ hoy | Rojo | `semaforo-vencida` |
+| **Próxima** | vence dentro de los próximos **10 días** | Amarillo | `semaforo-proxima` |
+| **Vigente** | vence a más de 10 días | Verde | `semaforo-vigente` |
+| **Sin fecha** | campo vacío | Neutro | `bg-white` |
+
+- **Implementación:** `frontend/src/utils/date.ts` expone `semaforoVencimiento(fecha)` que devuelve `{ estado, dias, clases }`, y la constante `DIAS_ALERTA_VENCIMIENTO = 10`.
+- **Estilos:** `frontend/src/style.css` define las clases `.semaforo-*`, que colorean el contenedor completo del Calendar de PrimeVue (fondo, borde, outline, texto y botón de despliegue). Se usa `!important` porque las utilidades de Tailwind (`bg-white`, `w-full`) se aplican al mismo elemento.
+- **Aplicado en:** `OrdenCreateView.vue` (alta), `OrdenDetailPanel.vue` y `OrdenDetailView.vue` (modal de edición).
+
+### 25.2 Fechas de Prescripción y Vencimiento Editables Post-Ingreso
+- `OrdenMedicaUpdate` ya soportaba `fecha_prescripcion` y `fecha_vencimiento`; ahora se exponen en el modal **"Editar Datos de la Orden"** de `OrdenDetailPanel.vue` y `OrdenDetailView.vue`.
+- Se agregaron los helpers `parseDate()` (evita el corrimiento de un día al interpretar `YYYY-MM-DD` en UTC) y `toISODate()` (serializa con componentes locales) en `frontend/src/utils/date.ts`.
+- El cambio de fecha se registra en la bitácora inmutable (`AuditoriaLog`) por el servicio de órdenes.
+
+### 25.3 Reordenamiento de Campos en el Alta de Orden
+El panel *"2. Prescripción y Datos Médicos"* de `OrdenCreateView.vue` quedó con el siguiente orden:
+
+1. **Mutual / Obra Social** (al cambiar, calcula el vencimiento y sugiere el copago)
+2. **N° Afiliado / Credencial**
+3. **Cantidad de Recetas Físicas**
+4. **Fecha de Prescripción**
+5. **Fecha de Vencimiento** (con semáforo)
+6. **Sucursal Emisora**
+7. **Valor Copago a Abonar ($)**
+8. **Estudios No Autorizados ($)**
+
+### 25.4 Estados del Sistema: Colores Configurables Aplicados en Todo el Sistema
+**Problema corregido:** los colores de estado definidos en `/configuracion` se guardaban en `estados_orden.color_badge` pero **no se reflejaban** en los expedientes, listados ni filtros: `StatusTag.vue` usaba un `switch` con una paleta hardcodeada y los filtros de búsqueda usaban una lista fija de estados.
+
+**Solución implementada:**
+1. **Nuevo store `frontend/src/stores/estados.store.ts`:**
+   - Carga el catálogo de estados vía `configService.listEstados(false)`.
+   - Caché en memoria con deduplicación de peticiones concurrentes (`inflight`).
+   - Índice por `nombre` **y** `codigo` para búsquedas O(1).
+   - Getters: `getEstado()`, `getColorBadge()`, `getIcono()`, `requiereMotivo()`.
+2. **`StatusTag.vue`:** ahora el `severity` y el `icono` provienen del catálogo configurado, con la paleta anterior como *fallback* únicamente mientras el catálogo carga o si el estado no existe en la configuración.
+3. **`OrdenesListView.vue`:** las opciones del filtro de estados se derivan del catálogo (solo activos, ordenados por `orden_secuencia`), con lista de respaldo.
+4. **`ConfiguracionView.vue`:** `loadEstados()` refresca el store compartido con `force = true`, de modo que al modificar un color o ícono el cambio impacta de inmediato en toda la aplicación sin recargar.
+
+**Diferencia detectada y corregida** (colores que la UI ignoraba):
+
+| Estado | Configurado en `/configuracion` | Paleta hardcodeada anterior |
+|---|---|---|
+| Ingreso | `contrast` | `info` |
+| en Auditoria | `warn` | `warn` (coincidía) |
+| Solicitudes de auditoria | `info` | `danger` |
+| Actualizada | `warn` | `contrast` |
+| Auditoria Finalizada | `success` | `info` |
+| Dar de baja | `danger` | `secondary` |
+| Cancelada | `secondary` | `danger` |
+| Cerrada | `secondary` | `success` |
+
+### 25.5 Validación Ejecutada
+- **Semáforo:** prueba sobre el datepicker real en el navegador headless con 5 casos límite — `vencida (hace 10 días) → ROJO`, `vence HOY → ROJO`, `+5 días → AMARILLO`, `+10 días exactos → AMARILLO`, `+60 días → VERDE`. Capturas: `semaforo_rojo.png`, `semaforo_amarillo.png`, `semaforo_verde.png`.
+- **Estados:** comparación automática entre el `color_badge` devuelto por `GET /api/v1/config/estados` y la severidad pintada en el DOM: **22 badges, 100% coincidentes**.
+- **Reordenamiento:** lectura de los labels del panel en el DOM confirmando el orden solicitado (Mutual → N° Afiliado → Cantidad → Prescripción → Vencimiento → Sucursal → Copago → Estudios No Autorizados).
+- **Sin leyendas de texto:** verificación de que no quede ningún badge ni párrafo explicativo del semáforo en el DOM.
+- Compilación TypeScript (`vue-tsc --noEmit`) sin errores tras todos los cambios.
+---
+
+## 26. CORRECCIÓN DE CAMPOS CON ÍCONO: MIGRACIÓN PRIMEVUE 3 → 4
+
+### 26.1 Síntoma Reportado
+En el **listado de órdenes**, el campo de búsqueda quedaba **debajo de la lupa** y el layout se desacomodaba: el ícono aparecía suelto en su propio renglón y el input se corría hacia abajo.
+
+### 26.2 Causa Raíz
+Las vistas usaban la clase **`p-input-icon-left`**, que es la convención de **PrimeVue 3**. En **PrimeVue 4** esa clase ya no posiciona el ícono, por lo que el `<i>` quedaba con `position: static` ocupando su propio espacio en el flujo, empujando el input hacia abajo.
+
+Medición del defecto en el DOM (antes de la corrección):
+
+| Métrica | Valor defectuoso |
+|---|---|
+| `position` del ícono | `static` (debía ser `absolute`) |
+| Desplazamiento vertical ícono ↔ input | **21 px** |
+| `padding-left` del input | 12 px (sin reservar espacio para el ícono) |
+| Ícono dentro del campo | No |
+
+### 26.3 Solución Implementada
+Se migró la sintaxis de campos con ícono a la convención de PrimeVue 4:
+
+```html
+<span class="p-icon-field p-icon-field-left w-full">
+ <i class="pi pi-search p-input-icon"></i>
+ <InputText ... class="w-full text-xs" />
+</span>
+```
+
+**Vistas corregidas (6):**
+- `views/ordenes/OrdenesListView.vue` — buscador de órdenes (el reportado)
+- `views/pacientes/PacientesListView.vue` — padrón de pacientes
+- `views/mutuales/ObrasSocialesListView.vue` — catálogo de mutuales
+- `views/users/UsersListView.vue` — buscador de usuarios y roles
+- `views/help/ManualUsuarioView.vue` — búsqueda del manual
+- `views/auth/LoginView.vue` — campos de usuario y contraseña
+
+**Reglas CSS de respaldo (`frontend/src/style.css`):**
+- `.p-icon-field` / `.p-icon-field-left` con posicionamiento absoluto, centrado vertical (`top: 50%` + `translateY(-50%)`) y `padding-left: 2.25rem` en el input.
+- Bloque equivalente para `.p-input-icon-left` como **red de seguridad**: si alguna vista futura conserva la clase antigua, el campo igualmente se renderiza alineado y no rompe el layout.
+
+### 26.4 Validación Ejecutada
+Verificación automática sobre el DOM real en navegador headless, midiendo geometría de ícono e input:
+
+| Vista | Alineación vertical | `padding-left` | `position` ícono |
+|---|---|
+| Órdenes (buscador) | **0 px** | 36 px | `absolute` |
+| Pacientes | 0 px | 36 px | `absolute` |
+| Mutuales | 0 px | 36 px | `absolute` |
+| Login (Usuario) | 0 px | 36 px | `absolute` |
+| Login (Contraseña) | 0 px | — | `absolute` |
+
+- Se confirmó que **no queda ninguna ocurrencia** de `p-input-icon-left` sin migrar en el código fuente.
+- Sin errores de consola ni peticiones fallidas en la carga de las vistas verificadas.
+- Compilación TypeScript (`vue-tsc --noEmit`) sin errores.

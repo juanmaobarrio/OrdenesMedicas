@@ -20,6 +20,46 @@ from backend.app.modules.users.router import router as users_router
 
 
 
+def migrate_plantilla_aviso_orden_fisica(connection) -> None:
+    # Inyecta el aviso de orden medica fisica adeudada en la plantilla DEFAULT ya persistida.
+    #
+    # SEGURIDAD EN PRODUCCION: es una migracion estrictamente ADITIVA y NO DESTRUCTIVA.
+    #  - Solo hace un UPDATE del cuerpo_html de la plantilla con codigo 'DEFAULT'.
+    #  - Nunca crea, borra ni modifica filas de ordenes, pacientes, usuarios ni configuracion.
+    #  - Es idempotente: si el marcador ya esta presente, no vuelve a tocar nada.
+    #  - Si el usuario personalizo el HTML (no conserva el marcador de estudios no
+    #    autorizados), NO se modifica: puede insertar la variable a mano desde
+    #    el gestor de plantillas en /configuracion.
+    #  - Cualquier fallo se registra como advertencia y NUNCA impide el arranque.
+    from sqlalchemy import inspect, text
+    try:
+        # La tabla puede no existir aun segun el orden de inicializacion o el motor:
+        # se verifica antes de consultar para no depender de una excepcion.
+        if not inspect(connection).has_table("plantillas_email"):
+            return
+        from backend.app.core.templates_email import AVISO_ORDEN_FISICA_MARKER, ESTUDIOS_MARKER
+        fila = connection.execute(
+            text("SELECT id, cuerpo_html FROM plantillas_email WHERE codigo = 'DEFAULT'")
+        ).fetchone()
+        if not fila or not fila[1] or "{{debe_orden_medica}}" in fila[1]:
+            return
+        nuevo_html = fila[1].replace(ESTUDIOS_MARKER, ESTUDIOS_MARKER + AVISO_ORDEN_FISICA_MARKER)
+        # Si el HTML fue personalizado, el reemplazo no produce cambios y se respeta.
+        if nuevo_html == fila[1]:
+            logger.info(
+                "Plantilla DEFAULT personalizada detectada: no se modifica (agregue "
+                "{{debe_orden_medica}} manualmente si desea el aviso)."
+            )
+            return
+        connection.execute(
+            text("UPDATE plantillas_email SET cuerpo_html = :html WHERE id = :id"),
+            {"html": nuevo_html, "id": fila[0]},
+        )
+        logger.info("Plantilla DEFAULT actualizada con el aviso de orden médica física adeudada.")
+    except Exception as err:
+        logger.warning(f"No se pudo actualizar la plantilla DEFAULT con el aviso de orden física: {err}")
+
+
 def sync_database_columns(connection):
     from sqlalchemy import text
     dialect = connection.dialect.name
@@ -115,6 +155,8 @@ def sync_database_columns(connection):
                     connection.execute(text(f"INSERT INTO configuracion_sistema (clave, valor, descripcion) VALUES ('{f_key}', '{f_val}', '{f_desc}')"))
         except Exception as err:
             logger.warning(f"Error comprobando columnas SQLite: {err}")
+
+        migrate_plantilla_aviso_orden_fisica(connection)
 
     elif dialect == "postgresql":
         postgres_statements = [
@@ -213,6 +255,8 @@ def sync_database_columns(connection):
                 connection.execute(text(stmt))
             except Exception as e:
                 logger.warning(f"Aviso ejecutando '{stmt}': {e}")
+
+        migrate_plantilla_aviso_orden_fisica(connection)
 
 
 @asynccontextmanager

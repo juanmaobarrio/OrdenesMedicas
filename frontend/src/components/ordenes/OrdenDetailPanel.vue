@@ -15,6 +15,7 @@ import InputNumber from 'primevue/inputnumber';
 import Chips from 'primevue/chips';
 import Dialog from 'primevue/dialog';
 import Checkbox from 'primevue/checkbox';
+import Calendar from 'primevue/calendar';
 
 import Dropdown from 'primevue/dropdown';
 import Textarea from 'primevue/textarea';
@@ -32,7 +33,7 @@ import IndicacionesChipsSelector from './IndicacionesChipsSelector.vue';
 import EmailResolucionModal from './EmailResolucionModal.vue';
 import CalculadoraEstudiosModal from './CalculadoraEstudiosModal.vue';
 import ImpresionIndicacionesModal from './ImpresionIndicacionesModal.vue';
-import { formatDate, formatDateTime } from '../../utils/date';
+import { formatDate, formatDateTime, parseDate, toISODate, semaforoVencimiento } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
 
@@ -168,6 +169,8 @@ const isLoadingPrevOrders = ref(false);
 
 const editForm = ref({
   cantidad_ordenes_fisicas: 1,
+  fecha_prescripcion: null as Date | null,
+  fecha_vencimiento: null as Date | null,
   sucursal_id: null as string | null,
   contacto_nombre: '',
   contacto_horario: '',
@@ -189,6 +192,9 @@ const editForm = ref({
   monto_abonado_atencion: 0,
 });
 
+// Semáforo de la fecha de vencimiento dentro del modal de edición
+const semaforoEditVencimiento = computed(() => semaforoVencimiento(editForm.value.fecha_vencimiento));
+
 const costoTotalAuditoria = computed(() => {
   if (!orden.value) return 0;
   const copago = Number(orden.value.valor_copago || 0);
@@ -208,6 +214,8 @@ const handleOpenEditOrden = () => {
   if (!orden.value) return;
   editForm.value = {
     cantidad_ordenes_fisicas: orden.value.cantidad_ordenes_fisicas || 1,
+    fecha_prescripcion: parseDate(orden.value.fecha_prescripcion),
+    fecha_vencimiento: parseDate(orden.value.fecha_vencimiento),
     sucursal_id: orden.value.sucursal_id || orden.value.sucursal?.id || null,
     contacto_nombre: orden.value.contacto_nombre || '',
     contacto_horario: orden.value.contacto_horario || '',
@@ -235,6 +243,8 @@ const handleSaveEditOrden = async () => {
   isActionLoading.value = true;
   try {
     const payload: Record<string, any> = {
+      fecha_prescripcion: toISODate(editForm.value.fecha_prescripcion),
+      fecha_vencimiento: toISODate(editForm.value.fecha_vencimiento),
       contacto_nombre: editForm.value.contacto_nombre.trim() || null,
       contacto_horario: editForm.value.contacto_horario.trim() || null,
       contacto_telefono: editForm.value.contacto_telefono.trim() || null,
@@ -1574,6 +1584,30 @@ const handleCancelarEnvioAuto = async () => {
             <i class="pi pi-info-circle text-[10px]"></i>
             La sede y cantidad de recetas solo pueden ser modificadas por usuarios con jerarquía superior a 30 (Auditores o Administradores).
           </span>
+        </div>
+
+        <!-- Fechas de Prescripción y Vencimiento (editables post-ingreso) -->
+        <div class="p-3 bg-slate-50 rounded-xl border-slate-200/90">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                Fecha de Prescripción
+              </label>
+              <Calendar v-model="editForm.fecha_prescripcion" dateFormat="yy-mm-dd" showIcon class="w-full" />
+            </div>
+            <div class="min-w-0">
+              <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                Fecha de Vencimiento
+              </label>
+              <Calendar
+                v-model="editForm.fecha_vencimiento"
+                dateFormat="yy-mm-dd"
+                showIcon
+                class="w-full transition-colors"
+                :class="semaforoEditVencimiento.clases"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- Códigos de Auditoría -->

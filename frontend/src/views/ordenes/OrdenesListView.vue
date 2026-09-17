@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useOrdenesStore } from '../../stores/ordenes.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { useFeaturesStore } from '../../stores/features.store';
+import { useEstadosStore } from '../../stores/estados.store';
 import { usersService } from '../../services/users.service';
 import { EstadoOrden, OrdenMedicaListItem, Sucursal } from '../../types';
 import DataTable from 'primevue/datatable';
@@ -22,23 +23,39 @@ const router = useRouter();
 const ordenesStore = useOrdenesStore();
 const authStore = useAuthStore();
 const featuresStore = useFeaturesStore();
+const estadosStore = useEstadosStore();
 
 const sucursales = ref<Sucursal[]>([]);
 const searchInput = ref('');
 const selectedOrdenId = ref<string | null>(null);
 
-const opcionesEstados: { label: string; value: EstadoOrden }[] = [
-  { label: 'Ingreso', value: 'Ingreso' },
-  { label: 'En Auditoría', value: 'en Auditoria' },
-  { label: 'Solicitudes de Auditoría', value: 'Solicitudes de auditoria' },
-  { label: 'Actualizada', value: 'Actualizada' },
-  { label: 'Auditoría Finalizada', value: 'Auditoria Finalizada' },
-  { label: 'Dar de baja', value: 'Dar de baja' },
-  { label: 'Cancelada', value: 'Cancelada' },
-  { label: 'Cerrada', value: 'Cerrada' },
+// Las opciones del filtro se derivan del catálogo de estados administrable en
+// /configuracion, respetando desactivaciones y el orden de secuencia configurado.
+// Estados del sistema usados como respaldo mientras el catálogo configurable carga.
+const FALLBACK_ESTADOS: string[] = [
+  'Ingreso',
+  'en Auditoria',
+  'Solicitudes de auditoria',
+  'Actualizada',
+  'Auditoria Finalizada',
+  'Dar de baja',
+  'Cancelada',
+  'Cerrada',
 ];
 
+const opcionesEstados = computed<{ label: string; value: EstadoOrden }[]>(() => {
+  if (estadosStore.estados.length === 0) {
+    return FALLBACK_ESTADOS.map((e) => ({ label: e, value: e as EstadoOrden }));
+  }
+  return estadosStore.estados
+    .filter((e) => e.activo)
+    .slice()
+    .sort((a, b) => (a.orden_secuencia ?? 0) - (b.orden_secuencia ?? 0))
+    .map((e) => ({ label: e.nombre, value: e.nombre as EstadoOrden }));
+});
+
 onMounted(async () => {
+  estadosStore.fetchEstados();
   if (authStore.isAdmin) {
     sucursales.value = await usersService.listSucursales();
   }
@@ -124,10 +141,10 @@ const handlePageChange = (event: any) => {
 
     <!-- Filter Bar (Compact) -->
     <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-2">
-      <!-- Search Input -->
+      <!-- Search Input (PrimeVue 4: p-icon-field + p-input-icon) -->
       <div class="flex-1 min-w-[200px]">
-        <span class="p-input-icon-left w-full">
-          <i class="pi pi-search text-slate-400 text-xs"></i>
+        <span class="p-icon-field p-icon-field-left w-full">
+          <i class="pi pi-search p-input-icon"></i>
           <InputText
             v-model="searchInput"
             placeholder="Buscar por N° Orden, DNI o Paciente..."

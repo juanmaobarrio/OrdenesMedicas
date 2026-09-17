@@ -396,8 +396,8 @@ const handleSaveRole = async () => {
               <!-- Filtros de Usuarios -->
               <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div class="flex items-center space-x-2 flex-1 min-w-[240px] max-w-md">
-                  <span class="p-input-icon-left w-full">
-                    <i class="pi pi-search text-slate-400 text-xs"></i>
+                  <span class="p-icon-field p-icon-field-left w-full">
+                    <i class="pi pi-search p-input-icon"></i>
                     <InputText v-model="searchUser" placeholder="Buscar por usuario, nombre, email o rol..." class="w-full text-xs" />
                   </span>
                 </div>

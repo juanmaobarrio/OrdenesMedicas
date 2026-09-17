@@ -2,6 +2,13 @@ import html
 import re
 from typing import List, Optional
 from decimal import Decimal
+# Marcadores usados para migrar de forma segura (aditiva) plantillas ya persistidas
+# en base de datos que todavía no incluyen el aviso de orden médica física adeudada.
+ESTUDIOS_MARKER = "{{estudios_no_autorizados}}"
+AVISO_ORDEN_FISICA_MARKER = (
+    "\n                            <!-- Aviso de Orden Médica Física Adeudada -->"
+    "\n                            {{debe_orden_medica}}"
+)
 
 
 def formatear_indicaciones_html(texto: Optional[str]) -> str:
@@ -45,8 +52,10 @@ def generar_plantilla_email_resolucion(
     lista_estudios_autorizados: Optional[List[str]] = None,
     lista_estudios_no_autorizados: Optional[List[str]] = None,
     cuerpo_template_custom: Optional[str] = None,
+    debe_orden_medica: bool = False,
 ) -> str:
     """Genera una plantilla HTML responsive y corporativa para notificar la resolución de auditoría."""
+    debe_orden_medica = bool(debe_orden_medica)
     safe_paciente = html.escape(paciente_nombre or "Estimado/a Paciente")
     safe_orden = html.escape(nro_orden or "")
     safe_mutual = html.escape(mutual_nombre or "")
@@ -89,6 +98,23 @@ def generar_plantilla_email_resolucion(
     </div>
     """
 
+
+    # Recuadro de advertencia: el paciente debe presentar la receta fisica original
+    aviso_orden_fisica_html = ""
+    if debe_orden_medica:
+        aviso_orden_fisica_html = f"""
+        <div style="background-color: #fff7ed; border: 2px solid #f97316; border-left: 6px solid #ea580c; border-radius: 8px; padding: 16px 20px; margin: 24px 0;">
+            <h3 style="margin: 0 0 8px 0; color: #9a3412; font-size: 15px; font-weight: 700;">
+                &#9888;&#65039; IMPORTANTE: Debe presentar la orden médica original
+            </h3>
+            <div style="font-size: 13.5px; color: #7c2d12; line-height: 1.6;">
+                Nuestros registros indican que usted <strong>adeuda la receta / orden médica física original</strong>.
+                Recuerde <strong>traerla el día de la toma de muestra</strong>, ya que es un requisito obligatorio
+                para poder realizar las extracciones y completar su atención. Sin la orden física no podremos proceder con las prácticas.
+            </div>
+        </div>
+        """
+
     indicaciones_html = ""
     if safe_indicaciones.strip():
         indicaciones_html = f"""
@@ -118,6 +144,8 @@ def generar_plantilla_email_resolucion(
             "{{estudios_no_autorizados}}": html.escape(no_aut_str),
             "{{indicaciones}}": safe_indicaciones,
             "{{sucursal_nombre}}": safe_sucursal,
+            "{{debe_orden_medica}}": aviso_orden_fisica_html,
+            "{{aviso_orden_fisica}}": aviso_orden_fisica_html,
         }
         for k, v in replacements.items():
             tpl = tpl.replace(k, v)
@@ -200,6 +228,9 @@ def generar_plantilla_email_resolucion(
 
                             <!-- Indicaciones de Preparación (si existen) -->
                             {indicaciones_html}
+
+                            <!-- Aviso de Orden Médica Física Adeudada (si corresponde) -->
+                            {aviso_orden_fisica_html}
 
                             <!-- Aviso de Comunicación Directa -->
                             <div style="background-color: #f1f5f9; border-radius: 8px; padding: 14px 18px; margin-top: 24px; font-size: 12.5px; color: #475569; line-height: 1.5;">
@@ -328,6 +359,10 @@ def obtener_plantilla_base_html() -> str:
                                     {{indicaciones}}
                                 </div>
                             </div>
+
+                            <!-- Aviso de Orden Médica Física Adeudada -->
+                            <!-- Se muestra únicamente si el paciente debe la receta física original -->
+                            {{debe_orden_medica}}
 
                             <!-- Aviso de Comunicación Directa -->
                             <div style="background-color: #f1f5f9; border-radius: 8px; padding: 14px 18px; margin-top: 24px; font-size: 12.5px; color: #475569; line-height: 1.5;">

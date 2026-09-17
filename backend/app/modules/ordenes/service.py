@@ -1459,6 +1459,7 @@ class EmailResolucionService:
             lista_estudios_autorizados=orden.estudios_autorizados or [],
             lista_estudios_no_autorizados=orden.estudios_no_autorizados or [],
             cuerpo_template_custom=tpl_custom_html,
+            debe_orden_medica=bool(orden.debe_orden_medica),
         )
 
         from backend.app.modules.ordenes.schemas import PlantillaEmailRead
@@ -1472,6 +1473,7 @@ class EmailResolucionService:
             mail_enviado_fecha=orden.mail_enviado_fecha,
             plantilla_id=tpl_default.id if tpl_default else None,
             plantillas_disponibles=[PlantillaEmailRead.model_validate(t) for t in plantillas_list],
+            debe_orden_medica=bool(orden.debe_orden_medica),
         )
 
     async def enviar_email_resolucion(
@@ -1536,6 +1538,7 @@ class EmailResolucionService:
                 lista_estudios_autorizados=orden.estudios_autorizados or [],
                 lista_estudios_no_autorizados=orden.estudios_no_autorizados or [],
                 cuerpo_template_custom=tpl_custom_html,
+                debe_orden_medica=bool(orden.debe_orden_medica),
             )
 
         from backend.app.core.zeptomail import zepto_mail_service

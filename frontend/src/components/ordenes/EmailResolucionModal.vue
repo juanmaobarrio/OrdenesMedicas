@@ -84,6 +84,21 @@ const handleSelectPlantilla = (tplId: string) => {
     }
 
     const noAutStr = noAutList.length > 0 ? noAutList.join(', ') : 'Ninguno (100% autorizado)';
+
+    // Recuadro de advertencia: el paciente debe la orden médica física original
+    const avisoOrdenFisica = props.orden.debe_orden_medica
+      ? `
+        <div style="background-color: #fff7ed; border: 2px solid #f97316; border-left: 6px solid #ea580c; border-radius: 8px; padding: 16px 20px; margin: 24px 0;">
+            <h3 style="margin: 0 0 8px 0; color: #9a3412; font-size: 15px; font-weight: 700;">
+                &#9888;&#65039; IMPORTANTE: Debe presentar la orden médica original
+            </h3>
+            <div style="font-size: 13.5px; color: #7c2d12; line-height: 1.6;">
+                Nuestros registros indican que usted <strong>adeuda la receta / orden médica física original</strong>.
+                Recuerde <strong>traerla el día de la toma de muestra</strong>, ya que es un requisito obligatorio
+                para poder realizar las extracciones y completar su atención. Sin la orden física no podremos proceder con las prácticas.
+            </div>
+        </div>`
+      : '';
     const copago = Number(props.orden.valor_copago || 0);
     const noAut = Number(props.orden.valor_estudios_no_autorizados || 0);
     const apb = Number(props.orden.valor_apb || 0);
@@ -101,6 +116,8 @@ const handleSelectPlantilla = (tplId: string) => {
     html = html.replace(/{{estudios_no_autorizados}}/g, noAutStr);
     html = html.replace(/{{indicaciones}}/g, props.orden.indicaciones_texto || '');
     html = html.replace(/{{sucursal_nombre}}/g, props.orden.sucursal?.nombre || 'Sede Central');
+    html = html.replace(/{{debe_orden_medica}}/g, avisoOrdenFisica);
+    html = html.replace(/{{aviso_orden_fisica}}/g, avisoOrdenFisica);
     emailCuerpoHtml.value = html;
   } else {
     // Restaurar el cuerpo original predeterminado

@@ -230,6 +230,7 @@ export const ordenesService = {
     indicacion_default: string;
     template_html: string;
     html_ensamblado: string;
+    usuario_nombre: string;
   }> {
     const response = await api.get(`/ordenes/${ordenId}/imprimir-indicaciones-data`);
     return response.data;
@@ -244,7 +245,7 @@ export const ordenesService = {
     indicaciones_html?: string;
     indicaciones_texto?: string;
     incluir_default?: boolean;
-  }): Promise<{ html_ensamblado: string; indicacion_default: string }> {
+  }): Promise<{ html_ensamblado: string; indicacion_default: string; usuario_nombre?: string }> {
     const response = await api.post('/ordenes/imprimir-indicaciones-preview', payload);
     return response.data;
   },

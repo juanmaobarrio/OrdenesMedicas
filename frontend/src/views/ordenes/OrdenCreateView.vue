@@ -25,6 +25,7 @@ import { IndicacionEstudio, OrdenMedicaListItem } from '../../types/ordenes';
 import StatusTag from '../../components/common/StatusTag.vue';
 import IndicacionesChipsSelector from '../../components/ordenes/IndicacionesChipsSelector.vue';
 import { useFeaturesStore } from '../../stores/features.store';
+import { semaforoVencimiento } from '../../utils/date';
 
 
 
@@ -260,6 +261,9 @@ onMounted(async () => {
     }
   }
 });
+
+// Semáforo de vigencia de la fecha de vencimiento de la prescripción
+const semaforoVencimientoForm = computed(() => semaforoVencimiento(form.value.fecha_vencimiento));
 
 const handleMutualChange = (mutualSigla?: string) => {
   const sig = mutualSigla || form.value.mutual;
@@ -545,14 +549,6 @@ const handleSubmit = async () => {
         </h3>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Fecha Prescripcion -->
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Fecha de Prescripción <span class="text-red-500">*</span>
-            </label>
-            <Calendar v-model="form.fecha_prescripcion" dateFormat="yy-mm-dd" showIcon class="w-full" @date-select="handleMutualChange(form.mutual)" />
-          </div>
-
           <!-- Mutual Dropdown -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
@@ -578,23 +574,6 @@ const handleSubmit = async () => {
             <InputText v-model="form.nro_afiliado" placeholder="Ej: 12345678/01" class="w-full" />
           </div>
 
-          <!-- Copago -->
-          <div class="min-w-0">
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Valor Copago a Abonar ($)
-            </label>
-            <InputNumber v-model="form.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
-          </div>
-
-          <!-- Valor Estudios No Autorizados -->
-          <div class="min-w-0">
-            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Estudios No Autorizados ($)
-            </label>
-            <InputNumber v-model="form.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
-          </div>
-
-
           <!-- Cantidad Cupones -->
           <div>
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
@@ -603,12 +582,26 @@ const handleSubmit = async () => {
             <InputNumber v-model="form.cantidad_ordenes_fisicas" :min="1" :max="50" showButtons class="w-full" />
           </div>
 
-          <!-- Fecha Vencimiento -->
+          <!-- Fecha Prescripcion -->
           <div>
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Fecha de Prescripción <span class="text-red-500">*</span>
+            </label>
+            <Calendar v-model="form.fecha_prescripcion" dateFormat="yy-mm-dd" showIcon class="w-full" @date-select="handleMutualChange(form.mutual)" />
+          </div>
+
+          <!-- Fecha Vencimiento (con semáforo de vigencia: solo color en el campo) -->
+          <div class="min-w-0">
             <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
               Fecha de Vencimiento
             </label>
-            <Calendar v-model="form.fecha_vencimiento" dateFormat="yy-mm-dd" showIcon class="w-full" />
+            <Calendar
+              v-model="form.fecha_vencimiento"
+              dateFormat="yy-mm-dd"
+              showIcon
+              class="w-full transition-colors"
+              :class="semaforoVencimientoForm.clases"
+            />
           </div>
 
           <!-- Sucursal -->
@@ -624,6 +617,22 @@ const handleSubmit = async () => {
               placeholder="Seleccionar sede"
               class="w-full"
             />
+          </div>
+
+          <!-- Copago -->
+          <div class="min-w-0">
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Valor Copago a Abonar ($)
+            </label>
+            <InputNumber v-model="form.valor_copago" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
+          </div>
+
+          <!-- Valor Estudios No Autorizados -->
+          <div class="min-w-0">
+            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Estudios No Autorizados ($)
+            </label>
+            <InputNumber v-model="form.valor_estudios_no_autorizados" mode="currency" currency="ARS" locale="es-AR" class="w-full" inputClass="w-full text-xs" :inputStyle="{ width: '100%', minWidth: '0' }" />
           </div>
         </div>
 

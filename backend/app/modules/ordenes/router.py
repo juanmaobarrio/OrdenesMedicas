@@ -1,4 +1,4 @@
-import os
+﻿import os
 import shutil
 import uuid
 from datetime import date, datetime
@@ -1074,11 +1074,13 @@ async def preview_imprimir_indicaciones(
         indicaciones_html=ind_html,
         indicacion_default_html=ind_default,
         template_custom=cfg_impresion.template_html,
+        usuario_nombre=current_user.nombre_pila,
     )
 
     return {
         "html_ensamblado": html_ensamblado,
         "indicacion_default": cfg_impresion.indicacion_default,
+        "usuario_nombre": current_user.nombre_pila,
     }
 
 
@@ -1116,6 +1118,7 @@ async def get_orden_imprimir_indicaciones_data(
         indicaciones_html=ind_html,
         indicacion_default_html=cfg_impresion.indicacion_default,
         template_custom=cfg_impresion.template_html,
+        usuario_nombre=current_user.nombre_pila,
     )
 
     return {
@@ -1129,4 +1132,5 @@ async def get_orden_imprimir_indicaciones_data(
         "indicacion_default": cfg_impresion.indicacion_default,
         "template_html": cfg_impresion.template_html,
         "html_ensamblado": html_ensamblado,
+        "usuario_nombre": current_user.nombre_pila,
     }

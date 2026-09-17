@@ -390,6 +390,7 @@ export interface PreviewEmailResolucion {
   mail_enviado_fecha?: string | null;
   plantilla_id?: string | null;
   plantillas_disponibles?: PlantillaEmail[];
+  debe_orden_medica?: boolean;
 }
 
 export interface EnviarEmailResolucionPayload {

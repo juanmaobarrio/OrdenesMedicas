@@ -56,8 +56,8 @@ const handleLogin = async () => {
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
             Usuario o Correo Electrónico
           </label>
-          <div class="p-input-icon-left w-full">
-            <i class="pi pi-user text-slate-400"></i>
+          <div class="p-icon-field p-icon-field-left w-full">
+            <i class="pi pi-user p-input-icon"></i>
             <InputText
               v-model="identifier"
               type="text"
@@ -72,8 +72,8 @@ const handleLogin = async () => {
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
             Contraseña
           </label>
-          <div class="p-input-icon-left w-full">
-            <i class="pi pi-lock text-slate-400"></i>
+          <div class="p-icon-field p-icon-field-left w-full">
+            <i class="pi pi-lock p-input-icon"></i>
             <Password
               v-model="password"
               class="w-full"
