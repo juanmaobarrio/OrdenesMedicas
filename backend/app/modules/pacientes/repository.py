@@ -20,6 +20,32 @@ class ObraSocialRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_sigla_or_codigo(self, valor: str) -> Optional[ObraSocial]:
+        """Busca una mutual por coincidencia exacta o insensible a mayúsculas con sigla o código."""
+        val = valor.strip().upper()
+        stmt = select(ObraSocial).where(
+            or_(
+                func.upper(ObraSocial.sigla) == val,
+                func.upper(ObraSocial.codigo) == val,
+                func.upper(ObraSocial.nombre) == val,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalars().first()
+
+    async def get_map_mutuales(self) -> dict[str, ObraSocial]:
+        """Retorna un diccionario indexado por sigla, código y nombre en mayúsculas para resolución O(1)."""
+        mutuales = await self.list_all(only_active=False)
+        mapping: dict[str, ObraSocial] = {}
+        for m in mutuales:
+            if m.sigla:
+                mapping[m.sigla.strip().upper()] = m
+            if m.codigo:
+                mapping[m.codigo.strip().upper()] = m
+            if m.nombre:
+                mapping[m.nombre.strip().upper()] = m
+        return mapping
+
     async def list_all(self, only_active: bool = True) -> Sequence[ObraSocial]:
         stmt = select(ObraSocial)
         if only_active:

@@ -1,5 +1,6 @@
 import { Paciente } from './pacientes';
 import { Sucursal, UserSummary } from './users';
+import { ObraSocial } from './mutuales';
 
 export type EstadoOrden =
   | 'Ingreso'
@@ -143,6 +144,9 @@ export interface OrdenMedicaListItem {
   estado: EstadoOrden;
   fecha_prescripcion: string;
   mutual: string;
+  mutual_id?: string | null;
+  mutual_codigo_externo?: string | null;
+  mutual_data?: Partial<ObraSocial> | null;
   nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
@@ -179,6 +183,9 @@ export interface OrdenMedicaDetail {
   cantidad_ordenes_fisicas: number;
   sucursal_id?: string;
   mutual: string;
+  mutual_id?: string | null;
+  mutual_codigo_externo?: string | null;
+  mutual_data?: Partial<ObraSocial> | null;
   nro_afiliado?: string | null;
   valor_copago: number;
   valor_estudios_no_autorizados?: number;
@@ -275,6 +282,9 @@ export interface OrdenLlamadaPendienteItem {
   contacto_email?: string | null;
   sucursal_nombre: string;
   mutual: string;
+  mutual_id?: string | null;
+  mutual_codigo_externo?: string | null;
+  mutual_data?: Partial<ObraSocial> | null;
   observaciones_ingreso?: string | null;
   observacion_resultado_auditoria?: string | null;
   debe_orden_medica?: boolean;

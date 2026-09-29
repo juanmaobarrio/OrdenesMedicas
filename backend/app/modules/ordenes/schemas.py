@@ -12,7 +12,7 @@ from backend.app.modules.ordenes.models import (
     TipoLlamadaPaciente,
 )
 
-from backend.app.modules.pacientes.schemas import PacienteRead
+from backend.app.modules.pacientes.schemas import ObraSocialSummary, PacienteRead
 from backend.app.modules.users.schemas import SucursalRead, UserReadSummary
 
 
@@ -179,6 +179,9 @@ class OrdenLlamadaPendienteItem(BaseModel):
     contacto_email: Optional[str] = None
     sucursal_nombre: str
     mutual: str
+    mutual_id: Optional[uuid.UUID] = None
+    mutual_codigo_externo: Optional[str] = None
+    mutual_data: Optional[ObraSocialSummary] = None
     observaciones_ingreso: Optional[str] = None
     observacion_resultado_auditoria: Optional[str] = None
     debe_orden_medica: bool = False
@@ -372,6 +375,9 @@ class OrdenMedicaListItem(BaseModel):
     estado: Any = "Ingreso"
     fecha_prescripcion: Any
     mutual: Optional[str] = "S/D"
+    mutual_id: Optional[uuid.UUID] = None
+    mutual_codigo_externo: Optional[str] = None
+    mutual_data: Optional[ObraSocialSummary] = None
     nro_afiliado: Optional[str] = None
     valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")
@@ -410,6 +416,9 @@ class OrdenMedicaDetail(BaseModel):
     fecha_prescripcion: Any
     cantidad_ordenes_fisicas: int = 1
     mutual: Optional[str] = "S/D"
+    mutual_id: Optional[uuid.UUID] = None
+    mutual_codigo_externo: Optional[str] = None
+    mutual_data: Optional[ObraSocialSummary] = None
     nro_afiliado: Optional[str] = None
     valor_copago: Decimal = Decimal("0.00")
     valor_estudios_no_autorizados: Decimal = Decimal("0.00")

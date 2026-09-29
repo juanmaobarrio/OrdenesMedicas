@@ -44,6 +44,21 @@ class ObraSocialRead(ObraSocialBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ObraSocialSummary(BaseModel):
+    """Resumen compacto de Obra Social / Mutual para embeber en órdenes médicas."""
+    id: uuid.UUID
+    codigo: str
+    sigla: str
+    nombre: str
+    codigo_externo: Optional[str] = None
+    display_name: Optional[str] = None
+    dias_vencimiento: Optional[int] = 30
+    copago_default: Optional[Decimal] = Decimal("0.00")
+    porcentaje_cobertura_apb: Optional[Decimal] = Decimal("0.00")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ==========================================
 # PACIENTE SCHEMAS
 # ==========================================

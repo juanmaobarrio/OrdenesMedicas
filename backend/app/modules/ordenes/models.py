@@ -18,12 +18,12 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
 
 
-from backend.app.modules.pacientes.models import Paciente
+from backend.app.modules.pacientes.models import ObraSocial, Paciente
 from backend.app.modules.users.models import Sucursal, User
 from backend.app.shared.base_model import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
@@ -240,6 +240,43 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Relaciones ORM
     paciente: Mapped[Paciente] = relationship("Paciente", lazy="selectin")
     sucursal: Mapped[Sucursal] = relationship("Sucursal", lazy="selectin")
+    mutual_rel: Mapped[Optional[ObraSocial]] = relationship(
+        "ObraSocial",
+        primaryjoin="foreign(func.upper(OrdenMedica.mutual)) == func.upper(ObraSocial.sigla)",
+        lazy="selectin",
+        viewonly=True,
+    )
+
+    @property
+    def mutual_data(self) -> Optional[dict]:
+        """Objeto compacto de la obra social asociada para serialización API."""
+        m = getattr(self, "mutual_rel", None)
+        if not m:
+            return None
+        return {
+            "id": m.id,
+            "codigo": m.codigo,
+            "sigla": m.sigla,
+            "nombre": m.nombre,
+            "codigo_externo": m.codigo_externo,
+            "display_name": m.display_name,
+            "dias_vencimiento": m.dias_vencimiento,
+            "copago_default": m.copago_default,
+            "porcentaje_cobertura_apb": m.porcentaje_cobertura_apb,
+        }
+
+    @property
+    def mutual_id(self) -> Optional[uuid.UUID]:
+        """UUID de la mutual asociada si se encuentra en el catálogo."""
+        m = getattr(self, "mutual_rel", None)
+        return m.id if m else None
+
+    @property
+    def mutual_codigo_externo(self) -> Optional[str]:
+        """Código de facturación o integración externa de la mutual si existe."""
+        m = getattr(self, "mutual_rel", None)
+        return m.codigo_externo if m else None
+
     created_by_user: Mapped[User] = relationship(
         "User", foreign_keys=[created_by_user_id], lazy="selectin"
     )

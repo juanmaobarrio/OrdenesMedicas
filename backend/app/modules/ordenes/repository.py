@@ -29,16 +29,17 @@ class OrdenMedicaRepository:
             .options(
                 selectinload(OrdenMedica.paciente),
                 selectinload(OrdenMedica.sucursal),
+                selectinload(OrdenMedica.mutual_rel),
                 selectinload(OrdenMedica.created_by_user),
                 selectinload(OrdenMedica.assigned_auditor),
                 selectinload(OrdenMedica.adjuntos).selectinload(AdjuntoOrden.subido_por),
                 selectinload(OrdenMedica.solicitudes).selectinload(AuditoriaSolicitud.auditor),
                 selectinload(OrdenMedica.solicitudes).selectinload(AuditoriaSolicitud.respondido_por),
-                    selectinload(OrdenMedica.llamadas_registro).selectinload(RegistroLlamadaPaciente.operador),
-                    selectinload(OrdenMedica.audit_logs).selectinload(AuditoriaLog.user),
-                )
-                .execution_options(populate_existing=True)
-                .where(OrdenMedica.id == orden_id)
+                selectinload(OrdenMedica.llamadas_registro).selectinload(RegistroLlamadaPaciente.operador),
+                selectinload(OrdenMedica.audit_logs).selectinload(AuditoriaLog.user),
+            )
+            .execution_options(populate_existing=True)
+            .where(OrdenMedica.id == orden_id)
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -79,6 +80,7 @@ class OrdenMedicaRepository:
             .options(
                 selectinload(OrdenMedica.paciente),
                 selectinload(OrdenMedica.sucursal),
+                selectinload(OrdenMedica.mutual_rel),
                 selectinload(OrdenMedica.created_by_user),
                 selectinload(OrdenMedica.assigned_auditor),
                 selectinload(OrdenMedica.adjuntos),
@@ -201,6 +203,7 @@ class OrdenMedicaRepository:
             .options(
                 selectinload(OrdenMedica.paciente),
                 selectinload(OrdenMedica.sucursal),
+                selectinload(OrdenMedica.mutual_rel),
                 selectinload(OrdenMedica.solicitudes),
                 selectinload(OrdenMedica.llamadas_registro),
             )

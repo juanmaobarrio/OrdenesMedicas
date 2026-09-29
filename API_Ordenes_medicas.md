@@ -102,7 +102,30 @@ curl -X GET "http://127.0.0.1:8000/api/v1/ordenes?estado=en%20Auditoria&limit=10
 
 #### B. Obtener Detalle Completo de una Orden
 - **Endpoint:** `GET /api/v1/ordenes/{id}`
-- Retorna la ficha del paciente, sucursal, números de auditoría, adjuntos, observaciones, llamadas registradas y bitácora.
+- Retorna la ficha del paciente, sucursal, números de auditoría, adjuntos, observaciones, llamadas registradas, bitácora y la **información completa de la mutual vinculada** (`mutual_data`, `mutual_id`, `mutual_codigo_externo`).
+
+**Ejemplo de respuesta con datos de mutual:**
+```json
+{
+  "id": "298d862f-2e26-437b-98bc-d117c0de6247",
+  "nro_orden": "ORD-2026-000022",
+  "estado": "Ingreso",
+  "mutual": "IOMA",
+  "mutual_id": "d764f156-4821-4c50-8de4-3c250427d752",
+  "mutual_codigo_externo": "EXT-IOMA",
+  "mutual_data": {
+    "id": "d764f156-4821-4c50-8de4-3c250427d752",
+    "codigo": "IOMA",
+    "sigla": "IOMA",
+    "nombre": "Instituto de Obra Medico Asistencial",
+    "codigo_externo": "EXT-IOMA",
+    "display_name": "IOMA - Instituto de Obra Medico Asistencial",
+    "dias_vencimiento": 60,
+    "copago_default": 6500.00,
+    "porcentaje_cobertura_apb": 0.00
+  }
+}
+```
 
 #### C. Crear una Nueva Orden Médica
 - **Endpoint:** `POST /api/v1/ordenes`

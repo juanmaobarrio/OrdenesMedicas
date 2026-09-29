@@ -1105,3 +1105,45 @@ Verificación automática sobre el DOM real en navegador headless, midiendo geom
 - Se confirmó que **no queda ninguna ocurrencia** de `p-input-icon-left` sin migrar en el código fuente.
 - Sin errores de consola ni peticiones fallidas en la carga de las vistas verificadas.
 - Compilación TypeScript (`vue-tsc --noEmit`) sin errores.
+
+
+---
+
+## 27. ENRIQUECIMIENTO DE INFORMACIÓN DE MUTUAL EN LA API (`mutual_data`, `mutual_id` Y `mutual_codigo_externo`)
+
+### 27.1 Contexto y Necesidad
+Al consultar órdenes médicas o auditorías mediante la API REST (para integraciones con automatizaciones externas tipo **n8n**, sistemas de facturación o webservices externos), las respuestas incluían únicamente el nombre/sigla de la mutual en el campo de texto `"mutual": "OSDE"`.
+Para vincular con sistemas externos y catálogos maestros se requería obtener directamente el identificador único (`UUID`) y el código de facturación/integración (`codigo_externo`).
+
+### 27.2 Solución Implementada
+Se enriquecieron todas las respuestas de las órdenes médicas sin romper la compatibilidad hacia atrás:
+
+1. **Esquemas Pydantic (`backend/app/modules/pacientes/schemas.py` y `backend/app/modules/ordenes/schemas.py`):**
+   - Se creó el DTO `ObraSocialSummary`:
+     ```python
+     class ObraSocialSummary(BaseModel):
+         id: uuid.UUID
+         codigo: str
+         sigla: str
+         nombre: str
+         codigo_externo: Optional[str] = None
+         display_name: Optional[str] = None
+         dias_vencimiento: Optional[int] = 30
+         copago_default: Optional[Decimal] = Decimal("0.00")
+         porcentaje_cobertura_apb: Optional[Decimal] = Decimal("0.00")
+     ```
+   - Se agregaron los siguientes campos a `OrdenMedicaDetail`, `OrdenMedicaListItem` y `OrdenLlamadaPendienteItem`:
+     - `mutual_id: Optional[uuid.UUID] = None`
+     - `mutual_codigo_externo: Optional[str] = None`
+     - `mutual_data: Optional[ObraSocialSummary] = None`
+
+2. **Modelo ORM (`backend/app/modules/ordenes/models.py`):**
+   - Relación viewonly `mutual_rel` vinculando `OrdenMedica.mutual` con `ObraSocial.sigla` de forma case-insensitive (`primaryjoin="foreign(func.upper(OrdenMedica.mutual)) == func.upper(ObraSocial.sigla)"`, `lazy="selectin"`).
+   - Propiedades calculadas `@property def mutual_data`, `@property def mutual_id` y `@property def mutual_codigo_externo`.
+
+3. **Capa de Persistencia y Repositorio (`repository.py` y `service.py`):**
+   - Se añadió `selectinload(OrdenMedica.mutual_rel)` en consultas por ID, listados paginados y bandeja de llamadas pendientes.
+   - En `OrdenMedicaService.obtener_llamadas_pendientes()` se realiza resolución optimizada mediante mapa indexado en memoria (`get_map_mutuales()`).
+
+4. **Tipos Frontend (`frontend/src/types/ordenes.ts`):**
+   - Se actualizaron las interfaces TypeScript `OrdenMedicaListItem`, `OrdenMedicaDetail` y `OrdenLlamadaPendienteItem` con `mutual_id?: string | null`, `mutual_codigo_externo?: string | null` y `mutual_data?: Partial<ObraSocial> | null`.

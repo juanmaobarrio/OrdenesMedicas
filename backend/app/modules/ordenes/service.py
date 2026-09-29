@@ -67,7 +67,8 @@ from backend.app.modules.ordenes.schemas import (
     SystemFeaturesConfigUpdate,
 )
 
-from backend.app.modules.pacientes.repository import PacienteRepository
+from backend.app.modules.pacientes.repository import ObraSocialRepository, PacienteRepository
+from backend.app.modules.pacientes.schemas import ObraSocialSummary
 from backend.app.modules.users.models import User
 from backend.app.modules.users.repository import SucursalRepository, UserRepository
 
@@ -130,6 +131,7 @@ class OrdenMedicaService:
         self.db = db
         self.repo = OrdenMedicaRepository(db)
         self.paciente_repo = PacienteRepository(db)
+        self.mutual_repo = ObraSocialRepository(db)
         self.sucursal_repo = SucursalRepository(db)
         self.user_repo = UserRepository(db)
 
@@ -891,6 +893,7 @@ class OrdenMedicaService:
         self, sucursal_id: Optional[uuid.UUID] = None
     ) -> Sequence[OrdenLlamadaPendienteItem]:
         ordenes = await self.repo.list_ordenes_con_llamadas_pendientes(sucursal_id=sucursal_id)
+        mutuales_map = await self.mutual_repo.get_map_mutuales()
 
         items: List[OrdenLlamadaPendienteItem] = []
         for o in ordenes:
@@ -945,6 +948,24 @@ class OrdenMedicaService:
             if dt_estado and dt_estado.tzinfo is None:
                 dt_estado = dt_estado.replace(tzinfo=timezone.utc)
 
+            mut_key = (o.mutual or "").strip().upper()
+            mut_obj = mutuales_map.get(mut_key)
+            mut_summary = (
+                ObraSocialSummary(
+                    id=mut_obj.id,
+                    codigo=mut_obj.codigo,
+                    sigla=mut_obj.sigla,
+                    nombre=mut_obj.nombre,
+                    codigo_externo=mut_obj.codigo_externo,
+                    display_name=mut_obj.display_name,
+                    dias_vencimiento=mut_obj.dias_vencimiento,
+                    copago_default=mut_obj.copago_default,
+                    porcentaje_cobertura_apb=mut_obj.porcentaje_cobertura_apb,
+                )
+                if mut_obj
+                else None
+            )
+
             item = OrdenLlamadaPendienteItem(
                 id=o.id,
                 nro_orden=o.nro_orden,
@@ -962,6 +983,9 @@ class OrdenMedicaService:
                 contacto_email=o.contacto_email,
                 sucursal_nombre=o.sucursal.nombre,
                 mutual=o.mutual,
+                mutual_id=mut_obj.id if mut_obj else None,
+                mutual_codigo_externo=mut_obj.codigo_externo if mut_obj else None,
+                mutual_data=mut_summary,
                 observaciones_ingreso=o.observaciones_ingreso,
                 observacion_resultado_auditoria=o.observacion_resultado_auditoria,
                 debe_orden_medica=o.debe_orden_medica,
