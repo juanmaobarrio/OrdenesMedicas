@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     ZEPTOMAIL_API_URL: str = "https://api.zeptomail.com/v1.1/email"
     ZEPTOMAIL_API_TOKEN: Optional[str] = None
     ZEPTOMAIL_FROM_EMAIL: str = "notificaciones@auditoriasmedicas.local"
-    ZEPTOMAIL_FROM_NAME: str = "Laboratorio de Análisis Clínicos"
+    ZEPTOMAIL_FROM_NAME: str = "Laboratorios Obarrio"
     ZEPTOMAIL_BOUNCE_ADDRESS: Optional[str] = None
     ZEPTOMAIL_TEST_REDIRECT_EMAIL: Optional[str] = None
 

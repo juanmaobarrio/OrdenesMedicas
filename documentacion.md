@@ -1147,3 +1147,68 @@ Se enriquecieron todas las respuestas de las órdenes médicas sin romper la com
 
 4. **Tipos Frontend (`frontend/src/types/ordenes.ts`):**
    - Se actualizaron las interfaces TypeScript `OrdenMedicaListItem`, `OrdenMedicaDetail` y `OrdenLlamadaPendienteItem` con `mutual_id?: string | null`, `mutual_codigo_externo?: string | null` y `mutual_data?: Partial<ObraSocial> | null`.
+
+
+---
+
+## 28. VENTANA POPUP DE AYUDA MEMORIA Y GUÍA DE LLAMADA AL PACIENTE
+
+### 28.1 Objetivo y Necesidad Operativa
+Para optimizar las comunicaciones salientes del personal hacia los pacientes (avisos de resolución de auditoría, diferencias arancelarias, pedidos de recetas físicas o reintegros económicos), se requería una ventana emergente tipo **Ayuda Memoria** accesible mediante un botón con ícono de información (`pi pi-info-circle`), ubicado al lado de **"Imprimir Indicaciones"**.
+
+Esta herramienta centraliza en un único panel interactivo y de lectura inmediata todos los datos críticos necesarios antes y durante la llamada telefónica, evitando que el operador deba navegar por distintas pestañas del expediente médico.
+
+### 28.2 Información Consolidada en el Popup
+1. **Identificación y Mutual:**
+   - **Nombre y Apellido:** visualización clara y destacada.
+   - **DNI:** documento de identidad formateado.
+   - **Mutual a la que pertenece:** nombre/sigla de la obra social y número de afiliado / credencial.
+   - **Contacto Telefónico:** teléfono fijo o celular con enlace directo `tel:` y horario de contacto preferido.
+2. **Control de Receta Física Original (¿Debe la orden o no?):**
+   - Si `debe_orden_medica = True`: banner destacado en color rojo de alta visibilidad advirtiendo que la orden ingresó digitalmente y es requisito indispensable exigir la **receta médica física original** el día de la extracción.
+   - Si `debe_orden_medica = False`: recuadro verde confirmando que no adeuda receta física.
+3. **Control de Atención Previa y Reintegro:**
+   - Si `ya_se_atendio = True`: recuadro de advertencia operativa indicando que el paciente **ya concurrió a realizarse la extracción**.
+   - Desglose contable: Monto abonado a cuenta, costo real liquidado por auditoría y resultado final (**Reintegro a favor del paciente** en verde o **Saldo a cobrar** en rojo).
+   - **Pauta obligatoria:** advertencia explícita para no decirle al paciente que "venga a atenderse", sino informarle que pase a retirar su reintegro económico.
+4. **Datos de lo que debe Abonar:**
+   - Copago / Bono de mutual.
+   - Aranceles de estudios no autorizados particulares.
+   - Acto Profesional Bioquímico (APB), si aplica.
+   - **Total a Abonar consolidado** con tipografía monoespaciada de alto contraste.
+5. **Prácticas Autorizadas y No Autorizadas:**
+   - **✓ Prácticas Autorizadas:** etiquetas de severidad `success` con conteo de estudios aprobados por la mutual.
+   - **✕ Prácticas No Autorizadas:** etiquetas de severidad `danger` con conteo de estudios particulares a cargo del paciente.
+6. **Indicaciones Clínicas (Solo el Título):**
+   - Visualización de los títulos de preparación asignados a la orden (ej: *"Ayuno 8 Horas"*, *"Orina de 24 Horas"*) presentados como chips compactos, facilitando la mención rápida durante la llamada sin sobrecargar de texto explicativo.
+   - Carga resiliente autónoma: si el catálogo no es provisto por props, el componente consulta automáticamente `configService.listIndicaciones(true)` en segundo plano.
+7. **Guiones Modelo (Speeches Adaptativos):**
+   - Pestaña **Guión Telefónico**: speech redactado con oratoria formal y empática, adaptado automáticamente según si corresponde reintegro, si tiene estudios no autorizados, si debe orden física o indicaciones clínicas.
+   - Pestaña **Mensaje WhatsApp / SMS**: redacción optimizada con negritas `*...*` y emojis amigables para copiar y pegar en sistemas de mensajería instantánea.
+   - Botón de copiado con confirmación interactiva Toast.
+
+### 28.3 Componentes y Vistas Integradas
+- **`frontend/src/components/ordenes/AyudaMemoriaLlamadaModal.vue`:** componente modal reutilizable con PrimeVue `Dialog`.
+- **`frontend/src/views/ordenes/OrdenDetailView.vue`:** botón `[ Ayuda Memoria ]` con ícono `pi pi-info-circle` junto a `[ Imprimir Indicaciones ]` en la barra superior del expediente.
+- **`frontend/src/components/ordenes/OrdenDetailPanel.vue`:** botón homólogo en el panel lateral embebido de órdenes.
+- **`frontend/src/views/ordenes/LlamadasPendientesView.vue`:** botón de acceso rápido directo en la columna de acciones de la tabla de llamadas y botón complementario en el modal de observaciones.
+
+### 28.4 Verificación en Entorno Local (Dev)
+- **Backend FastAPI:** ejecutándose en `http://127.0.0.1:8000` con documentación Swagger en `/docs`.
+- **Frontend Vite / Vue 3:** ejecutándose en `http://127.0.0.1:5173`.
+- **Pruebas End-to-End:** navegación automatizada en headless browser sobre el flujo real con inicio de sesión, apertura de orden médica, despliegue del modal de Ayuda Memoria y verificación de contenido extraído.
+
+
+### 28.5 Ajustes de Identidad, Leyenda de Prácticas, Permiso RBAC y Botón Ícono
+1. **Identidad Institucional ("Laboratorios Obarrio"):**
+   - Se actualizaron todos los guiones generados (llamada telefónica y mensaje de WhatsApp) para enunciar explícitamente **Laboratorios Obarrio** en lugar del genérico anterior.
+   - Se configuró además como remitente predeterminado en `ZEPTOMAIL_FROM_NAME` y en las plantillas de impresión institucional.
+2. **Leyenda Inteligente de Prácticas Autorizadas ("Evaluar según no autorizadas"):**
+   - Tanto en el expediente de la orden (`OrdenDetailView.vue` y `OrdenDetailPanel.vue`) como en el popup de **Ayuda Memoria** (`AyudaMemoriaLlamadaModal.vue`):
+     - Si la orden cuenta con prácticas no autorizadas cargadas y la lista de autorizadas está vacía (comportamiento frecuente cuando el auditor solo tipifica las prácticas rechazadas con arancel particular), se reemplaza la leyenda confusa *"Todos los solicitados"* o *"Se autorizan las restantes"* por la indicación precisa: **"Evaluar según no autorizadas"** en tipografía destacada de advertencia.
+3. **Control de Acceso y Permiso de Sistema (`ordenes:ayuda_memoria`):**
+   - Se creó el permiso granular `ordenes:ayuda_memoria` (*"Acceso a la ventana de Ayuda Memoria y guía telefónica al paciente"*) en `backend/app/core/seed.py`.
+   - Incorporado a los roles `ADMIN`, `AUDITOR` y `USUARIO` en la inicialización, editable desde la gestión de roles.
+   - En el frontend, la visualización del botón queda condicionada a `authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')`.
+4. **Diseño del Botón en Barra Superior:**
+   - Se removió el texto del botón, dejándolo exclusivamente como un **botón compacto con ícono de información** (`pi pi-info-circle`), con dimensiones cuadradas optimizadas (`w-9 h-9`), fondo sutil azulado y `title` accesible descriptivo, ubicado justo al lado de **"Imprimir Indicaciones"**.

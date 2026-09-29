@@ -232,7 +232,7 @@ def obtener_template_base_impresion_html() -> str:
     <!-- Encabezado / Membrete -->
     <div class="header">
       <div>
-        <div class="brand-title">Laboratorio de Análisis Clínicos</div>
+        <div class="brand-title">Laboratorios Obarrio</div>
         <div class="brand-subtitle">Indicaciones y Preparación Previa para Estudios Médicos</div>
       </div>
       <div class="meta-date">

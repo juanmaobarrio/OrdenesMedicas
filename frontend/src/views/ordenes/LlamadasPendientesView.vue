@@ -5,7 +5,8 @@ import { useOrdenesStore } from '../../stores/ordenes.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { useFeaturesStore } from '../../stores/features.store';
 import { usersService } from '../../services/users.service';
-import { OrdenLlamadaPendienteItem, Sucursal, TipoLlamada } from '../../types';
+import { ordenesService } from '../../services/ordenes.service';
+import { OrdenLlamadaPendienteItem, Sucursal, TipoLlamada, OrdenMedicaDetail } from '../../types';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -16,6 +17,7 @@ import ToggleSwitch from 'primevue/toggleswitch';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import EmptyState from '../../components/common/EmptyState.vue';
 import RegistrarLlamadaModal from '../../components/ordenes/RegistrarLlamadaModal.vue';
+import AyudaMemoriaLlamadaModal from '../../components/ordenes/AyudaMemoriaLlamadaModal.vue';
 import { formatDateTime } from '../../utils/date';
 
 const router = useRouter();
@@ -77,6 +79,24 @@ const cantOcultasPorEspera = computed(() => {
 const isModalVisible = ref(false);
 const isObservacionesModalVisible = ref(false);
 const selectedOrdenParaObs = ref<OrdenLlamadaPendienteItem | null>(null);
+
+// Ayuda Memoria state
+const isAyudaMemoriaVisible = ref(false);
+const ordenDetalleAyudaMemoria = ref<OrdenMedicaDetail | null>(null);
+const isLoadingAyudaMemoria = ref(false);
+
+const handleOpenAyudaMemoria = async (item: OrdenLlamadaPendienteItem) => {
+  isLoadingAyudaMemoria.value = true;
+  try {
+    const fullOrden = await ordenesService.getById(item.id);
+    ordenDetalleAyudaMemoria.value = fullOrden;
+    isAyudaMemoriaVisible.value = true;
+  } catch (error) {
+    console.error('Error al cargar orden para ayuda memoria:', error);
+  } finally {
+    isLoadingAyudaMemoria.value = false;
+  }
+};
 const selectedOrden = ref<{
   id: string;
   nroOrden: string;
@@ -317,9 +337,20 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
         </Column>
 
         <!-- Acciones -->
-        <Column header="Acciones" style="width: 200px" alignFrozen="right" frozen>
+        <Column header="Acciones" style="width: 220px" alignFrozen="right" frozen>
           <template #body="{ data }">
             <div class="flex items-center space-x-1.5">
+              <Button
+                v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+                icon="pi pi-info-circle"
+                text
+                rounded
+                size="small"
+                severity="info"
+                class="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                @click="handleOpenAyudaMemoria(data)"
+                title="Ayuda memoria: resumen paciente, mutual, montos, indicaciones y guión"
+              />
               <Button
                 icon="pi pi-window-maximize"
                 text
@@ -499,14 +530,25 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
 
       <template #footer>
         <div class="flex items-center justify-between w-full">
-          <Button
-            label="Ver Pantalla Completa"
-            icon="pi pi-window-maximize"
-            text
-            size="small"
-            severity="secondary"
-            @click="isObservacionesModalVisible = false; router.push(`/ordenes/${selectedOrdenParaObs?.id}`)"
-          />
+          <div class="flex items-center space-x-2">
+            <Button
+              label="Ver Pantalla Completa"
+              icon="pi pi-window-maximize"
+              text
+              size="small"
+              severity="secondary"
+              @click="isObservacionesModalVisible = false; router.push(`/ordenes/${selectedOrdenParaObs?.id}`)"
+            />
+            <Button
+              v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+              label="Ayuda Memoria"
+              icon="pi pi-info-circle"
+              outlined
+              size="small"
+              severity="info"
+              @click="handleOpenAyudaMemoria(selectedOrdenParaObs!)"
+            />
+          </div>
           <div class="space-x-2">
             <Button
               label="Cerrar"
@@ -539,6 +581,13 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
       :yaSeAtendio="featuresStore.isAtencionPreviaEnabled && selectedOrden.yaSeAtendio"
       :montoAbonadoAtencion="selectedOrden.montoAbonadoAtencion"
       @success="loadData"
+    />
+
+    <!-- Modal Ayuda Memoria y Guía Telefónica -->
+    <AyudaMemoriaLlamadaModal
+      v-if="ordenDetalleAyudaMemoria"
+      v-model:visible="isAyudaMemoriaVisible"
+      :orden="ordenDetalleAyudaMemoria"
     />
   </div>
 </template>

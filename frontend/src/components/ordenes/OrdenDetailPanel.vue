@@ -33,6 +33,7 @@ import IndicacionesChipsSelector from './IndicacionesChipsSelector.vue';
 import EmailResolucionModal from './EmailResolucionModal.vue';
 import CalculadoraEstudiosModal from './CalculadoraEstudiosModal.vue';
 import ImpresionIndicacionesModal from './ImpresionIndicacionesModal.vue';
+import AyudaMemoriaLlamadaModal from './AyudaMemoriaLlamadaModal.vue';
 import { formatDate, formatDateTime, parseDate, toISODate, semaforoVencimiento } from '../../utils/date';
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
@@ -61,6 +62,7 @@ const catalogoIndicaciones = ref<IndicacionEstudio[]>([]);
 const isEmailModalVisible = ref(false);
 const isImpresionIndicacionesVisible = ref(false);
 const isCalculadoraModalVisible = ref(false);
+const isAyudaMemoriaVisible = ref(false);
 
 const opcionesHorarios = [
   'Todo el día',
@@ -787,6 +789,18 @@ const handleCancelarEnvioAuto = async () => {
           @click="isImpresionIndicacionesVisible = true"
         />
 
+        <!-- Ayuda Memoria / Info Guía Telefónica (Protegido por Permiso) -->
+        <Button
+          v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+          icon="pi pi-info-circle"
+          severity="info"
+          outlined
+          size="small"
+          class="font-bold text-blue-700 bg-blue-50/50 hover:bg-blue-100 border-blue-300 w-9 h-9 p-0 flex items-center justify-center shrink-0"
+          title="Ayuda memoria: resumen de paciente, DNI, mutual, aranceles, indicaciones y guión para llamar"
+          @click="isAyudaMemoriaVisible = true"
+        />
+
         <!-- Asignar Auditor (Admin o con permiso) -->
         <Button
           v-if="featuresStore.isAsignarAuditorEnabled && (authStore.isAdmin || authStore.hasPermission('ordenes:audit'))"
@@ -974,6 +988,9 @@ const handleCancelarEnvioAuto = async () => {
                 {{ ea }}
               </span>
             </div>
+            <span v-else-if="orden.estudios_no_autorizados && orden.estudios_no_autorizados.length > 0" class="text-[11px] text-amber-800 font-semibold italic">
+              Evaluar según no autorizadas
+            </span>
             <span v-else class="text-[11px] text-emerald-700 italic">Todos autorizados</span>
           </div>
 
@@ -1900,6 +1917,14 @@ const handleCancelarEnvioAuto = async () => {
       v-if="orden"
       v-model:visible="isImpresionIndicacionesVisible"
       :orden-id="orden.id"
+    />
+
+    <!-- Modal Ayuda Memoria y Guía Telefónica -->
+    <AyudaMemoriaLlamadaModal
+      v-if="orden"
+      v-model:visible="isAyudaMemoriaVisible"
+      :orden="orden"
+      :catalogo-indicaciones="catalogoIndicaciones"
     />
   </div>
 </template>
