@@ -221,7 +221,7 @@ Te informamos que la auditoría médica ha *finalizado exitosamente* y tu trámi
 
   if (noAutorizadas.value.length > 0) {
     bloques.push(
-      `📌 *Prácticas aprobadas:* ${autorizadas.value.length > 0 ? autorizadas.value.join(', ') : 'Ninguna'}\n⚠️ *Prácticas sin cobertura (particular):* ${noAutorizadas.value.join(', ')}`
+      `⚠️ *Prácticas sin cobertura (particular):* ${noAutorizadas.value.join(', ')}`
     );
   }
 

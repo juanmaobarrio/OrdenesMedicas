@@ -1212,3 +1212,6 @@ Esta herramienta centraliza en un único panel interactivo y de lectura inmediat
    - En el frontend, la visualización del botón queda condicionada a `authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')`.
 4. **Diseño del Botón en Barra Superior:**
    - Se removió el texto del botón, dejándolo exclusivamente como un **botón compacto con ícono de información** (`pi pi-info-circle`), con dimensiones cuadradas optimizadas (`w-9 h-9`), fondo sutil azulado y `title` accesible descriptivo, ubicado justo al lado de **"Imprimir Indicaciones"**.
+
+5. **Optimización de Mensaje para WhatsApp / Mensajería:**
+   - En `AyudaMemoriaLlamadaModal.vue`, se simplificó el bloque de detalle de prácticas en el mensaje de WhatsApp (`speechWhatsapp`): se removió la línea redundante de estudios autorizados (`📌 *Prácticas aprobadas:* ...`) para dejar únicamente la mención a los estudios sin cobertura particular (`⚠️ *Prácticas sin cobertura (particular):* ...`), haciendo el mensaje más directo y claro para el paciente.
