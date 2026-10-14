@@ -789,9 +789,9 @@ const handleCancelarEnvioAuto = async () => {
           @click="isImpresionIndicacionesVisible = true"
         />
 
-        <!-- Ayuda Memoria / Info Guía Telefónica (Protegido por Permiso) -->
+        <!-- Ayuda Memoria / Info Guía Telefónica (Solo si estado es 'Auditoria Finalizada' y protegido por permiso) -->
         <Button
-          v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+          v-if="orden.estado === 'Auditoria Finalizada' && (authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria'))"
           icon="pi pi-info-circle"
           severity="info"
           outlined

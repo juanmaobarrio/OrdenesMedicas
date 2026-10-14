@@ -1266,3 +1266,17 @@ El error se debía a una combinación de dos factores:
   4. **Frontend:**
      - En `frontend/src/views/config/ConfiguracionView.vue`, en la pestaña APB se diseñó un selector de tarjetas interactivas con las opciones `10`, `100` y `1000`, con badges de selección activa y ejemplos visuales de redondeo.
      - Se actualizaron los tipos en `frontend/src/types/ordenes.ts` y las firmas de método en `frontend/src/services/config.service.ts`.
+
+
+---
+
+## 31. CONDICIONAMIENTO DEL CARTEL DE AYUDA MEMORIA EXCLUSIVAMENTE A ESTADO "AUDITORIA FINALIZADA"
+
+### 31.1 Requerimiento
+El botón y modal de **Ayuda Memoria** (`pi pi-info-circle`) solo debe estar disponible y visible cuando la orden médica se encuentre en estado **`Auditoria Finalizada`**. En cualquier otro estado (`Ingreso`, `en Auditoria`, `Solicitudes de auditoria`, `Actualizada`, etc.) no debe mostrarse.
+
+### 31.2 Implementación
+Se actualizó la condición `v-if` en todas las vistas y componentes que contienen el acceso a la Ayuda Memoria:
+1. **`frontend/src/views/ordenes/OrdenDetailView.vue`:** barra de herramientas superior del expediente. Condición: `orden.estado === 'Auditoria Finalizada' && (authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria'))`.
+2. **`frontend/src/components/ordenes/OrdenDetailPanel.vue`:** barra de herramientas del panel lateral embebido de órdenes. Misma condición evaluada sobre `orden.estado`.
+3. **`frontend/src/views/ordenes/LlamadasPendientesView.vue`:** botón en la columna de acciones de la tabla y botón inferior en el modal de observaciones. Condición: `data.estado === 'Auditoria Finalizada'` y `selectedOrdenParaObs?.estado === 'Auditoria Finalizada'`.

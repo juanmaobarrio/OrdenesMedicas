@@ -341,7 +341,7 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
           <template #body="{ data }">
             <div class="flex items-center space-x-1.5">
               <Button
-                v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+                v-if="data.estado === 'Auditoria Finalizada' && (authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria'))"
                 icon="pi pi-info-circle"
                 text
                 rounded
@@ -540,7 +540,7 @@ const handleOpenLlamadaModal = (item: OrdenLlamadaPendienteItem) => {
               @click="isObservacionesModalVisible = false; router.push(`/ordenes/${selectedOrdenParaObs?.id}`)"
             />
             <Button
-              v-if="authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria')"
+              v-if="selectedOrdenParaObs?.estado === 'Auditoria Finalizada' && (authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria'))"
               label="Ayuda Memoria"
               icon="pi pi-info-circle"
               outlined
