@@ -484,6 +484,7 @@ class OrdenMedicaDetail(BaseModel):
 # ==========================================
 class ConfiguracionAPBRead(BaseModel):
     valor_apb: Decimal = Field(..., description="Valor base vigente del Acto Profesional Bioquímico (APB)")
+    redondeo_estudios: int = Field(default=100, description="Factor de redondeo de precios de estudios: 10, 100 o 1000")
     descripcion: Optional[str] = None
     updated_at: Optional[datetime] = None
 
@@ -491,7 +492,8 @@ class ConfiguracionAPBRead(BaseModel):
 
 
 class ConfiguracionAPBUpdate(BaseModel):
-    valor_apb: Decimal = Field(..., ge=0, description="Nuevo valor de referencia del Acto Profesional Bioquímico (APB)")
+    valor_apb: Optional[Decimal] = Field(None, ge=0, description="Nuevo valor de referencia del Acto Profesional Bioquímico (APB)")
+    redondeo_estudios: Optional[int] = Field(None, description="Factor de redondeo de estudios: 10, 100 o 1000")
 
 
 # ==========================================

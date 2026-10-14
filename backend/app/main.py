@@ -408,7 +408,7 @@ def create_application() -> FastAPI:
     # Manejo global de excepciones no controladas
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Error no controlado en {request.method} {request.url.path}: {exc}", exc_info=True)
+        logger.opt(exception=True).error("Error no controlado en {} {}: {}", request.method, request.url.path, str(exc))
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": f"Error interno del servidor: {str(exc)}"},

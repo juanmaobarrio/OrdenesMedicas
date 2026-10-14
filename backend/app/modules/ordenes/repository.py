@@ -198,6 +198,14 @@ class OrdenMedicaRepository:
             OrdenMedica.llamada_finalizada_completada.is_(False)
         )
 
+        # Si el horario preferido es 'Solo WhatsApp' o 'Solo mail', no se deben generar llamadas
+        horario_norm = func.lower(func.coalesce(OrdenMedica.contacto_horario, ""))
+        cond_no_llamada = (
+            horario_norm.like("%solo whatsapp%") |
+            horario_norm.like("%solo mail%") |
+            horario_norm.like("%solo email%")
+        )
+
         stmt = (
             select(OrdenMedica)
             .options(
@@ -207,7 +215,7 @@ class OrdenMedicaRepository:
                 selectinload(OrdenMedica.solicitudes),
                 selectinload(OrdenMedica.llamadas_registro),
             )
-            .where(cond_solicitud | cond_finalizada)
+            .where((cond_solicitud | cond_finalizada) & ~cond_no_llamada)
         )
 
         if sucursal_id:

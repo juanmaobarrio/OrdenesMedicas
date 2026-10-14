@@ -257,6 +257,17 @@ async def seed_initial_data():
             db.add(apb_cfg)
             await db.flush()
 
+        stmt_redondeo = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "REDONDEO_ESTUDIOS")
+        redondeo_cfg = (await db.execute(stmt_redondeo)).scalar_one_or_none()
+        if not redondeo_cfg:
+            redondeo_cfg = ConfiguracionSistema(
+                clave="REDONDEO_ESTUDIOS",
+                valor="100",
+                descripcion="Factor de redondeo de precios de estudios (10, 100 o 1000)",
+            )
+            db.add(redondeo_cfg)
+            await db.flush()
+
         stmt_mail_auto = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
         mail_auto_cfg = (await db.execute(stmt_mail_auto)).scalar_one_or_none()
         if not mail_auto_cfg:

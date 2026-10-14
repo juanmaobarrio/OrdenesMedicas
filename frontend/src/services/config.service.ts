@@ -76,14 +76,17 @@ export const configService = {
     await api.delete(`/config/estados/${id}`);
   },
 
-  // Acto Profesional Bioquímico (APB) General
+  // Acto Profesional Bioquímico (APB) General y Redondeo
   async getValorApb(): Promise<ConfiguracionAPB> {
     const response = await api.get<ConfiguracionAPB>('/config/apb');
     return response.data;
   },
 
-  async updateValorApb(valor_apb: number): Promise<ConfiguracionAPB> {
-    const response = await api.put<ConfiguracionAPB>('/config/apb', { valor_apb });
+  async updateValorApb(valor_apb?: number, redondeo_estudios?: number): Promise<ConfiguracionAPB> {
+    const payload: { valor_apb?: number; redondeo_estudios?: number } = {};
+    if (valor_apb !== undefined) payload.valor_apb = valor_apb;
+    if (redondeo_estudios !== undefined) payload.redondeo_estudios = redondeo_estudios;
+    const response = await api.put<ConfiguracionAPB>('/config/apb', payload);
     return response.data;
   },
 

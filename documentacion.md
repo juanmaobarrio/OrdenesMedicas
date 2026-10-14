@@ -1215,3 +1215,54 @@ Esta herramienta centraliza en un único panel interactivo y de lectura inmediat
 
 5. **Optimización de Mensaje para WhatsApp / Mensajería:**
    - En `AyudaMemoriaLlamadaModal.vue`, se simplificó el bloque de detalle de prácticas en el mensaje de WhatsApp (`speechWhatsapp`): se removió la línea redundante de estudios autorizados (`📌 *Prácticas aprobadas:* ...`) para dejar únicamente la mención a los estudios sin cobertura particular (`⚠️ *Prácticas sin cobertura (particular):* ...`), haciendo el mensaje más directo y claro para el paciente.
+
+
+---
+
+## 29. CORRECCIÓN EN ACTUALIZACIÓN DE DATOS FILIATORIOS DE PACIENTES
+
+### 29.1 Síntoma
+Al intentar modificar los datos de un paciente desde el padrón general (`/pacientes`) mediante la ventana modal de edición, el backend arrojaba un error de servidor `500 Internal Server Error`, impidiendo guardar los cambios del paciente.
+
+### 29.2 Causa Raíz
+El error se debía a una combinación de dos factores:
+1. En `backend/app/modules/pacientes/service.py`, al procesar la actualización de `fecha_nacimiento` se utilizaba `date.fromisoformat(...)` sin haber importado el tipo `date` desde `datetime`, generando un `NameError`.
+2. Una vez resuelto el punto 1, al ejecutarse `await self.db.flush()` en SQLAlchemy asíncrono sobre el modelo `Paciente`, los atributos del mixin `TimestampMixin` (`updated_at`, etc.) quedaban expirados. Cuando FastAPI intentaba serializar el modelo hacia el esquema de salida `PacienteRead`, acceder a `updated_at` requería una lectura diferida de atributos I/O que disparaba una excepción de validación asíncrona: `ResponseValidationError: MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here`.
+3. Adicionalmente, el manejador global de excepciones no controladas en `backend/app/main.py` pasaba la excepción a `logger.error(f"... {exc}")` conteniendo llaves de diccionarios que Loguru interpretaba como campos de formato, arrojando un error interno colateral `KeyError: "'type'"`.
+
+### 29.3 Solución Implementada
+- Se añadió la importación `from datetime import date` en `backend/app/modules/pacientes/service.py`.
+- Se incorporó `await self.db.refresh(paciente)` inmediatamente después de `flush()` en `update_paciente`, y se agregó el método `update(...)` en `PacienteRepository` con `refresh` garantizado, asegurando que todos los atributos computados y timestamps estén cargados en memoria antes de la serialización a Pydantic v2.
+- Se corrigió el formateo del logger en `unhandled_exception_handler` de `backend/app/main.py` utilizando `logger.opt(exception=True).error(...)` para evitar colisiones con llaves en mensajes de excepción.
+- Se verificó la operación completa sobre el servidor activo con resultado `HTTP 200 OK` y serialización correcta.
+
+
+---
+
+## 30. EXCLUSIÓN DE LLAMADAS PENDIENTES SEGÚN CANAL PREFERIDO (SOLO WHATSAPP / SOLO MAIL) Y CONFIGURACIÓN DE REDONDEO DE PRECIOS EN APB (10, 100, 1000)
+
+### 30.1 Exclusión de Llamadas Telefónicas para Pacientes con Contacto Exclusivo Digital
+- **Requerimiento:** Cuando el horario/canal preferido de contacto configurado en la orden sea `"Solo WhatsApp"` o `"Solo mail"`, el sistema no debe generar la orden en la bandeja de llamadas pendientes ni sumar en el contador de llamadas del dashboard, dado que para estos pacientes no corresponde comunicación por vía telefónica.
+- **Implementación:**
+  - En `backend/app/modules/ordenes/repository.py` (`list_ordenes_con_llamadas_pendientes`), se incorporó la condición de exclusión:
+    `contacto_horario` no debe contener `'solo whatsapp'`, `'solo mail'` ni `'solo email'`.
+  - En `backend/app/modules/dashboard/repository.py` (`get_pending_calls_counts`), se replicó exactamente el mismo filtro para asegurar sincronización numérica en métricas y tarjetas de llamadas pendientes.
+
+### 30.2 Redondeo Parametrizable de Precios de Estudios Médicos en APB
+- **Requerimiento:** Permitir desde la configuración del Acto Profesional Bioquímico (APB) definir el factor de redondeo de precios de estudios entre tres opciones fijas: **10**, **100** o **1000**.
+  - Cada estudio individual (y no el monto total acumulado) debe redondearse según este factor usando redondeo comercial estándar (`ROUND_HALF_UP`).
+  - Ejemplo con factor 100:
+    - *Hemograma completo:* `$267.55` → `$300.00`
+    - *Hepatograma:* `$1445.37` → `$1400.00`
+    - *Total no autorizados (suma directa sin volver a redondear):* `$300.00 + $1400.00 = $1700.00`.
+- **Implementación:**
+  1. **Persistencia y Semilla:** Se incorporó el parámetro `REDONDEO_ESTUDIOS` en la tabla `configuracion_sistema` (valor por defecto `"100"`), inicializado automáticamente en `seed_initial_data()` de `backend/app/core/seed.py`.
+  2. **Esquemas y Endpoints:**
+     - En `backend/app/modules/ordenes/schemas.py`, se agregaron los campos `redondeo_estudios: int` en `ConfiguracionAPBRead` y `ConfiguracionAPBUpdate`.
+     - En `backend/app/modules/ordenes/service.py`, `get_config_apb()` y `update_valor_apb()` leen y persisten ambos parámetros conjuntamente.
+  3. **Lógica de Negocio y Cálculo:**
+     - Se crearon las funciones `_redondear_precio_estudio(precio, factor)` y se actualizó `_sincronizar_estudios_y_totales(..., factor_redondeo)`.
+     - Cada estudio individual dentro de `estudios_detalle` es redondeado a su múltiplo más próximo. La suma resultante para `valor_estudios_no_autorizados` se obtiene directamente a partir de los ítems ya redondeados.
+  4. **Frontend:**
+     - En `frontend/src/views/config/ConfiguracionView.vue`, en la pestaña APB se diseñó un selector de tarjetas interactivas con las opciones `10`, `100` y `1000`, con badges de selección activa y ejemplos visuales de redondeo.
+     - Se actualizaron los tipos en `frontend/src/types/ordenes.ts` y las firmas de método en `frontend/src/services/config.service.ts`.

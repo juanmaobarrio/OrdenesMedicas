@@ -423,15 +423,23 @@ const handleToggleActiveIndicacion = async (ind: IndicacionEstudio) => {
 
 // APB Configuration
 const valorApb = ref(0);
+const redondeoEstudios = ref(100);
 const apbUpdatedAt = ref<string | null>(null);
 const isLoadingApb = ref(false);
 const isSavingApb = ref(false);
+
+const opcionesRedondeo = [
+  { label: 'Redondeo a 10 ($10)', value: 10, ejemplo: 'Ej: $267,55 -> $270 | $1.445,37 -> $1.450' },
+  { label: 'Redondeo a 100 ($100)', value: 100, ejemplo: 'Ej: $267,55 -> $300 | $1.445,37 -> $1.400' },
+  { label: 'Redondeo a 1000 ($1.000)', value: 1000, ejemplo: 'Ej: $267,55 -> $0 | $1.445,37 -> $1.000' },
+];
 
 const loadApb = async () => {
   isLoadingApb.value = true;
   try {
     const res = await configService.getValorApb();
     valorApb.value = Number(res.valor_apb) || 0;
+    redondeoEstudios.value = Number(res.redondeo_estudios) || 100;
     apbUpdatedAt.value = res.updated_at || null;
   } catch (err: any) {
     console.warn('Error cargando APB:', err);
@@ -443,13 +451,14 @@ const loadApb = async () => {
 const handleSaveApb = async () => {
   isSavingApb.value = true;
   try {
-    const res = await configService.updateValorApb(valorApb.value);
+    const res = await configService.updateValorApb(valorApb.value, redondeoEstudios.value);
     valorApb.value = Number(res.valor_apb) || 0;
+    redondeoEstudios.value = Number(res.redondeo_estudios) || 100;
     apbUpdatedAt.value = res.updated_at || null;
     toast.add({
       severity: 'success',
       summary: 'Actualizado',
-      detail: `Valor base de APB fijado en $ ${valorApb.value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}`,
+      detail: `Configuración guardada (APB: $ ${valorApb.value.toLocaleString('es-AR', { minimumFractionDigits: 2 })}, Redondeo: a ${redondeoEstudios.value})`,
       life: 3500,
     });
   } catch (err: any) {
@@ -1088,7 +1097,7 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                 </div>
               </div>
 
-              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+              <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-5">
                 <div>
                   <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                     Valor Base de Referencia Vigente ($)
@@ -1107,10 +1116,50 @@ const handleToggleActiveEstado = async (e: EstadoOrdenConfig) => {
                   </p>
                 </div>
 
+                <!-- Configuración de Redondeo de Precios de Estudios -->
+                <div class="pt-4 border-t border-slate-100">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <label class="block text-xs font-bold text-slate-700 uppercase">
+                      Redondeo de Precios de Estudios Médicos
+                    </label>
+                    <span class="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200">
+                      Individual por estudio
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+                    Define la escala a la que se redondea el precio particular de cada estudio individual ingresado o cargado desde auditoría (no se redondea la suma final, sino cada práctica por separado).
+                  </p>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div
+                      v-for="opc in opcionesRedondeo"
+                      :key="opc.value"
+                      @click="redondeoEstudios = opc.value"
+                      :class="[
+                        'p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between',
+                        redondeoEstudios === opc.value
+                          ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 bg-slate-50/50 hover:border-slate-300 hover:bg-slate-50'
+                      ]"
+                    >
+                      <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-bold text-sm text-slate-800">{{ opc.label }}</span>
+                        <i
+                          :class="[
+                            'pi text-sm',
+                            redondeoEstudios === opc.value ? 'pi-check-circle text-indigo-600' : 'pi-circle text-slate-300'
+                          ]"
+                        ></i>
+                      </div>
+                      <span class="text-[11px] text-slate-500 font-mono">{{ opc.ejemplo }}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span class="text-xs text-slate-500">Los cambios se aplican de inmediato para nuevas órdenes.</span>
+                  <span class="text-xs text-slate-500">Los cambios se aplican de inmediato en los cálculos de estudios.</span>
                   <Button
-                    label="Guardar Nuevo Valor APB"
+                    label="Guardar Configuración APB"
                     icon="pi pi-check"
                     severity="primary"
                     :loading="isSavingApb"

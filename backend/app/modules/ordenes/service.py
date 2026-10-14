@@ -79,15 +79,34 @@ def _enum_str(v: Any) -> Optional[str]:
     return v.value if hasattr(v, "value") else str(v)
 
 
+def _redondear_precio_estudio(precio: float, factor: int = 100) -> float:
+    """
+    Redondea el precio de un estudio individual según el factor configurado (10, 100 o 1000).
+    Ejemplos con factor 100:
+      267.55 -> 300.00
+      1445.37 -> 1400.00
+    Usa redondeo estándar hacia el múltiplo más cercano.
+    """
+    if precio is None or precio <= 0 or factor not in (10, 100, 1000):
+        return float(precio or 0.0)
+    import decimal
+    d_precio = decimal.Decimal(str(precio))
+    d_factor = decimal.Decimal(str(factor))
+    d_redondeado = (d_precio / d_factor).quantize(decimal.Decimal("1"), rounding=decimal.ROUND_HALF_UP) * d_factor
+    return float(d_redondeado)
+
+
 def _sincronizar_estudios_y_totales(
     estudios_detalle: Optional[List[Any]],
     estudios_autorizados: Optional[List[str]],
     estudios_no_autorizados: Optional[List[str]],
     valor_estudios_no_autorizados: Optional[Decimal],
+    factor_redondeo: int = 100,
 ):
     """
     Sincroniza y autocalcula listas de nombres y monto de no autorizados
     a partir del desglose JSON de estudios_detalle si se proporciona.
+    Aplica el redondeo configurado a cada estudio individual por separado.
     """
     detalle_dicts = None
     if estudios_detalle is not None:
@@ -102,9 +121,11 @@ def _sincronizar_estudios_y_totales(
             d["nombre"] = str(d.get("nombre") or "").strip()
             d["codigo"] = str(d.get("codigo") or "").strip() if d.get("codigo") else None
             try:
-                d["precio"] = float(d.get("precio") or 0.0)
+                precio_raw = float(d.get("precio") or 0.0)
             except (ValueError, TypeError):
-                d["precio"] = 0.0
+                precio_raw = 0.0
+            # Redondear cada estudio individual según el factor configurado
+            d["precio"] = _redondear_precio_estudio(precio_raw, factor=factor_redondeo)
             d["autorizado"] = bool(d.get("autorizado", True))
             detalle_dicts.append(d)
 
@@ -117,7 +138,7 @@ def _sincronizar_estudios_y_totales(
             estudios_no_autorizados = [
                 d["nombre"] for d in detalle_dicts if not d["autorizado"] and d["nombre"]
             ]
-        # Si no se pasó un valor específico o es 0, sumar precios de no autorizados
+        # Sumar los precios ya redondeados individualmente
         if valor_estudios_no_autorizados is None or valor_estudios_no_autorizados == Decimal("0.00"):
             suma_no_aut = Decimal(str(sum(d["precio"] for d in detalle_dicts if not d["autorizado"])))
             if suma_no_aut > Decimal("0.00") or valor_estudios_no_autorizados is None:
@@ -167,6 +188,20 @@ class OrdenMedicaService:
             fecha_hasta=fecha_hasta,
         )
 
+    async def _get_factor_redondeo(self) -> int:
+        """Obtiene el factor de redondeo configurado para estudios (10, 100 o 1000)."""
+        stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "REDONDEO_ESTUDIOS")
+        res = await self.db.execute(stmt)
+        cfg = res.scalar_one_or_none()
+        if cfg and cfg.valor:
+            try:
+                val = int(cfg.valor)
+                if val in (10, 100, 1000):
+                    return val
+            except Exception:
+                pass
+        return 100
+
     async def create_orden(
         self,
         dto: OrdenMedicaCreate,
@@ -187,6 +222,7 @@ class OrdenMedicaService:
         # Generar numero correlativo unico
         nro_orden = await self.repo.generate_next_nro_orden()
 
+        factor_red = await self._get_factor_redondeo()
         (
             detalle_dicts,
             estudios_aut,
@@ -197,6 +233,7 @@ class OrdenMedicaService:
             estudios_autorizados=dto.estudios_autorizados,
             estudios_no_autorizados=dto.estudios_no_autorizados,
             valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+            factor_redondeo=factor_red,
         )
 
         orden = OrdenMedica(
@@ -350,6 +387,7 @@ class OrdenMedicaService:
                 diff["autotransicion_estado"] = EstadoOrden.EN_AUDITORIA.value
 
         if dto.estudios_detalle is not None:
+            factor_red = await self._get_factor_redondeo()
             (
                 detalle_dicts,
                 estudios_aut,
@@ -360,6 +398,7 @@ class OrdenMedicaService:
                 estudios_autorizados=dto.estudios_autorizados,
                 estudios_no_autorizados=dto.estudios_no_autorizados,
                 valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+                factor_redondeo=factor_red,
             )
             orden.estudios_detalle = detalle_dicts or []
             diff["estudios_detalle"] = detalle_dicts or []
@@ -516,6 +555,7 @@ class OrdenMedicaService:
         if dto.valor_apb is not None:
             orden.valor_apb = dto.valor_apb
         if getattr(dto, "estudios_detalle", None) is not None:
+            factor_red = await self._get_factor_redondeo()
             (
                 detalle_dicts,
                 estudios_aut,
@@ -526,6 +566,7 @@ class OrdenMedicaService:
                 estudios_autorizados=dto.estudios_autorizados,
                 estudios_no_autorizados=dto.estudios_no_autorizados,
                 valor_estudios_no_autorizados=dto.valor_estudios_no_autorizados,
+                factor_redondeo=factor_red,
             )
             orden.estudios_detalle = detalle_dicts or []
             if estudios_aut is not None:
@@ -1147,8 +1188,30 @@ class ConfiguracionSistemaService:
             val = Decimal(cfg.valor)
         except Exception:
             val = Decimal("0.00")
+
+        # Obtener o inicializar factor de redondeo (default 100)
+        stmt_red = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "REDONDEO_ESTUDIOS")
+        res_red = await self.db.execute(stmt_red)
+        cfg_red = res_red.scalar_one_or_none()
+        if not cfg_red:
+            cfg_red = ConfiguracionSistema(
+                clave="REDONDEO_ESTUDIOS",
+                valor="100",
+                descripcion="Factor de redondeo de precios de estudios (10, 100 o 1000)",
+            )
+            self.db.add(cfg_red)
+            await self.db.commit()
+            await self.db.refresh(cfg_red)
+        try:
+            redondeo_val = int(cfg_red.valor)
+            if redondeo_val not in (10, 100, 1000):
+                redondeo_val = 100
+        except Exception:
+            redondeo_val = 100
+
         return ConfiguracionAPBRead(
             valor_apb=val,
+            redondeo_estudios=redondeo_val,
             descripcion=cfg.descripcion,
             updated_at=cfg.updated_at,
         )
@@ -1160,16 +1223,48 @@ class ConfiguracionSistemaService:
         if not cfg:
             cfg = ConfiguracionSistema(
                 clave="VALOR_APB",
-                valor=str(dto.valor_apb),
+                valor=str(dto.valor_apb if dto.valor_apb is not None else "0.00"),
                 descripcion="Valor vigente de referencia del Acto Profesional Bioquímico (APB)",
             )
             self.db.add(cfg)
         else:
-            cfg.valor = str(dto.valor_apb)
+            if dto.valor_apb is not None:
+                cfg.valor = str(dto.valor_apb)
+
+        # Actualizar redondeo_estudios si se envió
+        stmt_red = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "REDONDEO_ESTUDIOS")
+        res_red = await self.db.execute(stmt_red)
+        cfg_red = res_red.scalar_one_or_none()
+        if not cfg_red:
+            red_str = str(dto.redondeo_estudios) if dto.redondeo_estudios in (10, 100, 1000) else "100"
+            cfg_red = ConfiguracionSistema(
+                clave="REDONDEO_ESTUDIOS",
+                valor=red_str,
+                descripcion="Factor de redondeo de precios de estudios (10, 100 o 1000)",
+            )
+            self.db.add(cfg_red)
+        else:
+            if dto.redondeo_estudios is not None and dto.redondeo_estudios in (10, 100, 1000):
+                cfg_red.valor = str(dto.redondeo_estudios)
+
         await self.db.commit()
         await self.db.refresh(cfg)
+        if cfg_red:
+            await self.db.refresh(cfg_red)
+
+        try:
+            val_ret = Decimal(cfg.valor)
+        except Exception:
+            val_ret = Decimal("0.00")
+
+        try:
+            red_ret = int(cfg_red.valor) if cfg_red else 100
+        except Exception:
+            red_ret = 100
+
         return ConfiguracionAPBRead(
-            valor_apb=Decimal(cfg.valor),
+            valor_apb=val_ret,
+            redondeo_estudios=red_ret,
             descripcion=cfg.descripcion,
             updated_at=cfg.updated_at,
         )
@@ -1391,6 +1486,20 @@ class IndicacionEstudioService:
 class EmailResolucionService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def _get_factor_redondeo(self) -> int:
+        """Obtiene el factor de redondeo configurado para estudios (10, 100 o 1000)."""
+        stmt = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "REDONDEO_ESTUDIOS")
+        res = await self.db.execute(stmt)
+        cfg = res.scalar_one_or_none()
+        if cfg and cfg.valor:
+            try:
+                val = int(cfg.valor)
+                if val in (10, 100, 1000):
+                    return val
+            except Exception:
+                pass
+        return 100
 
     async def get_config_automatizacion(self) -> ConfiguracionMailAutomatizacionRead:
         stmt_auto = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "ENVIO_MAIL_AUTOMATICO")
@@ -1680,6 +1789,7 @@ class EmailResolucionService:
             raise EntityNotFoundException("OrdenMedica", orden_id)
 
         if estudios_detalle is not None:
+            factor_red = await self._get_factor_redondeo()
             (
                 detalle_dicts,
                 estudios_aut,
@@ -1690,6 +1800,7 @@ class EmailResolucionService:
                 estudios_autorizados=estudios_autorizados,
                 estudios_no_autorizados=estudios_no_autorizados,
                 valor_estudios_no_autorizados=None,
+                factor_redondeo=factor_red,
             )
             orden.estudios_detalle = detalle_dicts or []
             if estudios_aut is not None:

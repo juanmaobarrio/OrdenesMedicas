@@ -297,6 +297,7 @@ export interface OrdenLlamadaPendienteItem {
 
 export interface ConfiguracionAPB {
   valor_apb: number;
+  redondeo_estudios?: number; // 10, 100 o 1000
   descripcion?: string;
   updated_at?: string;
 }

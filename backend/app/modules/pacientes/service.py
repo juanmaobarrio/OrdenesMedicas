@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Optional, Sequence, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -168,5 +169,6 @@ class PacienteService:
             paciente.is_active = dto.is_active
 
         await self.db.flush()
+        await self.db.refresh(paciente)
         return paciente
 

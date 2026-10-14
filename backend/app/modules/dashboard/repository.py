@@ -34,15 +34,24 @@ class DashboardRepository:
         self, sucursal_id: Optional[uuid.UUID] = None
     ) -> Dict[str, int]:
         """Calcula las llamadas pendientes divididas por motivo."""
+        horario_norm = func.lower(func.coalesce(OrdenMedica.contacto_horario, ""))
+        cond_no_llamada = (
+            horario_norm.like("%solo whatsapp%") |
+            horario_norm.like("%solo mail%") |
+            horario_norm.like("%solo email%")
+        )
+
         stmt_solicitud = (
             select(func.count(OrdenMedica.id))
             .where(OrdenMedica.estado == EstadoOrden.SOLICITUDES_AUDITORIA)
             .where(OrdenMedica.llamada_solicitud_completada.is_(False))
+            .where(~cond_no_llamada)
         )
         stmt_finalizada = (
             select(func.count(OrdenMedica.id))
             .where(OrdenMedica.estado == EstadoOrden.AUDITORIA_FINALIZADA)
             .where(OrdenMedica.llamada_finalizada_completada.is_(False))
+            .where(~cond_no_llamada)
         )
 
         if sucursal_id:

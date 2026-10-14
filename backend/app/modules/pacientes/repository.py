@@ -156,3 +156,11 @@ class PacienteRepository:
         await self.db.refresh(paciente)
         return paciente
 
+
+    async def update(self, paciente: Paciente, data: dict) -> Paciente:
+        for key, value in data.items():
+            if hasattr(paciente, key):
+                setattr(paciente, key, value)
+        await self.db.flush()
+        await self.db.refresh(paciente)
+        return paciente
