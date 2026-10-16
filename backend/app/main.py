@@ -249,6 +249,13 @@ def sync_database_columns(connection):
             VALUES ('FEATURE_IMPRESION_INDICACIONES', 'false', 'Activa la impresión de indicaciones clínicas y accesos directos')
             ON CONFLICT (clave) DO NOTHING
             """,
+            """
+            SELECT setval(
+                pg_get_serial_sequence('estados_orden_config', 'id'),
+                COALESCE((SELECT MAX(id) FROM estados_orden_config), 1),
+                true
+            )
+            """,
         ]
         for stmt in postgres_statements:
             try:

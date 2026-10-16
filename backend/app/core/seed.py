@@ -244,6 +244,25 @@ async def seed_initial_data():
                 db.add(est_obj)
                 await db.flush()
 
+        # Asegurar sincronización de la secuencia PostgreSQL para evitar colisiones de IDs autoincrementales
+        try:
+            bind = db.get_bind()
+            if bind.dialect.name == "postgresql":
+                await db.execute(
+                    text(
+                        """
+                        SELECT setval(
+                            pg_get_serial_sequence('estados_orden_config', 'id'),
+                            COALESCE((SELECT MAX(id) FROM estados_orden_config), 1),
+                            true
+                        );
+                        """
+                    )
+                )
+                await db.flush()
+        except Exception as seq_err:
+            logger.warning(f"Aviso al sincronizar secuencia de estados_orden_config: {seq_err}")
+
         # 8. Configuración General del Sistema (APB y Mail)
         from backend.app.modules.ordenes.models import ConfiguracionSistema, IndicacionEstudio, PlantillaEmail
         stmt_apb = select(ConfiguracionSistema).where(ConfiguracionSistema.clave == "VALOR_APB")

@@ -1280,3 +1280,21 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
 1. **`frontend/src/views/ordenes/OrdenDetailView.vue`:** barra de herramientas superior del expediente. Condición: `orden.estado === 'Auditoria Finalizada' && (authStore.isAdmin || authStore.hasPermission('ordenes:ayuda_memoria'))`.
 2. **`frontend/src/components/ordenes/OrdenDetailPanel.vue`:** barra de herramientas del panel lateral embebido de órdenes. Misma condición evaluada sobre `orden.estado`.
 3. **`frontend/src/views/ordenes/LlamadasPendientesView.vue`:** botón en la columna de acciones de la tabla y botón inferior en el modal de observaciones. Condición: `data.estado === 'Auditoria Finalizada'` y `selectedOrdenParaObs?.estado === 'Auditoria Finalizada'`.
+
+
+---
+
+## 32. SINCRONIZACIÓN DE SECUENCIA ID EN TABLA `estados_orden_config` (POSTGRESQL)
+
+- **Problema / Causa Raíz:**
+  Al crear un nuevo estado en la configuración del sistema (`POST /api/v1/config/estados`), el motor PostgreSQL arrojaba el error:
+  `duplicate key value violates unique constraint "estados_orden_config_pkey"`.
+  Esto ocurrió debido a que el semillero (`seed.py`) insertó los primeros 8 estados predeterminados del sistema asignándoles claves primarias manuales explícitas (`id=1` hasta `id=8`). En PostgreSQL, las inserciones explícitas no actualizan el puntero interno del generador de secuencias de la columna serial (`estados_orden_config_id_seq`), que continuaba apuntando al valor 1. Cuando la API intentaba insertar un 9no estado sin suministrar ID (dejando que la base de datos lo asigne), PostgreSQL generaba `id = 1` y chocaba contra la clave primaria ya existente.
+
+- **Solución Implementada:**
+  1. **Migración de Alembic (`0008_sync_estados_orden_config_seq.py`):**
+     Ejecuta `SELECT setval(pg_get_serial_sequence('estados_orden_config', 'id'), COALESCE((SELECT MAX(id) FROM estados_orden_config), 1), true);` de manera que el valor de la secuencia se calibre al máximo ID existente.
+  2. **Garantía Idempotente en el Arranque (`backend/app/main.py`):**
+     Se agregó la misma sentencia en `sync_database_columns()` para entornos PostgreSQL.
+  3. **Aseguramiento en Semillero (`backend/app/core/seed.py` y `migrar_columnas.py`):**
+     Inmediatamente después del loop que siembra los estados por defecto del sistema, se calibra la secuencia garantizando que cualquier posterior `INSERT` asigne el siguiente ID correlativo libre sin colisiones.
