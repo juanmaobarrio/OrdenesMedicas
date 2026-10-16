@@ -283,6 +283,57 @@ def sync_database_columns(connection):
                 END IF;
             END $$;
             """,
+            """
+            UPDATE ordenes_medicas
+            SET estado = CASE estado
+                WHEN 'INGRESO' THEN 'Ingreso'
+                WHEN 'EN_AUDITORIA' THEN 'en Auditoria'
+                WHEN 'SOLICITUDES_AUDITORIA' THEN 'Solicitudes de auditoria'
+                WHEN 'ACTUALIZADA' THEN 'Actualizada'
+                WHEN 'AUDITORIA_FINALIZADA' THEN 'Auditoria Finalizada'
+                WHEN 'DAR_DE_BAJA' THEN 'Dar de baja'
+                WHEN 'CANCELADA' THEN 'Cancelada'
+                WHEN 'CERRADA' THEN 'Cerrada'
+                ELSE estado
+            END
+            WHERE estado IN ('INGRESO', 'EN_AUDITORIA', 'SOLICITUDES_AUDITORIA', 'ACTUALIZADA', 'AUDITORIA_FINALIZADA', 'DAR_DE_BAJA', 'CANCELADA', 'CERRADA')
+            """,
+            """
+            UPDATE auditoria_logs
+            SET estado_anterior = CASE estado_anterior
+                WHEN 'INGRESO' THEN 'Ingreso'
+                WHEN 'EN_AUDITORIA' THEN 'en Auditoria'
+                WHEN 'SOLICITUDES_AUDITORIA' THEN 'Solicitudes de auditoria'
+                WHEN 'ACTUALIZADA' THEN 'Actualizada'
+                WHEN 'AUDITORIA_FINALIZADA' THEN 'Auditoria Finalizada'
+                WHEN 'DAR_DE_BAJA' THEN 'Dar de baja'
+                WHEN 'CANCELADA' THEN 'Cancelada'
+                WHEN 'CERRADA' THEN 'Cerrada'
+                ELSE estado_anterior
+            END
+            WHERE estado_anterior IN ('INGRESO', 'EN_AUDITORIA', 'SOLICITUDES_AUDITORIA', 'ACTUALIZADA', 'AUDITORIA_FINALIZADA', 'DAR_DE_BAJA', 'CANCELADA', 'CERRADA')
+            """,
+            """
+            UPDATE auditoria_logs
+            SET estado_nuevo = CASE estado_nuevo
+                WHEN 'INGRESO' THEN 'Ingreso'
+                WHEN 'EN_AUDITORIA' THEN 'en Auditoria'
+                WHEN 'SOLICITUDES_AUDITORIA' THEN 'Solicitudes de auditoria'
+                WHEN 'ACTUALIZADA' THEN 'Actualizada'
+                WHEN 'AUDITORIA_FINALIZADA' THEN 'Auditoria Finalizada'
+                WHEN 'DAR_DE_BAJA' THEN 'Dar de baja'
+                WHEN 'CANCELADA' THEN 'Cancelada'
+                WHEN 'CERRADA' THEN 'Cerrada'
+                ELSE estado_nuevo
+            END
+            WHERE estado_nuevo IN ('INGRESO', 'EN_AUDITORIA', 'SOLICITUDES_AUDITORIA', 'ACTUALIZADA', 'AUDITORIA_FINALIZADA', 'DAR_DE_BAJA', 'CANCELADA', 'CERRADA')
+            """,
+            """
+            UPDATE ordenes_medicas om
+            SET estado = eoc.nombre
+            FROM estados_orden_config eoc
+            WHERE om.estado = eoc.codigo
+            """,
         ]
         for stmt in postgres_statements:
             try:

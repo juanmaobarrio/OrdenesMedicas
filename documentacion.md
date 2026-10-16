@@ -1344,3 +1344,22 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
      - Se incorporó la verificación y conversión condicional en `sync_database_columns` para que en cualquier reinicio de contenedor se actualice de forma transparente.
   4. **Lógica de Servicio (`backend/app/modules/ordenes/service.py` y `dashboard/service.py`):**
      - Se reemplazaron todos los accesos directos `.estado.value` por la función utilitaria `_enum_str(...)`, garantizando compatibilidad total tanto con instancias de Enum como con cadenas de texto planas.
+
+
+---
+
+## 35. NORMALIZACIÓN DE CÓDIGOS DE ESTADOS A NOMBRES DESCRIPTIVOS EN LA BASE DE DATOS Y FRONTEND
+
+- **Problema / Incidente Detectado:**
+  Tras convertir la columna `ordenes_medicas.estado` de Enum a `VARCHAR(100)`, en la interfaz las órdenes médicas comenzaron a mostrar el código interno en mayúsculas (ej: `'INGRESO'`, `'EN_AUDITORIA'`, `'ACTUALIZADA'`) en lugar del nombre descriptivo legible (ej: `'Ingreso'`, `'en Auditoria'`, `'Actualizada'`).
+  Esto ocurrió porque los registros históricos en PostgreSQL estaban almacenados originalmente con el nombre del miembro de Enum (`e.name` en mayúsculas), y al convertirse a VARCHAR sin traducción, el motor conservó las cadenas en mayúsculas.
+
+- **Solución Implementada:**
+  1. **Frontend (`StatusTag.vue`):**
+     - Se incorporó la propiedad computada `label`: si recibe un código interno (ej: `'INGRESO'`, `'EN_AUDITORIA'`, etc.), consulta el catálogo dinámico de `estadosStore` y resuelve inmediatamente su descripción legible (`'Ingreso'`, `'en Auditoria'`).
+     - Se expandieron los mapas de fallback de colores e íconos (`SEVERITY_FALLBACK`, `FALLBACK_ICONO`) para contemplar indistintamente tanto el código como el nombre descriptivo.
+  2. **Normalización en Base de Datos (Alembic `0009` y `main.py`):**
+     - Se incluyó una consulta de normalización automática en la migración de Alembic y en el ciclo de inicio `lifespan` de FastAPI:
+       Traduce cualquier código en mayúsculas presente en `ordenes_medicas.estado` y `auditoria_logs` a su correspondiente nombre descriptivo (`'Ingreso'`, `'en Auditoria'`, `'Solicitudes de auditoria'`, `'Actualizada'`, `'Auditoria Finalizada'`, `'Dar de baja'`, `'Cancelada'`, `'Cerrada'`), además de mapear dinámicamente cualquier código contra `estados_orden_config.nombre`.
+  3. **Lógica de Creación y Transición en Servicio (`service.py`):**
+     - En todos los métodos de creación y actualización (`create`, `update`, `cambiar_estado`), `orden.estado` se inicializa y persiste siempre con el nombre descriptivo (`EstadoOrden.INGRESO.value`, `estado_cfg.nombre`).
