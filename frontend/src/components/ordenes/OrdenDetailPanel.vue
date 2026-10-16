@@ -6,6 +6,7 @@ import { usersService } from '../../services/users.service';
 import { mutualesService } from '../../services/mutuales.service';
 import { configService } from '../../services/config.service';
 import { useAuthStore } from '../../stores/auth.store';
+import { useEstadosStore } from '../../stores/estados.store';
 import { EstadoOrden, OrdenMedicaDetail, OrdenMedicaListItem, AdjuntoOrden, ObraSocial, UserDetail, MotivoCancelacion, IndicacionEstudio } from '../../types';
 
 import Button from 'primevue/button';
@@ -50,6 +51,7 @@ const emit = defineEmits<{
 const toast = useToast();
 const authStore = useAuthStore();
 const featuresStore = useFeaturesStore();
+const estadosStore = useEstadosStore();
 const router = useRouter();
 
 const orden = ref<OrdenMedicaDetail | null>(null);
@@ -84,6 +86,28 @@ const finalEstudiosNoAutorizados = ref(0);
 const finalValorApb = ref(0);
 const finalEstudiosAutorizadosLista = ref<string[]>([]);
 const finalEstudiosNoAutorizadosLista = ref<string[]>([]);
+
+const FALLBACK_ESTADOS: string[] = [
+  'Ingreso',
+  'en Auditoria',
+  'Solicitudes de auditoria',
+  'Actualizada',
+  'Auditoria Finalizada',
+  'Dar de baja',
+  'Cancelada',
+  'Cerrada',
+];
+
+const opcionesEstadosModal = computed<{ label: string; value: EstadoOrden }[]>(() => {
+  if (!estadosStore.estados || estadosStore.estados.length === 0) {
+    return FALLBACK_ESTADOS.map((e) => ({ label: e, value: e as EstadoOrden }));
+  }
+  return estadosStore.estados
+    .filter((e) => e.activo)
+    .slice()
+    .sort((a, b) => (a.orden_secuencia ?? 0) - (b.orden_secuencia ?? 0))
+    .map((e) => ({ label: e.nombre, value: e.nombre as EstadoOrden }));
+});
 
 const openCambiarEstadoModal = () => {
   if (orden.value) {
@@ -334,6 +358,7 @@ watch(
 );
 
 onMounted(async () => {
+  estadosStore.fetchEstados();
   const [mutRes, motRes, indRes, sucRes] = await Promise.all([
     mutualesService.list(),
     configService.listMotivosCancelacion(true),
@@ -1371,7 +1396,10 @@ const handleCancelarEnvioAuto = async () => {
           <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nuevo Estado</label>
           <Dropdown
             v-model="selectedNuevoEstado"
-            :options="['Ingreso', 'en Auditoria', 'Solicitudes de auditoria', 'Actualizada', 'Auditoria Finalizada', 'Dar de baja', 'Cancelada', 'Cerrada']"
+            :options="opcionesEstadosModal"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Seleccione estado..."
             class="w-full text-xs"
           />
         </div>

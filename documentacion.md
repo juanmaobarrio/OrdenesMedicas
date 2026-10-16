@@ -1298,3 +1298,25 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
      Se agregó la misma sentencia en `sync_database_columns()` para entornos PostgreSQL.
   3. **Aseguramiento en Semillero (`backend/app/core/seed.py` y `migrar_columnas.py`):**
      Inmediatamente después del loop que siembra los estados por defecto del sistema, se calibra la secuencia garantizando que cualquier posterior `INSERT` asigne el siguiente ID correlativo libre sin colisiones.
+
+
+---
+
+## 33. CARGA DINÁMICA DE ESTADOS EN EL SELECTOR DE ÓRDENES MÉDICAS Y SOPORTE DE ESTADOS PERSONALIZADOS EN POSTGRESQL
+
+- **Problema Detectado:**
+  En la vista detallada de la orden médica (`OrdenDetailView.vue`) y en el panel lateral embebido (`OrdenDetailPanel.vue`), el modal **Cambiar Estado** utilizaba una lista fija en duro (`:options="['Ingreso', 'en Auditoria', ...]"`) en lugar de consultar los estados administrables de la base de datos (`estados_orden_config`). Por este motivo, cualquier estado nuevo creado por el usuario (por ejemplo `TODO_RECHAZADO` o nombres personalizados) no se mostraba en el desplegable. Además, el backend requería que el estado perteneciera estrictamente al Enum estático de PostgreSQL `estado_orden_enum`.
+
+- **Solución Implementada:**
+  1. **Frontend (`OrdenDetailView.vue` y `OrdenDetailPanel.vue`):**
+     - Se integró el store centralizado de estados `useEstadosStore`.
+     - Se vinculó el desplegable `<Dropdown>` a la propiedad computada `opcionesEstadosModal`, que filtra los estados activos (`e.activo`), los ordena por su número de secuencia (`orden_secuencia`) y genera las opciones dinámicamente desde la base de datos (con fallback seguro en caso de carga inicial).
+     - Al montar la vista se invoca `estadosStore.fetchEstados()` para asegurar datos frescos.
+  2. **Tipos TypeScript (`types/ordenes.ts`):**
+     - Se flexibilizó el tipo `EstadoOrden` mediante `| (string & {})` para que admita tanto los estados canónicos del sistema como cualquier estado nuevo configurable por el usuario sin perder el tipado ni el autocompletado del IDE.
+  3. **Backend y Motor PostgreSQL (`OrdenMedicaService` y `main.py`):**
+     - En `OrdenMedicaService.cambiar_estado()`, si el usuario selecciona un estado personalizado que no forma parte del enum histórico inicial, se ejecuta de manera segura `ALTER TYPE estado_orden_enum ADD VALUE IF NOT EXISTS '{nombre}'` para que PostgreSQL acepte el nuevo valor sin rechazar la transacción.
+     - En el ciclo de arranque de FastAPI (`main.py` / `sync_database_columns`), se agregaron automáticamente al enum de Postgres todos los nombres existentes en la tabla `estados_orden_config`.
+
+  4. **Filtro de Reportes (`ReportesView.vue`):**
+     - Se convirtió el catálogo estático de estados del filtro de estadísticas y reportes en una propiedad computada reactiva conectada a `estadosStore.estados`, asegurando que cualquier estado agregado en el sistema esté disponible en los análisis y reportes configurables.

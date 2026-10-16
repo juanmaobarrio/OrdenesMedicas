@@ -10,7 +10,8 @@ export type EstadoOrden =
   | 'Auditoria Finalizada'
   | 'Dar de baja'
   | 'Cancelada'
-  | 'Cerrada';
+  | 'Cerrada'
+  | (string & {});
 
 export type EstadoSolicitud = 'PENDIENTE' | 'INFORMACION' | 'RESPONDIDA' | 'CERRADA';
 export type TipoLlamada =

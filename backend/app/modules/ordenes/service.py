@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sqlalchemy.orm import selectinload
@@ -505,24 +505,34 @@ class OrdenMedicaService:
         if not target_estado and not estado_cfg:
             raise AppException(status_code=400, detail="Debe especificar un estado_id o nuevo_estado valido")
 
-        # Asignar Enum si existe, o usar el estado por defecto
-        final_estado_enum = target_estado or EstadoOrden.INGRESO
+        # Asignar Enum si existe, o usar el nombre del estado configurado
+        final_estado_valor = target_estado.value if target_estado else estado_cfg.nombre
+        final_estado_obj = target_estado if target_estado else final_estado_valor
+
+        # Si el valor no está en el enum nativo de Postgres, agregarlo dinámicamente si aplica
+        try:
+            bind = self.db.get_bind()
+            if bind.dialect.name == "postgresql" and not target_estado:
+                safe_val = final_estado_valor.replace("'", "''")
+                await self.db.execute(text(f"ALTER TYPE estado_orden_enum ADD VALUE IF NOT EXISTS '{safe_val}'"))
+        except Exception:
+            pass
 
         # Comprobar requerimiento de motivo (si es cancelacion, baja o si la configuracion lo exige)
         requiere_motivo = (
-            final_estado_enum in (EstadoOrden.CANCELADA, EstadoOrden.DAR_DE_BAJA)
+            final_estado_valor in (EstadoOrden.CANCELADA.value, EstadoOrden.DAR_DE_BAJA.value)
             or (estado_cfg and estado_cfg.requiere_motivo)
-            or (estado_cfg and estado_cfg.tipo == TipoEstadoOrden.FINALIZACION and final_estado_enum != EstadoOrden.CERRADA)
+            or (estado_cfg and estado_cfg.tipo == TipoEstadoOrden.FINALIZACION and final_estado_valor != EstadoOrden.CERRADA.value)
         )
 
         if requiere_motivo and not dto.motivo:
             raise AppException(status_code=400, detail="Debe indicar el motivo del cambio de estado")
 
-        if final_estado_enum in (EstadoOrden.CANCELADA, EstadoOrden.DAR_DE_BAJA):
+        if final_estado_valor in (EstadoOrden.CANCELADA.value, EstadoOrden.DAR_DE_BAJA.value):
             orden.motivo_cancelacion = dto.motivo
 
         # Si pasa a 'Auditoria Finalizada', registrar observacion de resultado y habilitar llamada
-        if final_estado_enum == EstadoOrden.AUDITORIA_FINALIZADA:
+        if final_estado_valor == EstadoOrden.AUDITORIA_FINALIZADA.value:
             if dto.observacion_resultado:
                 orden.observacion_resultado_auditoria = dto.observacion_resultado
             elif dto.motivo:
@@ -582,10 +592,10 @@ class OrdenMedicaService:
                 orden.estudios_no_autorizados = dto.estudios_no_autorizados
 
         # Si pasa a 'Solicitudes de auditoria', habilitar llamada
-        if final_estado_enum == EstadoOrden.SOLICITUDES_AUDITORIA:
+        if final_estado_valor == EstadoOrden.SOLICITUDES_AUDITORIA.value:
             orden.llamada_solicitud_completada = False
 
-        orden.estado = final_estado_enum
+        orden.estado = final_estado_obj
 
         await self.db.flush()
 
@@ -611,8 +621,8 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="CAMBIO_ESTADO",
-                estado_anterior=estado_anterior.value,
-                estado_nuevo=final_estado_enum.value,
+                estado_anterior=_enum_str(estado_anterior),
+                estado_nuevo=final_estado_valor,
                 detalles=detalles_log,
                 ip_address=client_ip,
                 user_agent=user_agent,

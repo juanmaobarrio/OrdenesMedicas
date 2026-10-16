@@ -20,8 +20,10 @@ import Chart from 'primevue/chart';
 import Tag from 'primevue/tag';
 import LoadingSpinner from '../../components/common/LoadingSpinner.vue';
 import { useToast } from 'primevue/usetoast';
+import { useEstadosStore } from '../../stores/estados.store';
 
 const toast = useToast();
+const estadosStore = useEstadosStore();
 
 const sucursales = ref<Sucursal[]>([]);
 const mutuales = ref<ObraSocial[]>([]);
@@ -73,7 +75,7 @@ const opcionesTiempo = [
   { label: 'Por Año', value: 'anio' },
 ];
 
-const opcionesEstados = [
+const FALLBACK_ESTADOS = [
   { label: 'Ingreso', value: 'Ingreso' },
   { label: 'En Auditoría', value: 'en Auditoria' },
   { label: 'Solicitudes de Auditoría', value: 'Solicitudes de auditoria' },
@@ -83,6 +85,17 @@ const opcionesEstados = [
   { label: 'Dar de baja', value: 'Dar de baja' },
   { label: 'Cerrada', value: 'Cerrada' },
 ];
+
+const opcionesEstados = computed(() => {
+  if (!estadosStore.estados || estadosStore.estados.length === 0) {
+    return FALLBACK_ESTADOS;
+  }
+  return estadosStore.estados
+    .filter((e) => e.activo)
+    .slice()
+    .sort((a, b) => (a.orden_secuencia ?? 0) - (b.orden_secuencia ?? 0))
+    .map((e) => ({ label: e.nombre, value: e.nombre }));
+});
 
 const presets = [
   {
@@ -191,6 +204,7 @@ const ejecutarReporte = async () => {
 
 onMounted(async () => {
   try {
+    estadosStore.fetchEstados();
     const [sucRes, mutRes] = await Promise.all([
       usersService.listSucursales(),
       mutualesService.list(true),
