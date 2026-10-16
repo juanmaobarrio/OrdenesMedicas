@@ -459,8 +459,8 @@ class OrdenMedicaService:
                     orden_id=orden.id,
                     user_id=current_user.id,
                     accion="ACTUALIZACION_DATOS",
-                    estado_anterior=orden.estado.value,
-                    estado_nuevo=orden.estado.value,
+                    estado_anterior=_enum_str(orden.estado),
+                    estado_nuevo=_enum_str(orden.estado),
                     detalles=diff,
                     ip_address=client_ip,
                     user_agent=user_agent,
@@ -506,17 +506,7 @@ class OrdenMedicaService:
             raise AppException(status_code=400, detail="Debe especificar un estado_id o nuevo_estado valido")
 
         # Asignar Enum si existe, o usar el nombre del estado configurado
-        final_estado_valor = target_estado.value if target_estado else estado_cfg.nombre
-        final_estado_obj = target_estado if target_estado else final_estado_valor
-
-        # Si el valor no está en el enum nativo de Postgres, agregarlo dinámicamente si aplica
-        try:
-            bind = self.db.get_bind()
-            if bind.dialect.name == "postgresql" and not target_estado:
-                safe_val = final_estado_valor.replace("'", "''")
-                await self.db.execute(text(f"ALTER TYPE estado_orden_enum ADD VALUE IF NOT EXISTS '{safe_val}'"))
-        except Exception:
-            pass
+        final_estado_valor = target_estado.value if target_estado else (estado_cfg.nombre if estado_cfg else str(dto.nuevo_estado).strip())
 
         # Comprobar requerimiento de motivo (si es cancelacion, baja o si la configuracion lo exige)
         requiere_motivo = (
@@ -595,7 +585,7 @@ class OrdenMedicaService:
         if final_estado_valor == EstadoOrden.SOLICITUDES_AUDITORIA.value:
             orden.llamada_solicitud_completada = False
 
-        orden.estado = final_estado_obj
+        orden.estado = final_estado_valor
 
         await self.db.flush()
 
@@ -661,8 +651,8 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="ASIGNAR_AUDITOR",
-                estado_anterior=estado_anterior.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(estado_anterior),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={"auditor_id": str(dto.auditor_id) if dto.auditor_id else None},
                 ip_address=client_ip,
                 user_agent=user_agent,
@@ -705,7 +695,7 @@ class OrdenMedicaService:
                     orden_id=orden.id,
                     user_id=current_user.id,
                     accion="NUEVA_SOLICITUD_AUDITORIA",
-                    estado_anterior=estado_anterior.value,
+                    estado_anterior=_enum_str(estado_anterior),
                     estado_nuevo=EstadoOrden.SOLICITUDES_AUDITORIA.value,
                     detalles={
                         "solicitud_id": str(created_solicitud.id),
@@ -725,8 +715,8 @@ class OrdenMedicaService:
                     orden_id=orden.id,
                     user_id=current_user.id,
                     accion="NUEVA_OBSERVACION_INFORMATIVA",
-                    estado_anterior=estado_anterior.value,
-                    estado_nuevo=estado_anterior.value,
+                    estado_anterior=_enum_str(estado_anterior),
+                    estado_nuevo=_enum_str(estado_anterior),
                     detalles={
                         "solicitud_id": str(created_solicitud.id),
                         "motivo": dto.motivo_solicitud,
@@ -769,7 +759,7 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="RESPUESTA_SOLICITUD_AUDITORIA",
-                estado_anterior=estado_anterior.value,
+                estado_anterior=_enum_str(estado_anterior),
                 estado_nuevo=EstadoOrden.ACTUALIZADA.value,
                 detalles={
                     "solicitud_id": str(solicitud.id),
@@ -812,8 +802,8 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="SUBIDA_ADJUNTO",
-                estado_anterior=orden.estado.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(orden.estado),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={
                     "adjunto_id": str(created_adjunto.id),
                     "nombre_archivo": nombre_original,
@@ -840,9 +830,9 @@ class OrdenMedicaService:
         orden = await self.get_by_id(adjunto.orden_id)
 
         # Validar si la orden está en estado terminal
-        if orden.estado in [EstadoOrden.CANCELADA, EstadoOrden.DAR_DE_BAJA, EstadoOrden.CERRADA]:
+        if _enum_str(orden.estado) in [EstadoOrden.CANCELADA.value, EstadoOrden.DAR_DE_BAJA.value, EstadoOrden.CERRADA.value]:
             raise ForbiddenActionException(
-                f"No se pueden eliminar adjuntos de una orden en estado final '{orden.estado.value}'"
+                f"No se pueden eliminar adjuntos de una orden en estado final '{_enum_str(orden.estado)}'"
             )
 
         # Borrar archivo físico del disco si existe
@@ -858,8 +848,8 @@ class OrdenMedicaService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="ELIMINACION_ADJUNTO",
-                estado_anterior=orden.estado.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(orden.estado),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={
                     "adjunto_id": str(adjunto.id),
                     "nombre_archivo": adjunto.nombre_archivo_original,
@@ -1712,8 +1702,8 @@ class EmailResolucionService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="ENVIO_MAIL_RESOLUCION",
-                estado_anterior=orden.estado.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(orden.estado),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={
                     "destinatario": target_email,
                     "asunto": asunto,
@@ -1752,8 +1742,8 @@ class EmailResolucionService:
                 orden_id=orden.id,
                 user_id=current_user.id,
                 accion="CANCELACION_ENVIO_AUTO_MAIL",
-                estado_anterior=orden.estado.value,
-                estado_nuevo=orden.estado.value,
+                estado_anterior=_enum_str(orden.estado),
+                estado_nuevo=_enum_str(orden.estado),
                 detalles={"mensaje": "Operador frenó el despacho automático del correo"},
                 ip_address=client_ip,
                 user_agent=user_agent,

@@ -171,7 +171,7 @@ class DashboardService:
             total = cop + no_aut + apb
             writer.writerow([
                 o.nro_orden,
-                o.estado.value,
+                o.estado.value if hasattr(o.estado, "value") else str(o.estado or ""),
                 o.paciente.documento if o.paciente else "",
                 o.paciente.nombre_completo if o.paciente else "",
                 o.mutual,

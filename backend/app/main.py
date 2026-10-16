@@ -256,29 +256,39 @@ def sync_database_columns(connection):
                 true
             )
             """,
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'ordenes_medicas'
+                      AND column_name = 'estado'
+                      AND data_type = 'USER-DEFINED'
+                ) THEN
+                    ALTER TABLE ordenes_medicas ALTER COLUMN estado DROP DEFAULT;
+                    ALTER TABLE ordenes_medicas ALTER COLUMN estado TYPE VARCHAR(100) USING estado::VARCHAR(100);
+                    ALTER TABLE ordenes_medicas ALTER COLUMN estado SET DEFAULT 'Ingreso';
+                END IF;
+            END $$;
+            """,
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'auditoria_logs' AND column_name = 'estado_anterior'
+                ) THEN
+                    ALTER TABLE auditoria_logs ALTER COLUMN estado_anterior TYPE VARCHAR(100);
+                    ALTER TABLE auditoria_logs ALTER COLUMN estado_nuevo TYPE VARCHAR(100);
+                END IF;
+            END $$;
+            """,
         ]
         for stmt in postgres_statements:
             try:
                 connection.execute(text(stmt))
             except Exception as e:
                 logger.warning(f"Aviso ejecutando '{stmt}': {e}")
-
-        # Sincronizar dinámicamente nuevos estados configurados en PostgreSQL si la tabla ya existe
-        try:
-            from sqlalchemy import inspect
-            if inspect(connection).has_table("estados_orden_config"):
-                rows = connection.execute(text("SELECT nombre FROM estados_orden_config")).fetchall()
-                for row in rows:
-                    st_name = row[0]
-                    if st_name:
-                        # Limpiar comillas simples por seguridad
-                        safe_name = st_name.replace("'", "''")
-                        try:
-                            connection.execute(text(f"ALTER TYPE estado_orden_enum ADD VALUE IF NOT EXISTS '{safe_name}'"))
-                        except Exception:
-                            pass
-        except Exception as e_enum:
-            logger.warning(f"Aviso sincronizando enum de estados en postgres: {e_enum}")
 
         migrate_plantilla_aviso_orden_fisica(connection)
 

@@ -97,9 +97,9 @@ class OrdenMedica(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 
     # Estado del ciclo de vida
-    estado: Mapped[EstadoOrden] = mapped_column(
-        SQLEnum(EstadoOrden, name="estado_orden_enum"),
-        default=EstadoOrden.INGRESO,
+    estado: Mapped[str] = mapped_column(
+        String(100),
+        default=EstadoOrden.INGRESO.value,
         nullable=False,
         index=True,
     )
@@ -414,8 +414,8 @@ class AuditoriaLog(Base, UUIDPrimaryKeyMixin):
     accion: Mapped[str] = mapped_column(
         String(80), nullable=False, comment="Ej: CREACION, CAMBIO_ESTADO, ADJUNTAR_DOCUMENTO"
     )
-    estado_anterior: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    estado_nuevo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    estado_anterior: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    estado_nuevo: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     detalles: Mapped[Dict[str, Any]] = mapped_column(
         JSON_TYPE, default=dict, nullable=False, comment="Payload con snapshot del cambio"
     )

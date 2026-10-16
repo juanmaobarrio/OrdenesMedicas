@@ -132,6 +132,33 @@ async def fix_and_inspect():
                     true
                 );
                 """,
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'ordenes_medicas'
+                          AND column_name = 'estado'
+                          AND data_type = 'USER-DEFINED'
+                    ) THEN
+                        ALTER TABLE ordenes_medicas ALTER COLUMN estado DROP DEFAULT;
+                        ALTER TABLE ordenes_medicas ALTER COLUMN estado TYPE VARCHAR(100) USING estado::VARCHAR(100);
+                        ALTER TABLE ordenes_medicas ALTER COLUMN estado SET DEFAULT 'Ingreso';
+                    END IF;
+                END $$;
+                """,
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'auditoria_logs' AND column_name = 'estado_anterior'
+                    ) THEN
+                        ALTER TABLE auditoria_logs ALTER COLUMN estado_anterior TYPE VARCHAR(100);
+                        ALTER TABLE auditoria_logs ALTER COLUMN estado_nuevo TYPE VARCHAR(100);
+                    END IF;
+                END $$;
+                """,
             ]
             for stmt in postgres_statements:
                 try:

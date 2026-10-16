@@ -1320,3 +1320,27 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
 
   4. **Filtro de Reportes (`ReportesView.vue`):**
      - Se convirtió el catálogo estático de estados del filtro de estadísticas y reportes en una propiedad computada reactiva conectada a `estadosStore.estados`, asegurando que cualquier estado agregado en el sistema esté disponible en los análisis y reportes configurables.
+
+
+---
+
+## 34. DESACOPLAMIENTO DE `ordenes_medicas.estado` HACIA TIPO DINÁMICO VARCHAR (POSTGRESQL Y SQLALCHEMY)
+
+- **Problema / Incidente Detectado:**
+  Al intentar asignar un estado personalizado recientemente creado (ej: `'Todo Rechazado'`) a una orden médica, la API retornaba un error 500:
+  `Error interno del servidor: 'Todo Rechazado' is not among the defined enum values. Enum name: estado_orden_enum. Possible values: INGRESO, EN_AUDITORI.., SOLICITUDES.., ..., CERRADA`.
+  Esto ocurrió por dos motivos estructurales:
+  1. En el modelo SQLAlchemy (`OrdenMedica.estado`), la columna estaba anotada como `SQLEnum(EstadoOrden, name="estado_orden_enum")`. SQLAlchemy validaba a nivel de Python que el valor perteneciera a la clase Enum interna estática `EstadoOrden`.
+  2. En el motor PostgreSQL, la columna física `ordenes_medicas.estado` fue creada como tipo `estado_orden_enum`, rechazando cualquier valor no perteneciente al catálogo estático histórico.
+
+- **Solución Implementada:**
+  1. **Modelo ORM (`backend/app/modules/ordenes/models.py`):**
+     - Se modificó `OrdenMedica.estado` para que sea `Mapped[str] = mapped_column(String(100), default=EstadoOrden.INGRESO.value, nullable=False, index=True)`.
+     - Se ampliaron `auditoria_logs.estado_anterior` y `estado_nuevo` a `String(100)`.
+  2. **Migración de Alembic (`0009_convert_ordenes_medicas_estado_to_varchar.py`):**
+     - Convierte de forma no destructiva e idempotente la columna `estado` en PostgreSQL de Enum a `VARCHAR(100)` mediante `USING estado::VARCHAR(100)`.
+     - Preserva íntegramente todos los registros históricos existentes.
+  3. **Auto-actualización en Lifespan (`backend/app/main.py` y `migrar_columnas.py`):**
+     - Se incorporó la verificación y conversión condicional en `sync_database_columns` para que en cualquier reinicio de contenedor se actualice de forma transparente.
+  4. **Lógica de Servicio (`backend/app/modules/ordenes/service.py` y `dashboard/service.py`):**
+     - Se reemplazaron todos los accesos directos `.estado.value` por la función utilitaria `_enum_str(...)`, garantizando compatibilidad total tanto con instancias de Enum como con cadenas de texto planas.
