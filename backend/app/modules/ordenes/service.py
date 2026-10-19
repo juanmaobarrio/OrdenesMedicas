@@ -436,6 +436,8 @@ class OrdenMedicaService:
             orden.contacto_email = dto.contacto_email.strip().lower()
 
         if dto.observaciones_ingreso is not None:
+            if dto.observaciones_ingreso != orden.observaciones_ingreso:
+                diff["observaciones_ingreso"] = dto.observaciones_ingreso
             orden.observaciones_ingreso = dto.observaciones_ingreso
 
         if dto.debe_orden_medica is not None:

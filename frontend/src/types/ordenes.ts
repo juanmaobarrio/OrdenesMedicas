@@ -63,6 +63,25 @@ export interface RegistroLlamada {
   created_at: string;
 }
 
+export interface ObservacionUnificada {
+  id: string;
+  tipo: 'RESOLUCION' | 'SOLICITUD' | 'CANCELACION' | 'CAMBIO_ESTADO' | 'INGRESO' | 'ACTUALIZACION';
+  titulo: string;
+  mensaje: string;
+  usuario?: string;
+  fecha: string;
+  fechaFormateada: string;
+  badgeLabel: string;
+  badgeSeverity: 'info' | 'warn' | 'danger' | 'success' | 'secondary' | 'contrast';
+  badgeIcon: string;
+  cardBgClass: string;
+  cardBorderClass: string;
+  solicitudId?: string | null;
+  solicitudEstado?: string | null;
+  respuestaOperador?: string | null;
+  respondidoPor?: string | null;
+}
+
 export interface AuditoriaLog {
   id: string;
   orden_id: string;

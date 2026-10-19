@@ -34,6 +34,7 @@ import { formatDate, formatDateTime, parseDate, toISODate, semaforoVencimiento }
 import { useToast } from 'primevue/usetoast';
 import { useFeaturesStore } from '../../stores/features.store';
 import { useEstadosStore } from '../../stores/estados.store';
+import { extraerObservacionesUnificadas } from '../../utils/observaciones';
 
 const route = useRoute();
 const router = useRouter();
@@ -222,6 +223,8 @@ const reintegroCalculado = computed(() => {
   const abonado = Number(orden.value.monto_abonado_atencion || 0);
   return abonado - costoTotalAuditoria.value;
 });
+
+const todasLasObservaciones = computed(() => extraerObservacionesUnificadas(orden.value));
 
 const handleOpenEditOrden = () => {
   if (!orden.value) return;
@@ -1023,7 +1026,7 @@ const handleCancelarEnvioAuto = async () => {
           <Tabs v-model:value="activeTab">
             <TabList>
               <Tab value="0">
-                <i class="pi pi-exclamation-circle mr-1"></i> Observaciones ({{ orden.solicitudes?.length || 0 }})
+                <i class="pi pi-comments mr-1"></i> Observaciones ({{ todasLasObservaciones.length }})
               </Tab>
               <Tab value="1">
                 <i class="pi pi-paperclip mr-1"></i> Adjuntos ({{ orden.adjuntos?.length || 0 }})
@@ -1039,106 +1042,88 @@ const handleCancelarEnvioAuto = async () => {
               </Tab>
             </TabList>
             <TabPanels>
-              <!-- Tab 0: Solicitudes de Auditoría -->
+              <!-- Tab 0: Todas las Observaciones (Historial Unificado Descendente) -->
               <TabPanel value="0">
                 <div class="p-4 space-y-4">
-                  <!-- Resolución Final de Auditoría (Verde / Éxito) -->
-                  <div
-                    v-if="orden.observacion_resultado_auditoria"
-                    class="p-4 rounded-xl border border-emerald-300 bg-emerald-50/90 space-y-2 text-xs shadow-sm"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <i class="pi pi-check-circle text-emerald-600 text-base"></i>
-                        <span class="font-bold text-emerald-950 uppercase tracking-wide">
-                          Resolución Final de Auditoría Médica
-                        </span>
-                      </div>
-                      <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">
-                        Aprobada / Resuelta
-                      </span>
-                    </div>
-                    <p class="text-slate-800 bg-white p-3 rounded-lg border border-emerald-200 leading-relaxed font-medium">
-                      {{ orden.observacion_resultado_auditoria }}
-                    </p>
-                    <div class="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 pt-1 border-t border-emerald-200/60 gap-2">
-                      <span>Copago: <strong>${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
-                      <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">No Autorizados: <strong>${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
-                      <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0">APB: <strong>${{ Number(orden.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
-                      <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
-                    </div>
-
-                    <!-- Desglose de reintegro en resolución final si ya se atendió (Feature Flag) -->
-                    <div v-if="featuresStore.isAtencionPreviaEnabled && orden.ya_se_atendio" class="mt-2 pt-2 border-t border-emerald-300/80 bg-emerald-100/70 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                      <div>
-                        <span class="font-bold text-emerald-950 uppercase flex items-center gap-1">
-                          <i class="pi pi-wallet text-emerald-700"></i>
-                          {{ reintegroCalculado >= 0 ? 'Reintegro a Realizar al Paciente:' : 'Saldo a Abonar por el Paciente:' }}
-                        </span>
-                        <span class="text-[10px] text-emerald-800">
-                          Abonó al atenderse: ${{ Number(orden.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} | Costo según auditoría: ${{ costoTotalAuditoria.toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
-                        </span>
-                      </div>
-                      <span class="font-mono font-extrabold text-sm" :class="reintegroCalculado >= 0 ? 'text-emerald-900' : 'text-red-700'">
-                        ${{ Math.abs(reintegroCalculado).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
-                        <span class="text-[10px] font-sans font-bold">({{ reintegroCalculado >= 0 ? 'A FAVOR' : 'A PAGAR' }})</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div v-if="orden.solicitudes.length === 0 && !orden.observacion_resultado_auditoria" class="text-center py-8 text-sm text-slate-400">
-                    No hay observaciones de auditoría registradas.
+                  <div v-if="todasLasObservaciones.length === 0" class="text-center py-8 text-sm text-slate-400">
+                    No hay observaciones ni registros para esta orden.
                   </div>
                   <div
-                    v-for="sol in orden.solicitudes"
-                    :key="sol.id"
-                    class="p-4 rounded-xl border space-y-3"
-                    :class="{
-                      'bg-blue-50/70 border-blue-300 text-blue-900': sol.estado === 'INFORMACION',
-                      'bg-amber-50/50 border-amber-200': sol.estado === 'PENDIENTE',
-                      'bg-slate-50 border-slate-200': sol.estado !== 'INFORMACION' && sol.estado !== 'PENDIENTE',
-                    }"
+                    v-for="obs in todasLasObservaciones"
+                    :key="obs.id"
+                    class="p-4 rounded-xl border space-y-3 shadow-sm transition"
+                    :class="[obs.cardBgClass, obs.cardBorderClass]"
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-2">
                       <div>
                         <span
-                          class="text-xs font-bold uppercase"
-                          :class="sol.estado === 'INFORMACION' ? 'text-blue-950' : 'text-amber-800'"
+                          class="text-xs font-bold uppercase tracking-wide block"
+                          :class="obs.tipo === 'CANCELACION' ? 'text-red-950' : (obs.tipo === 'RESOLUCION' ? 'text-emerald-950' : (obs.tipo === 'SOLICITUD' ? (obs.badgeSeverity === 'info' ? 'text-blue-950' : 'text-amber-950') : 'text-slate-800'))"
                         >
-                          {{ sol.motivo_solicitud }}
+                          {{ obs.titulo }}
                         </span>
-                        <p class="text-xs text-slate-500">Por Dr/a. {{ sol.auditor?.full_name }} &bull; {{ sol.created_at.slice(0, 16).replace('T', ' ') }}</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5">
+                          Por {{ obs.usuario }} &bull; {{ obs.fechaFormateada }}
+                        </p>
                       </div>
                       <span
-                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1"
+                        class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase flex items-center gap-1 shrink-0"
                         :class="{
-                          'bg-blue-100 text-blue-800 border border-blue-200': sol.estado === 'INFORMACION',
-                          'bg-amber-200 text-amber-900': sol.estado === 'PENDIENTE',
-                          'bg-emerald-100 text-emerald-800': sol.estado === 'RESPONDIDA' || sol.estado === 'CERRADA',
+                          'bg-red-100 text-red-800 border border-red-300': obs.badgeSeverity === 'danger',
+                          'bg-emerald-100 text-emerald-800 border border-emerald-300': obs.badgeSeverity === 'success',
+                          'bg-amber-100 text-amber-900 border border-amber-300': obs.badgeSeverity === 'warn',
+                          'bg-blue-100 text-blue-800 border border-blue-200': obs.badgeSeverity === 'info',
+                          'bg-slate-200 text-slate-800 border border-slate-300': obs.badgeSeverity === 'contrast' || obs.badgeSeverity === 'secondary',
                         }"
                       >
-                        <i v-if="sol.estado === 'INFORMACION'" class="pi pi-info-circle text-[9px]"></i>
-                        <i v-else-if="sol.estado === 'PENDIENTE'" class="pi pi-clock text-[9px]"></i>
-                        <i v-else class="pi pi-check text-[9px]"></i>
-                        {{ sol.estado === 'INFORMACION' ? 'INFORMACIÓN' : sol.estado }}
+                        <i :class="[obs.badgeIcon, 'text-[10px]']"></i>
+                        {{ obs.badgeLabel }}
                       </span>
                     </div>
-                    <p class="text-sm text-slate-700 bg-white p-3 rounded border border-slate-200 leading-relaxed">{{ sol.mensaje_auditor }}</p>
 
-                    <!-- Respuesta si existe -->
-                    <div v-if="sol.respuesta_operador" class="p-3 bg-emerald-50 rounded border border-emerald-200 space-y-1">
-                      <p class="text-[11px] font-bold text-emerald-800 uppercase">Respuesta de Sucursal (por {{ sol.respondido_por?.full_name }})</p>
-                      <p class="text-xs text-slate-700">{{ sol.respuesta_operador }}</p>
+                    <p class="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-200/90 leading-relaxed font-medium">
+                      {{ obs.mensaje }}
+                    </p>
+
+                    <!-- Si es resolución de auditoría, adjuntar desglose financiero y reintegro -->
+                    <div v-if="obs.tipo === 'RESOLUCION'" class="space-y-2 pt-1 border-t border-emerald-200/60">
+                      <div class="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 gap-2">
+                        <span>Copago: <strong>${{ Number(orden.valor_copago || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                        <span v-if="Number(orden.valor_estudios_no_autorizados || 0) > 0">No Autorizados: <strong>${{ Number(orden.valor_estudios_no_autorizados).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                        <span v-if="orden.abona_apb || Number(orden.valor_apb || 0) > 0">APB: <strong>${{ Number(orden.valor_apb || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}</strong></span>
+                        <span>Total a Cobrar: <strong>${{ (Number(orden.valor_copago || 0) + Number(orden.valor_estudios_no_autorizados || 0) + Number(orden.valor_apb || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                      </div>
+                      <div v-if="featuresStore.isAtencionPreviaEnabled && orden.ya_se_atendio" class="pt-2 border-t border-emerald-300/80 bg-emerald-100/70 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div>
+                          <span class="font-bold text-emerald-950 uppercase flex items-center gap-1">
+                            <i class="pi pi-wallet text-emerald-700"></i>
+                            {{ reintegroCalculado >= 0 ? 'Reintegro a Realizar al Paciente:' : 'Saldo a Abonar por el Paciente:' }}
+                          </span>
+                          <span class="text-[10px] text-emerald-800">
+                            Abonó al atenderse: ${{ Number(orden.monto_abonado_atencion || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) }} | Costo según auditoría: ${{ costoTotalAuditoria.toLocaleString('es-AR', { minimumFractionDigits: 2 }) }}
+                          </span>
+                        </div>
+                        <span class="font-mono font-extrabold text-sm" :class="reintegroCalculado >= 0 ? 'text-emerald-900' : 'text-red-700'">
+                          ${{ Math.abs(reintegroCalculado).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                          <span class="text-[10px] font-sans font-bold">({{ reintegroCalculado >= 0 ? 'A FAVOR' : 'A PAGAR' }})</span>
+                        </span>
+                      </div>
                     </div>
 
-                    <!-- Boton para responder solo si esta pendiente -->
-                    <div v-else-if="sol.estado === 'PENDIENTE'" class="pt-2">
+                    <!-- Respuesta de sucursal si existe -->
+                    <div v-if="obs.respuestaOperador" class="p-3 bg-emerald-50 rounded-lg border border-emerald-200 space-y-1">
+                      <p class="text-[11px] font-bold text-emerald-800 uppercase">Respuesta de Sucursal {{ obs.respondidoPor ? `(por ${obs.respondidoPor})` : '' }}</p>
+                      <p class="text-xs text-slate-700">{{ obs.respuestaOperador }}</p>
+                    </div>
+
+                    <!-- Botón responder si es una solicitud pendiente -->
+                    <div v-else-if="obs.tipo === 'SOLICITUD' && obs.solicitudEstado === 'PENDIENTE'" class="pt-1">
                       <Button
                         label="Responder Observación"
                         icon="pi pi-reply"
                         size="small"
                         severity="primary"
-                        @click="selectedSolicitudId = sol.id; isResponderVisible = true"
+                        @click="selectedSolicitudId = obs.solicitudId || null; isResponderVisible = true"
                       />
                     </div>
                   </div>

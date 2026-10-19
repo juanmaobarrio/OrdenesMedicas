@@ -1363,3 +1363,25 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
        Traduce cualquier código en mayúsculas presente en `ordenes_medicas.estado` y `auditoria_logs` a su correspondiente nombre descriptivo (`'Ingreso'`, `'en Auditoria'`, `'Solicitudes de auditoria'`, `'Actualizada'`, `'Auditoria Finalizada'`, `'Dar de baja'`, `'Cancelada'`, `'Cerrada'`), además de mapear dinámicamente cualquier código contra `estados_orden_config.nombre`.
   3. **Lógica de Creación y Transición en Servicio (`service.py`):**
      - En todos los métodos de creación y actualización (`create`, `update`, `cambiar_estado`), `orden.estado` se inicializa y persiste siempre con el nombre descriptivo (`EstadoOrden.INGRESO.value`, `estado_cfg.nombre`).
+
+
+---
+
+## 36. CONSOLIDACIÓN CRONOLÓGICA DESCENDENTE DE OBSERVACIONES EN DETALLE DE ÓRDENES
+
+- **Requerimiento:**
+  En el expediente de la orden médica, las observaciones cargadas en distintos momentos y movimientos (observaciones de ingreso, notas y solicitudes de auditoría médica, motivos de cancelación o baja, y observaciones de cambio de estado) no se podían consultar en un único lugar unificado. Se solicitó que la pestaña **Observaciones** presente todas las observaciones históricas de la orden médica en estricto orden cronológico descendente (la más nueva primero, la más antigua al final).
+
+- **Solución Implementada:**
+  1. **Motor de Unificación (`frontend/src/utils/observaciones.ts`):**
+     - Se implementó la función pura `extraerObservacionesUnificadas(orden)`, que recopila y normaliza todas las observaciones de la orden:
+       - Observaciones emitidas en solicitudes o notas de auditoría médica (`orden.solicitudes`), incluyendo las respuestas de la sucursal.
+       - Motivos y detalles cargados en transiciones de estado, cancelaciones y bajas registrados en `orden.audit_logs`.
+       - Observaciones o motivos de cancelación históricos (`orden.motivo_cancelacion`).
+       - Resolución final de auditoría médica (`orden.observacion_resultado_auditoria`) con su desglose financiero.
+       - Observación de ingreso original (`orden.observaciones_ingreso`) y sus posteriores actualizaciones registradas en bitácora.
+     - Aplica ordenamiento cronológico descendente: `sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())`.
+  2. **Vistas Frontend (`OrdenDetailView.vue` y `OrdenDetailPanel.vue`):**
+     - Ambas vistas conectan la pestaña a `todasLasObservaciones`, mostrando el contador total consolidado en la cabecera de la pestaña: `Observaciones ({{ todasLasObservaciones.length }})`.
+     - Cada observación se renderiza en una tarjeta diferenciada con badge temático (Rojo para Cancelación/Baja, Verde para Resolución Aprobada, Amarillo para Solicitud Pendiente, Azul para Nota Informativa/Ingreso), indicando autor y fecha/hora formateada.
+     - Permite responder solicitudes pendientes directamente desde la tarjeta correspondiente.
