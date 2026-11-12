@@ -5,7 +5,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: ordenes_medicas_postgres
-    restart: unless-stopped
+    restart: always
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -31,7 +31,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: ordenes_medicas_backend
-    restart: unless-stopped
+    restart: always
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,7 +71,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: ordenes_medicas_frontend
-    restart: unless-stopped
+    restart: always
     environment:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
     depends_on:

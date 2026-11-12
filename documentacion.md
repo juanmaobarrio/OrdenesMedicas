@@ -1385,3 +1385,22 @@ Se actualizó la condición `v-if` en todas las vistas y componentes que contien
      - Ambas vistas conectan la pestaña a `todasLasObservaciones`, mostrando el contador total consolidado en la cabecera de la pestaña: `Observaciones ({{ todasLasObservaciones.length }})`.
      - Cada observación se renderiza en una tarjeta diferenciada con badge temático (Rojo para Cancelación/Baja, Verde para Resolución Aprobada, Amarillo para Solicitud Pendiente, Azul para Nota Informativa/Ingreso), indicando autor y fecha/hora formateada.
      - Permite responder solicitudes pendientes directamente desde la tarjeta correspondiente.
+
+---
+
+## 30. OPTIMIZACIÓN DE TOLERANCIA A REINICIOS EN HARDWARE LOCAL (ZIMABOARD / ZIMAOS)
+
+### 30.1 Diagnóstico de Falla en Arranque en Frío
+Al reiniciar la ZimaBoard con ZimaOS, se detectó que el motor Docker levantaba los contenedores simultáneamente sin respetar el orden secuencial de dependencias:
+1. **Falla en Backend:** El contenedor FastAPI intentaba conectarse a PostgreSQL antes de que el motor de base de datos completara su inicio y montaje de volumen, arrojando `[Errno -2] Name or service not known` y terminando en `Exited (0)`.
+2. **Falla en Frontend:** Nginx Alpine intentaba resolver en tiempo de inicio el host estático `proxy_pass http://backend:8000/api/`. Al estar el backend apagado, Nginx abortaba inmediatamente con `[emerg] host not found in upstream "backend"` y entraba en bucle continuo de reinicio (`Restarting (1)`).
+
+### 30.2 Solución Definitiva Implementada
+1. **Espera Activa con Reintentos en `backend/entrypoint.sh`:**
+   - Se añadió un bucle con socket TCP que sondea `POSTGRES_SERVER:5432` con hasta 30 reintentos (60 segundos) antes de ejecutar migraciones o lanzar Uvicorn.
+   - Si PostgreSQL tarda unos segundos en iniciar en el boot, el script espera pacientemente y continúa sin crashear.
+2. **Resolución DNS Dinámica en Nginx (`frontend/nginx.conf`):**
+   - Se incorporó la directiva `resolver 127.0.0.11 valid=10s ipv6=off;` (el DNS interno de Docker) y se asignó el destino a una variable dinámica `set $backend_upstream http://backend:8000;`.
+   - Nginx no valida la existencia del backend en el segundo 0 del booteo, permitiendo que Nginx inicie y sirva la SPA de inmediato, resolviendo el backend dinámicamente cuando este se encuentre listo.
+3. **Política de Reinicio `restart: always` en `docker-compose.yml`:**
+   - Se cambiaron todos los servicios de `unless-stopped` a `always`, garantizando que Docker mantenga los contenedores en ejecución permanente tras cualquier corte de energía o reinicio del hardware sin requerir intervención manual vía SSH.

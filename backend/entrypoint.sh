@@ -3,6 +3,24 @@ set -e
 
 echo "=== Iniciando Backend de Sistema de Órdenes Médicas ==="
 
+# Esperar activamente a que PostgreSQL esté disponible y responda
+DB_HOST="${POSTGRES_SERVER:-postgres}"
+DB_PORT="${POSTGRES_PORT:-5432}"
+
+echo "Esperando conexión a PostgreSQL en $DB_HOST:$DB_PORT..."
+MAX_RETRIES=30
+COUNT=0
+while ! python -c "import socket; s = socket.socket(); s.settimeout(2); s.connect(('$DB_HOST', int('$DB_PORT'))); s.close()" 2>/dev/null; do
+    COUNT=$((COUNT + 1))
+    if [ $COUNT -ge $MAX_RETRIES ]; then
+        echo "Aviso: Se superó el tiempo de espera por PostgreSQL. Continuando de todos modos..."
+        break
+    fi
+    echo "PostgreSQL no responde aún ($COUNT/$MAX_RETRIES). Esperando 2 segundos..."
+    sleep 2
+done
+echo "Conexión con PostgreSQL establecida correctamente."
+
 # Ejecutar migraciones de Alembic si existe la configuración
 if [ -f "backend/alembic.ini" ]; then
     echo "Aplicando migraciones de base de datos..."
